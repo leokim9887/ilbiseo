@@ -1,0 +1,76 @@
+import type { Task, TaskKind } from "./types";
+
+const KIND_ORDER: Record<TaskKind, number> = {
+  spot: 0,
+  ongoing: 1,
+  someday: 2,
+};
+
+function score(task: Task): number {
+  return task.urgency * 10 + task.importance;
+}
+
+/** 아버지 정렬 규칙: 스팟 → 지속(목표일) → 언젠가(시급·중요), 유사 할일 묶음 */
+export function sortTasks(tasks: Task[]): Task[] {
+  const active = tasks.filter((t) => t.status === "active");
+  const byGroup = new Map<string, Task[]>();
+
+  for (const task of active) {
+    const key = (task.groupKey || task.title).trim().toLowerCase() || "_";
+    const list = byGroup.get(key) ?? [];
+    list.push(task);
+    byGroup.set(key, list);
+  }
+
+  const groupEntries = [...byGroup.entries()].map(([key, items]) => {
+    const sortedItems = [...items].sort(compareWithinGroup);
+    const representative = sortedItems[0];
+    return { key, items: sortedItems, representative };
+  });
+
+  groupEntries.sort((a, b) =>
+    compareTasks(a.representative, b.representative),
+  );
+
+  return groupEntries.flatMap((g) => g.items);
+}
+
+function compareWithinGroup(a: Task, b: Task): number {
+  return compareTasks(a, b) || a.title.localeCompare(b.title, "ko");
+}
+
+function compareTasks(a: Task, b: Task): number {
+  const kindDiff = KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
+  if (kindDiff !== 0) return kindDiff;
+
+  if (a.kind === "ongoing" || a.kind === "spot") {
+    const da = a.targetDate ?? "9999-12-31";
+    const db = b.targetDate ?? "9999-12-31";
+    if (da !== db) return da.localeCompare(db);
+  }
+
+  const scoreDiff = score(b) - score(a);
+  if (scoreDiff !== 0) return scoreDiff;
+
+  return a.createdAt.localeCompare(b.createdAt);
+}
+
+export function sortCompleted(tasks: Task[]): Task[] {
+  return tasks
+    .filter((t) => t.status === "completed")
+    .sort((a, b) =>
+      (b.completedAt ?? "").localeCompare(a.completedAt ?? ""),
+    );
+}
+
+export function inferGroupKey(title: string): string {
+  const cleaned = title
+    .replace(/\d+/g, "")
+    .replace(/[()[\]【】]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  const tokens = cleaned.split(" ").filter(Boolean);
+  if (tokens.length === 0) return title.trim().toLowerCase() || "기타";
+  return tokens.slice(0, 2).join(" ");
+}

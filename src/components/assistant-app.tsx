@@ -8,6 +8,8 @@ import { OcrImport } from "@/components/ocr-import";
 import { CalendarImport } from "@/components/calendar-import";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InstallHint } from "@/components/install-hint";
+import { WelcomeBanner } from "@/components/welcome-banner";
 import { Plus, RotateCcw, Loader2 } from "lucide-react";
 
 export function AssistantApp() {
@@ -54,10 +56,16 @@ export function AssistantApp() {
   const somedayCount = activeTasks.filter((t) => t.kind === "someday").length;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+    <div className="flex min-h-full flex-1 flex-col">
+      <InstallHint />
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-4 py-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:gap-6 sm:px-6 sm:py-8">
+      <WelcomeBanner />
       <header className="animate-fade-up space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
+            <p className="text-[11px] font-semibold tracking-[0.08em] text-[var(--ink-muted)] uppercase">
+              아버지용 · 이 기기 전용
+            </p>
             <p className="font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--brand)] sm:text-5xl">
               일비서
             </p>
@@ -139,6 +147,7 @@ export function AssistantApp() {
           </TabsContent>
         </Tabs>
       </section>
+      </div>
     </div>
   );
 }

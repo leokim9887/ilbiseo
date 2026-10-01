@@ -3,55 +3,55 @@
 아버지 전용 헤드헌팅 **할 일·일정 개인 비서** (로그인·다중 사용자 없음).  
 엑셀 「할 일 계획 및 정리 방법」 규칙을 웹·홈 화면 앱처럼 쓸 수 있게 옮긴 도구입니다.
 
-## 기능
+## 목표 형태
 
-- 엑셀형 TO DO 그리드 (추가·수정·삭제·완료)
-- 정렬: **스팟(당일)** → **지속(~목표일)** → **언젠가(시급·중요)**, 유사 할일 묶음
-- 완료 기록 아카이브
-- 메모 붙여넣기 / OCR(mock) / 캘린더 mock·ICS·JSON
-- `localStorage` 저장 + **PWA**(홈 화면 추가, 오프라인 셸)
+입력된 일정·할 일 → **매일 정해진 시각** → 메일/문자/메신저로 **중요도 순 브리핑** → 같은 내용을 **엑셀로 저장**.  
+(발송 시각·채널·엑셀 보관 위치는 아직 미확정)
+
+## 지금 되는 것
+
+- 엑셀형 TO DO 그리드, 스팟→지속→언젠가 정렬·유사 묶음, 완료 기록
+- 메모 / OCR(mock) / 캘린더 mock·ICS·JSON, `localStorage` + **PWA**
+- **오늘 브리핑** 미리보기 + 「지금 생성」
+- 희망 발송 시각 설정 (기본 07:30, 로컬 표시용 — 실제 cron 없음)
+- **엑셀(.xlsx) 다운로드** (오늘 브리핑 / 브리핑 요약 / 완료 기록 시트)
+- `POST /api/daily-briefing` 스케줄러 뼈대 (dry-run: JSON + xlsx base64, **실제 메일 미발송**)
+
+## 아직 대기 (확정 후 연결)
+
+- 매일 발송 **시각**
+- 알림 **채널** (메일 권장 / 문자 / 카카오 등)
+- 엑셀 **보관 위치** (메일 첨부 vs 드라이브 누적)
+- 실 Google Calendar OAuth / 실 OCR / 기기 간 동기화
 
 ## 로컬 실행
 
 ```bash
 npm install
-npm run dev          # http://127.0.0.1:4317
-# 또는 프로덕션
-npm run build && npm run start
+npm run build && npm run start   # http://127.0.0.1:4317
+# 개발: npm run dev
 ```
 
-## 배포 (Vercel — 한 줄)
+### 스케줄러 dry-run 예시
 
-이 환경에는 Vercel 토큰이 없어 여기서 공개 URL을 올리지 못했습니다. 로컬/본인 계정에서:
+```bash
+curl -s -X POST http://127.0.0.1:4317/api/daily-briefing \
+  -H 'Content-Type: application/json' \
+  -d '{"tasks":[],"send":false}'
+```
+
+## 배포
 
 ```bash
 npx vercel --prod
+# 또는 익명 임시: npx vercel deploy --temporary
 ```
 
-또는 GitHub/Origin 저장소를 [Vercel](https://vercel.com)에 Import → Framework: Next.js → Deploy.  
-`vercel.json`과 `next.config.ts`에 Service Worker·매니페스트 헤더가 포함되어 있습니다.
+## 아버지 설치 (PWA)
 
-배포 후 아버지 폰에서 HTTPS URL을 열고 아래처럼 홈 화면에 추가하면 됩니다.
-
-## 아버지 설치 방법
-
-### iPhone / iPad (Safari)
-1. Safari로 일비서 주소를 연다  
-2. 하단 **공유** 버튼 탭  
-3. **홈 화면에 추가** → 추가  
-
-### Android (Chrome)
-1. Chrome으로 일비서 주소를 연다  
-2. 메뉴(⋮) → **앱 설치** 또는 **홈 화면에 추가**  
-3. (안내 배너의 **설치**가 보이면 그걸로도 가능)
-
-설치 후 아이콘으로 열면 전체 화면(앱처럼)으로 동작하고, 할 일 데이터는 **그 기기 브라우저**에 남습니다.
+- **iPhone**: Safari → 공유 → 홈 화면에 추가  
+- **Android**: Chrome ⋮ → 앱 설치 / 홈 화면에 추가  
 
 ## 스택
 
-Next.js · TypeScript · Tailwind · shadcn/ui · PWA (manifest + service worker)
-
-## 의도적으로 미룸
-
-- Google Calendar OAuth / 실 OCR API  
-- 계정·동기화·다중 기기 공유 (현재는 기기 로컬 전용)
+Next.js · TypeScript · Tailwind · shadcn/ui · ExcelJS · PWA

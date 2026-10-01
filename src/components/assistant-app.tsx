@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InstallHint } from "@/components/install-hint";
 import { WelcomeBanner } from "@/components/welcome-banner";
+import { DailyBriefingPanel } from "@/components/daily-briefing";
 import { Plus, RotateCcw, Loader2 } from "lucide-react";
 
 export function AssistantApp() {
@@ -27,6 +28,9 @@ export function AssistantApp() {
     clearCompleted,
     resetSamples,
   } = useTasks();
+
+  // all tasks (active + completed) for briefing/xlsx — from same hook state
+  const allTasksForExport = [...activeTasks, ...completedTasks];
 
   if (status === "loading") {
     return (
@@ -121,6 +125,7 @@ export function AssistantApp() {
         <Tabs defaultValue="todo" className="gap-4">
           <TabsList className="h-9 bg-[var(--sheet-header)]">
             <TabsTrigger value="todo">TO DO 목록</TabsTrigger>
+            <TabsTrigger value="briefing">오늘 브리핑</TabsTrigger>
             <TabsTrigger value="done">
               완료 기록 ({completedTasks.length})
             </TabsTrigger>
@@ -136,6 +141,9 @@ export function AssistantApp() {
               정렬: 스팟(당일) → 지속(목표기일) → 언젠가(시급·중요) · 유사
               할일은 묶음으로 표시 · 브라우저에 자동 저장
             </p>
+          </TabsContent>
+          <TabsContent value="briefing" className="animate-sheet-in outline-none">
+            <DailyBriefingPanel tasks={allTasksForExport} />
           </TabsContent>
           <TabsContent value="done" className="animate-sheet-in outline-none">
             <CompletionLog

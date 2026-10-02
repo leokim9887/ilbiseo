@@ -44,10 +44,14 @@ async function main() {
 
   await desktop.getByRole("button", { name: "행 추가" }).click();
   await desktop.waitForTimeout(250);
-  await desktop.locator('textarea[aria-label="할일 LIST UP"]').last().fill(
-    "아버지 표 형식 스모크 — LIST UP 칸",
-  );
-  await desktop.locator('input[aria-label="마감목표"]').last().fill("9/30");
+  const listup = desktop.locator('textarea[aria-label="할일 LIST UP"]').first();
+  await listup.fill("아버지 표 형식 스모크 — LIST UP 칸");
+  await desktop.waitForTimeout(200);
+  await desktop
+    .getByRole("row", { name: /아버지 표 형식 스모크/ })
+    .getByLabel("마감목표")
+    .fill("9/30");
+  await desktop.waitForTimeout(200);
   await shot(desktop, "headers");
 
   // crop-ish: screenshot workbook only

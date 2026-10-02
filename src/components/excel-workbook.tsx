@@ -335,13 +335,12 @@ export function ExcelWorkbook({
                         data-excel-cell={`${task.id}:deadline`}
                         value={task.targetDate ?? ""}
                         placeholder="예: 9/1"
-                        disabled={task.kind === "someday" && sheet === "todo"}
                         onChange={(e) =>
                           onUpdate(task.id, {
                             targetDate: e.target.value || null,
                           })
                         }
-                        className="excel-input text-center disabled:opacity-40"
+                        className="excel-input text-center"
                         aria-label="마감목표"
                       />
                     </EditCell>

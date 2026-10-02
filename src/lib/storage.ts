@@ -11,6 +11,7 @@ import {
 } from "./types";
 import { createId } from "./id";
 import { createMockCalendarEvents } from "./calendar-data";
+import { inferGroupKey } from "./sort";
 
 export function createEmptyState(): AppState {
   return {
@@ -44,16 +45,54 @@ function migrateTask(raw: Record<string, unknown>): Task {
   };
 }
 
+/** Fold leftover checklist items into someday tasks; always persist empty checklists. */
+function foldChecklistsIntoTasks(
+  tasks: Task[],
+  checklists: ChecklistItem[],
+): Task[] {
+  if (!checklists.length) return tasks;
+  const existing = new Set(
+    tasks.map((t) => `${t.category}::${t.title.trim().toLowerCase()}`),
+  );
+  const extras: Task[] = [];
+  for (const c of checklists) {
+    if (c.checked) continue;
+    const title = String(c.title || "").trim();
+    if (!title) continue;
+    const key = `${c.category}::${title.toLowerCase()}`;
+    if (existing.has(key)) continue;
+    existing.add(key);
+    extras.push({
+      id: createId(),
+      title,
+      category: c.category,
+      kind: "someday",
+      targetDate: null,
+      urgency: 3,
+      importance: 3,
+      groupKey: inferGroupKey(title),
+      memo: "예전 체크리스트에서 옮김",
+      source: "import",
+      status: "active",
+      createdAt: c.createdAt || new Date().toISOString(),
+      completedAt: null,
+    });
+  }
+  return extras.length ? [...tasks, ...extras] : tasks;
+}
+
 export function normalizeState(raw: unknown): AppState | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
   if (!Array.isArray(obj.tasks)) return null;
+  const tasks = obj.tasks.map((t) => migrateTask(t as Record<string, unknown>));
+  const legacyChecks = Array.isArray(obj.checklists)
+    ? (obj.checklists as ChecklistItem[])
+    : [];
   return {
     version: Number(obj.version ?? APP_VERSION),
-    tasks: obj.tasks.map((t) => migrateTask(t as Record<string, unknown>)),
-    checklists: Array.isArray(obj.checklists)
-      ? (obj.checklists as ChecklistItem[])
-      : [],
+    tasks: foldChecklistsIntoTasks(tasks, legacyChecks),
+    checklists: [],
     calendarEvents: Array.isArray(obj.calendarEvents)
       ? (obj.calendarEvents as CalendarEvent[])
       : [],
@@ -65,8 +104,14 @@ export function loadState(): AppState | null {
   try {
     const v2 = localStorage.getItem(STORAGE_KEY);
     if (v2) {
-      const n = normalizeState(JSON.parse(v2));
-      if (n) return n;
+      const parsed = JSON.parse(v2) as { checklists?: unknown[] };
+      const hadChecks =
+        Array.isArray(parsed.checklists) && parsed.checklists.length > 0;
+      const n = normalizeState(parsed);
+      if (n) {
+        if (hadChecks) saveState(n);
+        return n;
+      }
     }
     const v1 = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (v1) {
@@ -78,19 +123,15 @@ export function loadState(): AppState | null {
         calendarEvents: [],
       });
       if (n) {
-        // Seed calendar/checklist if migrating empty extras
-        if (n.checklists.length === 0 && n.calendarEvents.length === 0) {
-          const sample = createSampleState();
-          n.checklists = sample.checklists;
-          n.calendarEvents = sample.calendarEvents;
-          // assign categories to legacy tasks round-robin-ish by kind
-          n.tasks = n.tasks.map((t, i) => ({
-            ...t,
-            category: (["work", "personal", "project", "team"] as TaskCategory[])[
-              i % 4
-            ],
-          }));
+        if (n.calendarEvents.length === 0) {
+          n.calendarEvents = createMockCalendarEvents();
         }
+        n.tasks = n.tasks.map((t, i) => ({
+          ...t,
+          category: (["work", "personal", "project", "team"] as TaskCategory[])[
+            i % 4
+          ],
+        }));
         saveState(n);
         return n;
       }
@@ -103,7 +144,12 @@ export function loadState(): AppState | null {
 
 export function saveState(state: AppState): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const clean: AppState = {
+    ...state,
+    checklists: [],
+    version: APP_VERSION,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
 }
 
 export function createSampleState(): AppState {
@@ -126,19 +172,6 @@ export function createSampleState(): AppState {
     completedAt: partial.completedAt ?? null,
     status: partial.status ?? "active",
     ...partial,
-  });
-
-  const check = (
-    title: string,
-    category: TaskCategory,
-    checked = false,
-  ): ChecklistItem => ({
-    id: createId(),
-    title,
-    category,
-    checked,
-    createdAt: new Date().toISOString(),
-    completedAt: checked ? new Date().toISOString() : null,
   });
 
   return {
@@ -257,14 +290,7 @@ export function createSampleState(): AppState {
         completedAt: new Date().toISOString(),
       }),
     ],
-    checklists: [
-      check("이력서 키워드 검토", "work"),
-      check("레퍼런스 콜 일정 잡기", "work"),
-      check("명함 스캔 백업", "personal", true),
-      check("과제 산출물 폴더 정리", "project"),
-      check("팀 주간 싱크 안건", "team"),
-      check("온보딩 문서 링크 확인", "team"),
-    ],
+    checklists: [],
     calendarEvents: createMockCalendarEvents(),
   };
 }

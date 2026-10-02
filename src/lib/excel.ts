@@ -3,7 +3,6 @@ import {
   CATEGORY_LABEL,
   KIND_LABEL,
   type CalendarEvent,
-  type ChecklistItem,
   type Task,
 } from "./types";
 import { sortCompleted, sortTasks } from "./sort";
@@ -13,7 +12,7 @@ import { formatCalendarWhen } from "./calendar-data";
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
   pattern: "solid",
-  fgColor: { argb: "FF0B4F57" },
+  fgColor: { argb: "FF163F39" },
 };
 const HEADER_FONT: Partial<ExcelJS.Font> = {
   color: { argb: "FFFFFFFF" },
@@ -32,7 +31,6 @@ function styleHeader(row: ExcelJS.Row) {
 
 export type WorkbookPayload = {
   tasks: Task[];
-  checklists: ChecklistItem[];
   calendarEvents: CalendarEvent[];
   briefing?: DailyBriefing | null;
 };
@@ -40,7 +38,7 @@ export type WorkbookPayload = {
 export async function buildWorkbook(
   payload: WorkbookPayload,
 ): Promise<ExcelJS.Buffer> {
-  const { tasks, checklists, calendarEvents, briefing } = payload;
+  const { tasks, calendarEvents, briefing } = payload;
   const wb = new ExcelJS.Workbook();
   wb.creator = "일비서";
   wb.created = new Date();
@@ -50,8 +48,8 @@ export async function buildWorkbook(
   });
   todo.columns = [
     { header: "틀", key: "category", width: 10 },
-    { header: "할 일", key: "title", width: 34 },
-    { header: "유형", key: "kind", width: 14 },
+    { header: "제목", key: "title", width: 34 },
+    { header: "종류", key: "kind", width: 14 },
     { header: "목표기일", key: "targetDate", width: 12 },
     { header: "중요", key: "importance", width: 8 },
     { header: "시급", key: "urgency", width: 8 },
@@ -80,7 +78,7 @@ export async function buildWorkbook(
   done.columns = [
     { header: "틀", key: "category", width: 10 },
     { header: "한 일", key: "title", width: 34 },
-    { header: "유형", key: "kind", width: 14 },
+    { header: "종류", key: "kind", width: 14 },
     { header: "목표기일", key: "targetDate", width: 12 },
     { header: "중요", key: "importance", width: 8 },
     { header: "시급", key: "urgency", width: 8 },
@@ -100,27 +98,6 @@ export async function buildWorkbook(
         ? new Date(t.completedAt).toLocaleString("ko-KR")
         : "",
       memo: t.memo,
-    });
-  }
-
-  const check = wb.addWorksheet("체크리스트", {
-    views: [{ state: "frozen", ySplit: 1 }],
-  });
-  check.columns = [
-    { header: "틀", key: "category", width: 10 },
-    { header: "항목", key: "title", width: 36 },
-    { header: "완료", key: "checked", width: 8 },
-    { header: "완료일", key: "completedAt", width: 20 },
-  ];
-  styleHeader(check.getRow(1));
-  for (const c of checklists) {
-    check.addRow({
-      category: CATEGORY_LABEL[c.category],
-      title: c.title,
-      checked: c.checked ? "Y" : "",
-      completedAt: c.completedAt
-        ? new Date(c.completedAt).toLocaleString("ko-KR")
-        : "",
     });
   }
 
@@ -152,7 +129,7 @@ export async function buildWorkbook(
     summary.getRow(1).font = {
       bold: true,
       size: 14,
-      color: { argb: "FF0B4F57" },
+      color: { argb: "FF163F39" },
     };
     summary.addRow([briefing.summaryLine]);
     summary.addRow([]);
@@ -168,10 +145,9 @@ export async function buildWorkbook(
 export async function buildBriefingWorkbook(
   tasks: Task[],
   briefing: DailyBriefing,
-  checklists: ChecklistItem[] = [],
   calendarEvents: CalendarEvent[] = [],
 ) {
-  return buildWorkbook({ tasks, checklists, calendarEvents, briefing });
+  return buildWorkbook({ tasks, calendarEvents, briefing });
 }
 
 export function briefingFilename(date: string): string {

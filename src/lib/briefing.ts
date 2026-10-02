@@ -2,7 +2,6 @@ import {
   CATEGORY_LABEL,
   KIND_LABEL,
   type CalendarEvent,
-  type ChecklistItem,
   type Task,
   type TaskCategory,
   type TaskKind,
@@ -39,16 +38,10 @@ export type DailyBriefing = {
   headline: string;
   summaryLine: string;
   sections: BriefingSection[];
-  checklistSections: {
-    category: TaskCategory;
-    categoryLabel: string;
-    items: { title: string; checked: boolean }[];
-  }[];
   calendarLines: { when: string; title: string; notes: string }[];
   plaintext: string;
   activeCount: number;
   completedCount: number;
-  checklistOpenCount: number;
 };
 
 const SECTION_TITLE: Record<TaskKind, string> = {
@@ -103,7 +96,6 @@ function nearWindow(dateStr: string, today: string, days = 7): boolean {
 
 export function buildDailyBriefing(
   tasks: Task[],
-  checklists: ChecklistItem[] = [],
   calendarEvents: CalendarEvent[] = [],
   now = new Date(),
 ): DailyBriefing {
@@ -111,7 +103,6 @@ export function buildDailyBriefing(
   const completed = sortCompleted(tasks);
   const date = todayIso(now);
 
-  // Prefer today + nearby for ongoing/spot; keep someday high priority
   const focus = sorted.filter((t) => {
     if (t.kind === "spot") return true;
     if (t.kind === "someday") return t.importance >= 4 || t.urgency >= 4;
@@ -155,22 +146,6 @@ export function buildDailyBriefing(
       };
     });
 
-  const openChecks = checklists.filter((c) => !c.checked);
-  const checklistSections = (
-    ["work", "personal", "project", "team"] as TaskCategory[]
-  )
-    .map((category) => {
-      const items = checklists
-        .filter((c) => c.category === category)
-        .map((c) => ({ title: c.title, checked: c.checked }));
-      return {
-        category,
-        categoryLabel: CATEGORY_LABEL[category],
-        items,
-      };
-    })
-    .filter((s) => s.items.length > 0);
-
   const calendarLines = calendarEvents
     .filter((e) => nearWindow(e.start, date, 7))
     .sort((a, b) => a.start.localeCompare(b.start))
@@ -181,12 +156,12 @@ export function buildDailyBriefing(
     }));
 
   const headline = `일비서 브리핑 · ${formatKoDate(date)}`;
-  const summaryLine = `할 일 ${list.length}건 · 체크리스트 미완료 ${openChecks.length}건 · 캘린더(근접) ${calendarLines.length}건 · 한 일 ${completed.length}건`;
+  const summaryLine = `할 일 ${list.length}건 · 캘린더(근접) ${calendarLines.length}건 · 한 일 ${completed.length}건`;
 
   const parts: string[] = [
     headline,
     summaryLine,
-    "※ 일비서 할 일/체크리스트와 구글 캘린더는 구분되어 있습니다.",
+    "※ 일비서 할 일과 구글 캘린더는 구분되어 있습니다.",
     "",
     "【일비서 할 일】",
   ];
@@ -220,19 +195,6 @@ export function buildDailyBriefing(
     parts.push("");
   }
 
-  parts.push("【체크리스트】");
-  if (checklistSections.length === 0) {
-    parts.push("  (항목 없음)");
-  } else {
-    for (const sec of checklistSections) {
-      parts.push(`  〔${sec.categoryLabel}〕`);
-      for (const item of sec.items) {
-        parts.push(`  ${item.checked ? "☑" : "☐"} ${item.title}`);
-      }
-    }
-  }
-  parts.push("");
-
   parts.push("【구글 캘린더 — 별도】");
   if (calendarLines.length === 0) {
     parts.push("  (근접 일정 없음)");
@@ -249,12 +211,10 @@ export function buildDailyBriefing(
     headline,
     summaryLine,
     sections,
-    checklistSections,
     calendarLines,
     plaintext: parts.join("\n").trim() + "\n",
     activeCount: sorted.length,
     completedCount: completed.length,
-    checklistOpenCount: openChecks.length,
   };
 }
 

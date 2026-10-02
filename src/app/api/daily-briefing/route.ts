@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildDailyBriefing } from "@/lib/briefing";
 import { buildWorkbook, briefingFilename } from "@/lib/excel";
-import type { CalendarEvent, ChecklistItem, Task } from "@/lib/types";
+import type { CalendarEvent, Task } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -70,7 +70,6 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as {
       tasks?: Task[];
-      checklists?: ChecklistItem[];
       calendarEvents?: CalendarEvent[];
       send?: boolean;
       preferredHour?: string;
@@ -78,15 +77,13 @@ export async function POST(request: Request) {
     };
 
     const tasks = Array.isArray(body.tasks) ? body.tasks : [];
-    const checklists = Array.isArray(body.checklists) ? body.checklists : [];
     const calendarEvents = Array.isArray(body.calendarEvents)
       ? body.calendarEvents
       : [];
 
-    const briefing = buildDailyBriefing(tasks, checklists, calendarEvents);
+    const briefing = buildDailyBriefing(tasks, calendarEvents);
     const buffer = await buildWorkbook({
       tasks,
-      checklists,
       calendarEvents,
       briefing,
     });
@@ -150,9 +147,7 @@ export async function POST(request: Request) {
         plaintext: briefing.plaintext,
         activeCount: briefing.activeCount,
         completedCount: briefing.completedCount,
-        checklistOpenCount: briefing.checklistOpenCount,
         sections: briefing.sections,
-        checklistSections: briefing.checklistSections,
         calendarLines: briefing.calendarLines,
       },
       excel: {
@@ -184,7 +179,6 @@ export async function GET() {
     method: "POST",
     body: {
       tasks: [],
-      checklists: [],
       calendarEvents: [],
       send: false,
       workEmail: "",

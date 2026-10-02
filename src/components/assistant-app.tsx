@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { TodoGrid } from "@/components/todo-grid";
 import { CompletionLog } from "@/components/completion-log";
-import { ChecklistPanel } from "@/components/checklist-panel";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { DailyBriefingPanel } from "@/components/daily-briefing";
 import { ExcelLinker } from "@/components/excel-linker";
@@ -50,9 +49,7 @@ export function AssistantApp() {
 
   const active = app.activeTasks(category);
   const done = app.completedTasks(category);
-  const checks = app.checklistsFor(category);
-  const showCategory =
-    view === "todo" || view === "done" || view === "checklist";
+  const showCategory = view === "todo" || view === "done";
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -70,8 +67,8 @@ export function AssistantApp() {
                 일비서
               </h1>
               <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-[var(--ink-muted)]">
-                할 일·한 일·체크리스트를 네 틀로 보고, 캘린더는 따로, 매일 08:00
-                브리핑과 PC 엑셀까지.
+                네 틀로 할 일·한 일을 엑셀처럼 관리하고, 캘린더는 따로, 매일
+                08:00 브리핑과 PC 엑셀까지.
               </p>
             </div>
             <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">
@@ -103,7 +100,6 @@ export function AssistantApp() {
           counts={{
             todo: app.allActive.length,
             done: app.allCompleted.length,
-            checklist: app.state.checklists.filter((c) => !c.checked).length,
             calendar: app.calendarEvents.length,
           }}
         />
@@ -148,7 +144,7 @@ export function AssistantApp() {
           {view === "todo" ? (
             <PanelShell
               title={`${CATEGORY_LABEL[category]} · 할 일`}
-              description="오늘·스팟이 위에, 비슷한 일은 묶입니다. 체크하면 한 일로 갑니다."
+              description="엑셀처럼 칸을 바로 고칩니다. 위쪽부터 스팟 → 지속 → 언젠가 순입니다."
               actions={
                 <>
                   <Button
@@ -158,7 +154,7 @@ export function AssistantApp() {
                     onClick={() => app.addTask({ category, kind: "spot" })}
                   >
                     <Plus className="size-4" />
-                    항목 추가
+                    행 추가
                   </Button>
                   <MemoImport category={category} onImport={app.addMany} />
                   <OcrImport category={category} onImport={app.addMany} />
@@ -173,9 +169,6 @@ export function AssistantApp() {
                 onDelete={app.deleteTask}
                 onAddItem={() => app.addTask({ category, kind: "spot" })}
               />
-              <p className="mt-4 text-[12px] text-[var(--ink-muted)]">
-                ▾ 으로 기한·시급·중요·메모를 고칩니다.
-              </p>
             </PanelShell>
           ) : null}
 
@@ -192,22 +185,6 @@ export function AssistantApp() {
             </PanelShell>
           ) : null}
 
-          {view === "checklist" ? (
-            <PanelShell
-              title={`${CATEGORY_LABEL[category]} · 체크리스트`}
-              description="짧게 체크만 하면 되는 항목입니다. 할 일과 별도로 둡니다."
-            >
-              <ChecklistPanel
-                items={checks}
-                category={category}
-                onAdd={app.addChecklist}
-                onToggle={app.toggleChecklist}
-                onDelete={app.deleteChecklist}
-                bare
-              />
-            </PanelShell>
-          ) : null}
-
           {view === "calendar" ? (
             <CalendarPanel
               events={app.calendarEvents}
@@ -219,7 +196,6 @@ export function AssistantApp() {
           {view === "briefing" ? (
             <DailyBriefingPanel
               tasks={app.state.tasks}
-              checklists={app.state.checklists}
               calendarEvents={app.calendarEvents}
               onAfterExport={() => void app.forceExcelSync()}
             />
@@ -243,8 +219,9 @@ export function AssistantApp() {
                     데이터
                   </p>
                   <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    할 일·한 일·체크리스트는 이 브라우저(localStorage)에
-                    저장됩니다. 샘플을 다시 넣어도 기존 구조는 그대로입니다.
+                    할 일·한 일은 이 브라우저(localStorage)에 저장됩니다. 예전
+                    체크리스트가 있으면 미완료 항목만 할 일로 옮긴 뒤
+                    비웁니다.
                   </p>
                   <Button
                     type="button"

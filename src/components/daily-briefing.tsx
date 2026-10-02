@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CalendarEvent, ChecklistItem, Task } from "@/lib/types";
+import type { CalendarEvent, Task } from "@/lib/types";
 import {
   buildDailyBriefing,
   loadSettings,
@@ -28,14 +28,12 @@ import {
 
 interface DailyBriefingPanelProps {
   tasks: Task[];
-  checklists: ChecklistItem[];
   calendarEvents: CalendarEvent[];
   onAfterExport?: () => void;
 }
 
 export function DailyBriefingPanel({
   tasks,
-  checklists,
   calendarEvents,
   onAfterExport,
 }: DailyBriefingPanelProps) {
@@ -53,8 +51,8 @@ export function DailyBriefingPanel({
   }, []);
 
   const preview = useMemo(
-    () => briefing ?? buildDailyBriefing(tasks, checklists, calendarEvents),
-    [briefing, tasks, checklists, calendarEvents],
+    () => briefing ?? buildDailyBriefing(tasks, calendarEvents),
+    [briefing, tasks, calendarEvents],
   );
 
   const persistSettings = (next: AppSettings) => {
@@ -66,7 +64,7 @@ export function DailyBriefingPanel({
     setBusy("gen");
     setError(null);
     try {
-      setBriefing(buildDailyBriefing(tasks, checklists, calendarEvents));
+      setBriefing(buildDailyBriefing(tasks, calendarEvents));
       setApiNote(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "브리핑 생성 실패");
@@ -79,11 +77,10 @@ export function DailyBriefingPanel({
     setBusy("xlsx");
     setError(null);
     try {
-      const b = buildDailyBriefing(tasks, checklists, calendarEvents);
+      const b = buildDailyBriefing(tasks, calendarEvents);
       setBriefing(b);
       const buf = await buildWorkbook({
         tasks,
-        checklists,
         calendarEvents,
         briefing: b,
       });
@@ -106,7 +103,6 @@ export function DailyBriefingPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tasks,
-          checklists,
           calendarEvents,
           send,
           preferredHour: settings.briefingHour,
@@ -122,7 +118,7 @@ export function DailyBriefingPanel({
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "API 호출 실패");
       }
-      setBriefing(buildDailyBriefing(tasks, checklists, calendarEvents));
+      setBriefing(buildDailyBriefing(tasks, calendarEvents));
       setApiNote(
         `${send ? "발송 시도" : "dry-run"} · ${data.delivery?.status} · ${data.delivery?.message}`,
       );
@@ -136,7 +132,7 @@ export function DailyBriefingPanel({
   return (
     <PanelShell
       title="오늘 브리핑"
-      description="매일 08:00(KST) 목표. 할 일 · 체크리스트 · 구글 캘린더를 구분해서 읽기 쉽게 정리합니다."
+      description="매일 08:00(KST) 목표. 할 일과 구글 캘린더를 구분해서 읽기 쉽게 정리합니다."
       icon={<Newspaper className="size-5" />}
       actions={
         <>
@@ -294,28 +290,6 @@ export function DailyBriefingPanel({
                               메모: {line.memo}
                             </p>
                           ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))
-              )}
-            </section>
-
-            <section className="px-4 py-3">
-              <h4 className="mb-2 text-sm font-semibold">【체크리스트】</h4>
-              {preview.checklistSections.length === 0 ? (
-                <p className="text-sm text-[var(--ink-muted)]">항목 없음</p>
-              ) : (
-                preview.checklistSections.map((sec) => (
-                  <div key={sec.category} className="mb-2">
-                    <p className="text-[11px] font-semibold text-[var(--ink-muted)]">
-                      〔{sec.categoryLabel}〕
-                    </p>
-                    <ul className="mt-1 space-y-1">
-                      {sec.items.map((item, i) => (
-                        <li key={`${item.title}-${i}`} className="text-sm">
-                          {item.checked ? "☑" : "☐"} {item.title}
                         </li>
                       ))}
                     </ul>

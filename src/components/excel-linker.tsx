@@ -37,12 +37,10 @@ export function ExcelLinker({
       if (!handle) {
         const briefing = buildDailyBriefing(
           state.tasks,
-          state.checklists,
           state.calendarEvents,
         );
         const buf = await buildWorkbook({
           tasks: state.tasks,
-          checklists: state.checklists,
           calendarEvents: state.calendarEvents,
           briefing,
         });
@@ -66,12 +64,10 @@ export function ExcelLinker({
     try {
       const briefing = buildDailyBriefing(
         state.tasks,
-        state.checklists,
         state.calendarEvents,
       );
       const buf = await buildWorkbook({
         tasks: state.tasks,
-        checklists: state.checklists,
         calendarEvents: state.calendarEvents,
         briefing,
       });
@@ -95,7 +91,7 @@ export function ExcelLinker({
           <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
             {fsOk
               ? linked
-                ? "연결됨 — 할 일·체크리스트를 바꾸면 같은 파일이 덮어쓰기됩니다."
+                ? "연결됨 — 할 일·한 일을 바꾸면 같은 파일이 덮어쓰기됩니다."
                 : "아버지 PC Chrome에서 파일을 고르면 입력할 때마다 갱신됩니다."
               : "이 브라우저는 파일 연결을 지원하지 않습니다. 「지금 저장/다운로드」를 쓰세요."}
           </p>

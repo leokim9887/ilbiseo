@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AppState,
   CalendarEvent,
-  ChecklistItem,
   Task,
   TaskCategory,
 } from "@/lib/types";
@@ -37,7 +36,7 @@ export function useAppState() {
   useEffect(() => {
     try {
       const loaded = loadState();
-      if (loaded && (loaded.tasks.length > 0 || loaded.checklists.length > 0)) {
+      if (loaded && loaded.tasks.length > 0) {
         setState(loaded);
       } else {
         const seeded = createSampleState();
@@ -61,14 +60,9 @@ export function useAppState() {
     }
     setExcelLinked(true);
     try {
-      const briefing = buildDailyBriefing(
-        next.tasks,
-        next.checklists,
-        next.calendarEvents,
-      );
+      const briefing = buildDailyBriefing(next.tasks, next.calendarEvents);
       const buf = await buildWorkbook({
         tasks: next.tasks,
-        checklists: next.checklists,
         calendarEvents: next.calendarEvents,
         briefing,
       });
@@ -85,16 +79,17 @@ export function useAppState() {
 
   const persist = useCallback(
     (next: AppState) => {
-      setState(next);
+      const clean = { ...next, checklists: [] as AppState["checklists"] };
+      setState(clean);
       try {
-        saveState(next);
+        saveState(clean);
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "저장에 실패했습니다.");
       }
       if (excelTimer.current) clearTimeout(excelTimer.current);
       excelTimer.current = setTimeout(() => {
-        void syncExcel(next);
+        void syncExcel(clean);
       }, 600);
     },
     [syncExcel],
@@ -107,14 +102,6 @@ export function useAppState() {
   const completedTasks = useCallback(
     (category?: TaskCategory) => sortCompleted(state.tasks, category),
     [state.tasks],
-  );
-
-  const checklistsFor = useCallback(
-    (category?: TaskCategory) =>
-      state.checklists.filter((c) =>
-        category ? c.category === category : true,
-      ),
-    [state.checklists],
   );
 
   const addTask = useCallback(
@@ -212,49 +199,6 @@ export function useAppState() {
     [persist, state],
   );
 
-  const addChecklist = useCallback(
-    (title: string, category: TaskCategory) => {
-      const item: ChecklistItem = {
-        id: createId(),
-        title: title.trim() || "새 항목",
-        category,
-        checked: false,
-        createdAt: new Date().toISOString(),
-        completedAt: null,
-      };
-      persist({ ...state, checklists: [...state.checklists, item] });
-    },
-    [persist, state],
-  );
-
-  const toggleChecklist = useCallback(
-    (id: string, checked: boolean) => {
-      persist({
-        ...state,
-        checklists: state.checklists.map((c) =>
-          c.id === id
-            ? {
-                ...c,
-                checked,
-                completedAt: checked ? new Date().toISOString() : null,
-              }
-            : c,
-        ),
-      });
-    },
-    [persist, state],
-  );
-
-  const deleteChecklist = useCallback(
-    (id: string) => {
-      persist({
-        ...state,
-        checklists: state.checklists.filter((c) => c.id !== id),
-      });
-    },
-    [persist, state],
-  );
-
   const setCalendarEvents = useCallback(
     (events: CalendarEvent[]) => {
       persist({ ...state, calendarEvents: events });
@@ -297,7 +241,6 @@ export function useAppState() {
     allCompleted,
     activeTasks,
     completedTasks,
-    checklistsFor,
     calendarEvents: state.calendarEvents,
     addTask,
     addMany,
@@ -305,9 +248,6 @@ export function useAppState() {
     completeTask,
     restoreTask,
     deleteTask,
-    addChecklist,
-    toggleChecklist,
-    deleteChecklist,
     setCalendarEvents,
     replaceCalendar,
     resetSamples,

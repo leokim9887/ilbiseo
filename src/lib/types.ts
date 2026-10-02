@@ -22,6 +22,7 @@ export interface Task {
   completedAt: string | null;
 }
 
+/** Legacy only — kept so old localStorage still parses; always stored as []. */
 export interface ChecklistItem {
   id: string;
   title: string;
@@ -45,6 +46,7 @@ export interface CalendarEvent {
 export interface AppState {
   version: number;
   tasks: Task[];
+  /** Always empty after migration; field kept for load compatibility. */
   checklists: ChecklistItem[];
   calendarEvents: CalendarEvent[];
 }

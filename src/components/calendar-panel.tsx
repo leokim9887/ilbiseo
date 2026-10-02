@@ -63,7 +63,7 @@ export function CalendarPanel({
   return (
     <PanelShell
       title="구글 캘린더"
-      description="프로그램 할 일·체크리스트와 섞지 않습니다. mock 또는 ICS로 확인할 수 있습니다."
+      description="프로그램 할 일과 섞지 않습니다. mock 또는 ICS로 확인할 수 있습니다."
       icon={<CalendarDays className="size-5" />}
       actions={
         <>

@@ -55,13 +55,18 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
               type="button"
               onClick={() => onChange(item.id)}
               aria-current={active ? "page" : undefined}
+              aria-label={
+                typeof count === "number"
+                  ? `${item.label} ${count}건`
+                  : item.label
+              }
               className={`flex min-h-14 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                 active
                   ? "border-[var(--brand)] bg-[var(--brand)] text-[var(--primary-foreground)] shadow-sm"
                   : "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)] hover:bg-[var(--row-hover)]"
               }`}
             >
-              <Icon className="size-5 shrink-0 opacity-90" />
+              <Icon className="size-5 shrink-0 opacity-90" aria-hidden />
               <span className="min-w-0">
                 <span className="block text-sm font-semibold leading-tight">
                   {item.label}
@@ -69,6 +74,7 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
                 {typeof count === "number" ? (
                   <span
                     className={`block text-[11px] ${active ? "text-white/75" : "text-[var(--ink-muted)]"}`}
+                    aria-hidden
                   >
                     {count}건
                   </span>

@@ -17,88 +17,94 @@ async function shot(page, name) {
   console.log("wrote", path);
 }
 
+async function goNav(page, label) {
+  await page
+    .locator("nav.hidden.sm\\:grid, nav[aria-label='주요 메뉴']")
+    .first()
+    .getByRole("button", { name: new RegExp(`^${label}`) })
+    .click();
+  await page.waitForTimeout(400);
+}
+
 async function smoke(page) {
   await dismissWelcome(page);
+  await goNav(page, "할 일");
+  await page.getByRole("heading", { name: /할 일/ }).waitFor({ timeout: 5000 });
 
-  // add task
-  await page.getByRole("button", { name: "항목 추가" }).first().click();
-  await page.waitForTimeout(200);
-  const title = page.getByLabel("할 일 제목").first();
-  await title.fill("UI개편 스모크 항목");
-  await page.waitForTimeout(200);
+  await page.getByRole("button", { name: "항목 추가" }).click();
+  await page.waitForTimeout(250);
+  await page.getByLabel("할 일 제목").first().fill("UI개편 스모크 항목");
+  await page.waitForTimeout(250);
 
-  // complete → 한 일
   await page.getByLabel(/완료 → 한 일로 이동/).first().click();
-  await page.waitForTimeout(300);
-  await page.getByRole("button", { name: /^한 일/ }).first().click();
-  await page.waitForTimeout(300);
-  const restored = page.getByText("UI개편 스모크 항목");
-  if (!(await restored.isVisible())) throw new Error("한 일 이동 실패");
+  await page.waitForTimeout(350);
+  await goNav(page, "한 일");
+  await page.getByText("UI개편 스모크 항목").waitFor({ timeout: 5000 });
 
-  // checklist
-  await page.getByRole("button", { name: /체크/ }).first().click();
+  await goNav(page, "체크리스트");
   await page.getByPlaceholder("체크 항목 적기").fill("체크 스모크");
   await page.getByRole("button", { name: "추가" }).click();
-  await page.waitForTimeout(200);
-  await page.getByText("체크 스모크").click();
+  await page.getByText("체크 스모크").waitFor({ timeout: 5000 });
+  await page
+    .locator("li")
+    .filter({ hasText: "체크 스모크" })
+    .getByRole("checkbox")
+    .click();
   await page.waitForTimeout(200);
 
-  // calendar
-  await page.getByRole("button", { name: /캘린더|일정/ }).first().click();
-  await page.waitForTimeout(200);
-  const mock = page.getByRole("button", { name: /mock/i }).first();
-  if (await mock.isVisible()) await mock.click();
+  await goNav(page, "캘린더");
+  await page.getByRole("button", { name: /mock/i }).first().click();
   await page.waitForTimeout(300);
 
-  // briefing
-  await page.getByRole("button", { name: /브리핑/ }).first().click();
-  await page.waitForTimeout(300);
+  await goNav(page, "오늘 브리핑");
   await page.getByRole("button", { name: "지금 생성" }).click();
   await page.waitForTimeout(400);
 
-  // settings excel
-  await page.getByRole("button", { name: /설정/ }).first().click();
-  await page.waitForTimeout(200);
-  if (!(await page.getByText("엑셀 파일 연결").first().isVisible())) {
-    throw new Error("엑셀 연결 UI 없음");
-  }
+  await goNav(page, "설정");
+  await page.getByText("엑셀 파일 연결").first().waitFor({ timeout: 5000 });
 
   console.log("smoke ok");
 }
 
 async function main() {
   const browser = await chromium.launch();
-  const desktop = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await desktop.goto(BASE, { waitUntil: "networkidle" });
-  await desktop.evaluate(() => {
-    localStorage.clear();
+
+  const desktop = await browser.newPage({
+    viewport: { width: 1280, height: 900 },
   });
+  await desktop.goto(BASE, { waitUntil: "networkidle" });
+  await desktop.evaluate(() => localStorage.clear());
   await desktop.reload({ waitUntil: "networkidle" });
   await dismissWelcome(desktop);
   await shot(desktop, "home");
 
-  await desktop.getByRole("button", { name: /^캘린더/ }).first().click();
-  await desktop.waitForTimeout(250);
-  const mock = desktop.getByRole("button", { name: /mock/i }).first();
-  if (await mock.isVisible()) await mock.click();
+  await goNav(desktop, "캘린더");
+  await desktop.getByRole("button", { name: /mock/i }).first().click();
   await desktop.waitForTimeout(300);
   await shot(desktop, "calendar");
 
-  await desktop.getByRole("button", { name: /브리핑/ }).first().click();
-  await desktop.waitForTimeout(400);
+  await goNav(desktop, "오늘 브리핑");
+  await desktop.waitForTimeout(300);
   await shot(desktop, "briefing");
+  await desktop.close();
 
-  await smoke(desktop);
-
-  const mobileCtx = await browser.newContext({
-    ...devices["iPhone 13"],
+  const smokePage = await browser.newPage({
+    viewport: { width: 1280, height: 900 },
   });
+  await smokePage.goto(BASE, { waitUntil: "networkidle" });
+  await smokePage.evaluate(() => localStorage.clear());
+  await smokePage.reload({ waitUntil: "networkidle" });
+  await smoke(smokePage);
+  await smokePage.close();
+
+  const mobileCtx = await browser.newContext({ ...devices["iPhone 13"] });
   const mobile = await mobileCtx.newPage();
   await mobile.goto(BASE, { waitUntil: "networkidle" });
   await mobile.evaluate(() => localStorage.clear());
   await mobile.reload({ waitUntil: "networkidle" });
   await dismissWelcome(mobile);
   await shot(mobile, "mobile");
+  await mobileCtx.close();
 
   await browser.close();
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-const SEEN_KEY = "ilbiseo-welcome-seen";
+const SEEN_KEY = "ilbiseo-welcome-seen-v2";
 
 export function WelcomeBanner() {
   const [open, setOpen] = useState(false);
@@ -33,9 +33,10 @@ export function WelcomeBanner() {
         아버지용 일비서
       </p>
       <p className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]">
-        로그인 없이 이 기기에서만 쓰는 개인 할 일 비서입니다. 스팟 → 지속 →
-        언젠가 순으로 자동 정렬되고, 완료한 일은 기록으로 남깁니다. 홈 화면에
-        추가해 두면 앱처럼 바로 열 수 있습니다.
+        업무·개인·과제·팀원 네 틀에서 할 일/한 일·체크리스트를 관리합니다. 구글
+        캘린더는 별도 탭입니다. PC에서 「엑셀 파일 연결」하면 입력할 때마다
+        로컬 xlsx가 갱신되고, 매일 08:00 브리핑은 업무 이메일을 넣으면
+        발송을 준비합니다.
       </p>
       <div className="mt-3">
         <Button type="button" size="sm" onClick={close}>

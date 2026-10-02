@@ -1,14 +1,101 @@
-import { APP_VERSION, STORAGE_KEY, type AppState, type Task } from "./types";
+import {
+  APP_VERSION,
+  CATEGORY_LABEL,
+  LEGACY_STORAGE_KEY,
+  STORAGE_KEY,
+  type AppState,
+  type CalendarEvent,
+  type ChecklistItem,
+  type Task,
+  type TaskCategory,
+} from "./types";
 import { createId } from "./id";
+import { createMockCalendarEvents } from "./calendar-data";
+
+export function createEmptyState(): AppState {
+  return {
+    version: APP_VERSION,
+    tasks: [],
+    checklists: [],
+    calendarEvents: [],
+  };
+}
+
+function migrateTask(raw: Record<string, unknown>): Task {
+  const title = String(raw.title ?? "할 일");
+  const notes = String(raw.notes ?? raw.memo ?? "");
+  return {
+    id: String(raw.id ?? createId()),
+    title,
+    category: (raw.category as TaskCategory) || "work",
+    kind: (raw.kind as Task["kind"]) || "someday",
+    targetDate: (raw.targetDate as string | null) ?? null,
+    urgency: Number(raw.urgency ?? 3) || 3,
+    importance: Number(raw.importance ?? 3) || 3,
+    groupKey: String(raw.groupKey ?? title),
+    memo: notes,
+    source:
+      raw.source === "calendar"
+        ? "import"
+        : ((raw.source as Task["source"]) || "manual"),
+    status: (raw.status as Task["status"]) || "active",
+    createdAt: String(raw.createdAt ?? new Date().toISOString()),
+    completedAt: (raw.completedAt as string | null) ?? null,
+  };
+}
+
+export function normalizeState(raw: unknown): AppState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (!Array.isArray(obj.tasks)) return null;
+  return {
+    version: Number(obj.version ?? APP_VERSION),
+    tasks: obj.tasks.map((t) => migrateTask(t as Record<string, unknown>)),
+    checklists: Array.isArray(obj.checklists)
+      ? (obj.checklists as ChecklistItem[])
+      : [],
+    calendarEvents: Array.isArray(obj.calendarEvents)
+      ? (obj.calendarEvents as CalendarEvent[])
+      : [],
+  };
+}
 
 export function loadState(): AppState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as AppState;
-    if (!parsed || !Array.isArray(parsed.tasks)) return null;
-    return { version: parsed.version ?? APP_VERSION, tasks: parsed.tasks };
+    const v2 = localStorage.getItem(STORAGE_KEY);
+    if (v2) {
+      const n = normalizeState(JSON.parse(v2));
+      if (n) return n;
+    }
+    const v1 = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (v1) {
+      const legacy = JSON.parse(v1) as { tasks?: unknown[] };
+      const n = normalizeState({
+        version: APP_VERSION,
+        tasks: legacy.tasks ?? [],
+        checklists: [],
+        calendarEvents: [],
+      });
+      if (n) {
+        // Seed calendar/checklist if migrating empty extras
+        if (n.checklists.length === 0 && n.calendarEvents.length === 0) {
+          const sample = createSampleState();
+          n.checklists = sample.checklists;
+          n.calendarEvents = sample.calendarEvents;
+          // assign categories to legacy tasks round-robin-ish by kind
+          n.tasks = n.tasks.map((t, i) => ({
+            ...t,
+            category: (["work", "personal", "project", "team"] as TaskCategory[])[
+              i % 4
+            ],
+          }));
+        }
+        saveState(n);
+        return n;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -19,11 +106,7 @@ export function saveState(state: AppState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-export function createEmptyState(): AppState {
-  return { version: APP_VERSION, tasks: [] };
-}
-
-export function createSampleTasks(): Task[] {
+export function createSampleState(): AppState {
   const today = new Date();
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const inDays = (n: number) => {
@@ -32,70 +115,158 @@ export function createSampleTasks(): Task[] {
     return iso(d);
   };
 
-  const base = (partial: Omit<Task, "id" | "createdAt" | "completedAt" | "status" | "notes"> & { notes?: string }): Task => ({
+  const task = (
+    partial: Omit<Task, "id" | "createdAt" | "completedAt" | "status"> & {
+      status?: Task["status"];
+      completedAt?: string | null;
+    },
+  ): Task => ({
     id: createId(),
     createdAt: new Date().toISOString(),
-    completedAt: null,
-    status: "active",
-    notes: partial.notes ?? "",
+    completedAt: partial.completedAt ?? null,
+    status: partial.status ?? "active",
     ...partial,
   });
 
-  return [
-    base({
-      title: "후보자 A 이력서 검토",
-      kind: "spot",
-      targetDate: iso(today),
-      urgency: 5,
-      importance: 5,
-      groupKey: "후보자 이력서",
-      source: "manual",
-      notes: "오늘 안에 피드백 전달",
-    }),
-    base({
-      title: "클라이언트 B 미팅 준비",
-      kind: "spot",
-      targetDate: iso(today),
-      urgency: 4,
-      importance: 5,
-      groupKey: "클라이언트 미팅",
-      source: "calendar",
-    }),
-    base({
-      title: "포지션 JD 초안 작성",
-      kind: "ongoing",
-      targetDate: inDays(5),
-      urgency: 3,
-      importance: 4,
-      groupKey: "포지션 JD",
-      source: "memo",
-    }),
-    base({
-      title: "포지션 JD 최종 검수",
-      kind: "ongoing",
-      targetDate: inDays(7),
-      urgency: 3,
-      importance: 4,
-      groupKey: "포지션 JD",
-      source: "manual",
-    }),
-    base({
-      title: "네트워킹 명함 정리",
-      kind: "someday",
-      targetDate: null,
-      urgency: 2,
-      importance: 3,
-      groupKey: "네트워킹",
-      source: "manual",
-    }),
-    base({
-      title: "헤드헌팅 소개서 템플릿",
-      kind: "someday",
-      targetDate: null,
-      urgency: 1,
-      importance: 4,
-      groupKey: "소개서",
-      source: "ocr",
-    }),
-  ];
+  const check = (
+    title: string,
+    category: TaskCategory,
+    checked = false,
+  ): ChecklistItem => ({
+    id: createId(),
+    title,
+    category,
+    checked,
+    createdAt: new Date().toISOString(),
+    completedAt: checked ? new Date().toISOString() : null,
+  });
+
+  return {
+    version: APP_VERSION,
+    tasks: [
+      task({
+        title: "후보자 A 이력서 검토",
+        category: "work",
+        kind: "spot",
+        targetDate: iso(today),
+        urgency: 5,
+        importance: 5,
+        groupKey: "후보자 이력서",
+        source: "manual",
+        memo: "오늘 안에 피드백 전달",
+      }),
+      task({
+        title: "클라이언트 B 미팅 자료",
+        category: "work",
+        kind: "spot",
+        targetDate: iso(today),
+        urgency: 4,
+        importance: 5,
+        groupKey: "클라이언트 미팅",
+        source: "manual",
+        memo: "제안서 초안 지참",
+      }),
+      task({
+        title: "포지션 JD 초안 작성",
+        category: "project",
+        kind: "ongoing",
+        targetDate: inDays(5),
+        urgency: 3,
+        importance: 4,
+        groupKey: "포지션 JD",
+        source: "memo",
+        memo: "",
+      }),
+      task({
+        title: "포지션 JD 최종 검수",
+        category: "project",
+        kind: "ongoing",
+        targetDate: inDays(7),
+        urgency: 3,
+        importance: 4,
+        groupKey: "포지션 JD",
+        source: "manual",
+        memo: "팀 리뷰 반영",
+      }),
+      task({
+        title: "가족 저녁 약속 확인",
+        category: "personal",
+        kind: "spot",
+        targetDate: iso(today),
+        urgency: 3,
+        importance: 4,
+        groupKey: "가족",
+        source: "manual",
+        memo: "장소 확인",
+      }),
+      task({
+        title: "건강검진 예약",
+        category: "personal",
+        kind: "someday",
+        targetDate: null,
+        urgency: 2,
+        importance: 4,
+        groupKey: "건강",
+        source: "manual",
+        memo: "",
+      }),
+      task({
+        title: "신입 온보딩 체크 공유",
+        category: "team",
+        kind: "ongoing",
+        targetDate: inDays(3),
+        urgency: 3,
+        importance: 4,
+        groupKey: "온보딩",
+        source: "manual",
+        memo: "김대리 담당",
+      }),
+      task({
+        title: "주간 리포트 양식",
+        category: "team",
+        kind: "someday",
+        targetDate: null,
+        urgency: 2,
+        importance: 3,
+        groupKey: "리포트",
+        source: "manual",
+        memo: "",
+      }),
+      task({
+        title: "네트워킹 명함 정리",
+        category: "work",
+        kind: "someday",
+        targetDate: null,
+        urgency: 2,
+        importance: 3,
+        groupKey: "네트워킹",
+        source: "manual",
+        memo: "",
+      }),
+      task({
+        title: "헤드헌팅 소개서 템플릿",
+        category: "project",
+        kind: "someday",
+        targetDate: null,
+        urgency: 1,
+        importance: 4,
+        groupKey: "소개서",
+        source: "ocr",
+        memo: "OCR로 가져온 후보",
+        status: "completed",
+        completedAt: new Date().toISOString(),
+      }),
+    ],
+    checklists: [
+      check("이력서 키워드 검토", "work"),
+      check("레퍼런스 콜 일정 잡기", "work"),
+      check("명함 스캔 백업", "personal", true),
+      check("과제 산출물 폴더 정리", "project"),
+      check("팀 주간 싱크 안건", "team"),
+      check("온보딩 문서 링크 확인", "team"),
+    ],
+    calendarEvents: createMockCalendarEvents(),
+  };
 }
+
+export { CATEGORY_LABEL };

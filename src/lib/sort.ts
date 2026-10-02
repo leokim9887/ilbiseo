@@ -1,4 +1,4 @@
-import type { Task, TaskKind } from "./types";
+import type { Task, TaskCategory, TaskKind } from "./types";
 
 const KIND_ORDER: Record<TaskKind, number> = {
   spot: 0,
@@ -10,9 +10,12 @@ function score(task: Task): number {
   return task.urgency * 10 + task.importance;
 }
 
-/** 아버지 정렬 규칙: 스팟 → 지속(목표일) → 언젠가(시급·중요), 유사 할일 묶음 */
-export function sortTasks(tasks: Task[]): Task[] {
-  const active = tasks.filter((t) => t.status === "active");
+export function sortTasks(tasks: Task[], category?: TaskCategory): Task[] {
+  const active = tasks.filter(
+    (t) =>
+      t.status === "active" &&
+      (category ? t.category === category : true),
+  );
   const byGroup = new Map<string, Task[]>();
 
   for (const task of active) {
@@ -24,8 +27,7 @@ export function sortTasks(tasks: Task[]): Task[] {
 
   const groupEntries = [...byGroup.entries()].map(([key, items]) => {
     const sortedItems = [...items].sort(compareWithinGroup);
-    const representative = sortedItems[0];
-    return { key, items: sortedItems, representative };
+    return { key, items: sortedItems, representative: sortedItems[0] };
   });
 
   groupEntries.sort((a, b) =>
@@ -55,9 +57,16 @@ function compareTasks(a: Task, b: Task): number {
   return a.createdAt.localeCompare(b.createdAt);
 }
 
-export function sortCompleted(tasks: Task[]): Task[] {
+export function sortCompleted(
+  tasks: Task[],
+  category?: TaskCategory,
+): Task[] {
   return tasks
-    .filter((t) => t.status === "completed")
+    .filter(
+      (t) =>
+        t.status === "completed" &&
+        (category ? t.category === category : true),
+    )
     .sort((a, b) =>
       (b.completedAt ?? "").localeCompare(a.completedAt ?? ""),
     );

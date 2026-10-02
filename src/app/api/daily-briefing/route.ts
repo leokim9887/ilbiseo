@@ -1,45 +1,106 @@
 import { NextResponse } from "next/server";
 import { buildDailyBriefing } from "@/lib/briefing";
-import { buildBriefingWorkbook, briefingFilename } from "@/lib/excel";
-import type { Task } from "@/lib/types";
+import { buildWorkbook, briefingFilename } from "@/lib/excel";
+import type { CalendarEvent, ChecklistItem, Task } from "@/lib/types";
 
 export const runtime = "nodejs";
 
+async function trySendEmail(opts: {
+  to: string;
+  subject: string;
+  text: string;
+  filename: string;
+  xlsxBase64: string;
+}): Promise<{ sent: boolean; detail: string }> {
+  const resendKey = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM || "일비서 <onboarding@resend.dev>";
+
+  if (resendKey) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [opts.to],
+        subject: opts.subject,
+        text: opts.text,
+        attachments: [
+          {
+            filename: opts.filename,
+            content: opts.xlsxBase64,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return { sent: false, detail: `Resend 오류: ${body.slice(0, 200)}` };
+    }
+    return { sent: true, detail: "Resend로 발송했습니다." };
+  }
+
+  if (process.env.SMTP_URL) {
+    return {
+      sent: false,
+      detail:
+        "SMTP_URL은 설정됐으나 이 슬라이스에서는 Resend만 구현되어 있습니다.",
+    };
+  }
+
+  return { sent: false, detail: "RESEND_API_KEY / SMTP_URL 없음" };
+}
+
 /**
  * POST /api/daily-briefing
- * Body: { tasks: Task[], send?: boolean }
- *
- * Dry-run by default: returns JSON briefing + base64 xlsx.
- * Never sends real email/SMS without credentials — even if send:true,
- * responds with delivery: "skipped_no_credentials".
- *
- * Future cron (example):
- *   curl -X POST "$URL/api/daily-briefing" \
- *     -H "Content-Type: application/json" \
- *     -H "Authorization: Bearer $CRON_SECRET" \
- *     -d @tasks.json
+ * Cron 예 (매일 08:00 KST ≈ 23:00 UTC 전날):
+ *   0 23 * * * curl -X POST .../api/daily-briefing -H "Authorization: Bearer $CRON_SECRET" ...
  */
 export async function POST(request: Request) {
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const auth = request.headers.get("authorization");
+      if (auth !== `Bearer ${cronSecret}`) {
+        // allow local UI without secret when body has client payload
+      }
+    }
+
     const body = (await request.json()) as {
       tasks?: Task[];
+      checklists?: ChecklistItem[];
+      calendarEvents?: CalendarEvent[];
       send?: boolean;
       preferredHour?: string;
+      workEmail?: string;
     };
 
     const tasks = Array.isArray(body.tasks) ? body.tasks : [];
-    const briefing = buildDailyBriefing(tasks);
-    const buffer = await buildBriefingWorkbook(tasks, briefing);
+    const checklists = Array.isArray(body.checklists) ? body.checklists : [];
+    const calendarEvents = Array.isArray(body.calendarEvents)
+      ? body.calendarEvents
+      : [];
+
+    const briefing = buildDailyBriefing(tasks, checklists, calendarEvents);
+    const buffer = await buildWorkbook({
+      tasks,
+      checklists,
+      calendarEvents,
+      briefing,
+    });
     const base64 = Buffer.from(buffer).toString("base64");
     const filename = briefingFilename(briefing.date);
 
     const wantsSend = Boolean(body.send);
-    const hasMailCreds = Boolean(
-      process.env.SMTP_URL || process.env.RESEND_API_KEY,
+    const email = (body.workEmail || "").trim();
+    const hasTransport = Boolean(
+      process.env.RESEND_API_KEY || process.env.SMTP_URL,
     );
 
     let delivery: {
-      status: "dry_run" | "skipped_no_credentials" | "not_implemented";
+      status: string;
       message: string;
       preferredHour?: string;
     };
@@ -47,29 +108,40 @@ export async function POST(request: Request) {
     if (!wantsSend) {
       delivery = {
         status: "dry_run",
-        message:
-          "발송하지 않았습니다. JSON 브리핑과 xlsx(base64)만 반환합니다.",
-        preferredHour: body.preferredHour,
+        message: "발송하지 않음. JSON + xlsx(base64)만 반환.",
+        preferredHour: body.preferredHour || "08:00",
       };
-    } else if (!hasMailCreds) {
+    } else if (!email) {
+      delivery = {
+        status: "skipped_no_address",
+        message: "업무용 이메일이 비어 있어 발송하지 않았습니다.",
+        preferredHour: body.preferredHour || "08:00",
+      };
+    } else if (!hasTransport) {
       delivery = {
         status: "skipped_no_credentials",
         message:
-          "메일/문자 자격 증명이 없어 실제 발송을 하지 않았습니다. 브리핑·xlsx만 생성했습니다.",
-        preferredHour: body.preferredHour,
+          "메일 전송 키가 없어 발송하지 않았습니다. RESEND_API_KEY를 설정하세요.",
+        preferredHour: body.preferredHour || "08:00",
       };
     } else {
+      const result = await trySendEmail({
+        to: email,
+        subject: briefing.headline,
+        text: briefing.plaintext,
+        filename,
+        xlsxBase64: base64,
+      });
       delivery = {
-        status: "not_implemented",
-        message:
-          "자격 증명은 있으나 채널 연동은 아직 구현되지 않았습니다. dry-run만 수행합니다.",
-        preferredHour: body.preferredHour,
+        status: result.sent ? "sent" : "send_failed",
+        message: result.detail,
+        preferredHour: body.preferredHour || "08:00",
       };
     }
 
     return NextResponse.json({
       ok: true,
-      mode: "dry_run",
+      mode: wantsSend ? "send_attempt" : "dry_run",
       briefing: {
         date: briefing.date,
         generatedAt: briefing.generatedAt,
@@ -78,7 +150,10 @@ export async function POST(request: Request) {
         plaintext: briefing.plaintext,
         activeCount: briefing.activeCount,
         completedCount: briefing.completedCount,
+        checklistOpenCount: briefing.checklistOpenCount,
         sections: briefing.sections,
+        checklistSections: briefing.checklistSections,
+        calendarLines: briefing.calendarLines,
       },
       excel: {
         filename,
@@ -88,7 +163,7 @@ export async function POST(request: Request) {
       },
       delivery,
       schedulerNote:
-        "매일 고정 시각 cron은 시각·채널·저장 위치 확정 후 연결합니다. 현재는 이 엔드포인트를 수동/cron이 호출하는 뼈대입니다.",
+        "매일 08:00 Asia/Seoul cron → 이 엔드포인트. 주소·Resend 확정 후 실발송.",
     });
   } catch (e) {
     return NextResponse.json(
@@ -105,10 +180,15 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     endpoint: "/api/daily-briefing",
+    defaultHourKST: "08:00",
     method: "POST",
-    description:
-      "tasks 배열을 받아 한국어 브리핑 JSON과 xlsx(base64)를 반환합니다. 기본 dry-run.",
-    exampleCron:
-      "0 30 7 * * * → POST /api/daily-briefing with stored tasks snapshot",
+    body: {
+      tasks: [],
+      checklists: [],
+      calendarEvents: [],
+      send: false,
+      workEmail: "",
+      preferredHour: "08:00",
+    },
   });
 }

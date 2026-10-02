@@ -32,32 +32,63 @@ async function main() {
   await desktop.getByText("일비서.xlsx").waitFor();
   await desktop.getByText("① 스팟성 할일").waitFor();
 
-  // smoke: add row, edit title, memo, complete
   await desktop.getByRole("button", { name: "행 추가" }).click();
-  await desktop.waitForTimeout(250);
-  const titles = desktop.locator('input[aria-label="제목"]');
-  await titles.last().fill("진짜엑셀 스모크");
-  const memos = desktop.locator('input[aria-label="메모"]');
-  await memos.last().fill("메모확인");
+  await desktop.waitForTimeout(300);
+  const title = desktop.locator('input[aria-label="제목"]').last();
+  await title.click();
+  await title.fill("진짜엑셀 스모크");
+  await title.press("Tab");
   await desktop.waitForTimeout(200);
+  await desktop.locator('input[aria-label="메모"]').last().fill("메모확인");
+  await desktop.waitForTimeout(300);
   await shot(desktop, "workbook");
 
-  // section bands visible
   await desktop.getByText("② 지속성 할일").waitFor();
   await desktop.getByText("③ 언젠가 해야할 일").waitFor();
   await shot(desktop, "sections");
 
-  // complete first checkbox on new row (last data checkbox)
-  const checks = desktop.locator('input[type="checkbox"][aria-label*="완료"]');
-  await checks.last().check();
-  await desktop.waitForTimeout(350);
-  await desktop.getByRole("button", { name: "한 일", exact: true }).last().click();
-  await desktop.waitForTimeout(350);
-  await desktop.getByText("진짜엑셀 스모크").waitFor();
+  const clicked = await desktop.evaluate(() => {
+    const inputs = [...document.querySelectorAll('input[aria-label="제목"]')];
+    const input = inputs.find((el) => el.value === "진짜엑셀 스모크");
+    if (!input) return false;
+    const row = input.closest("tr");
+    const box = row?.querySelector('input[type="checkbox"]');
+    if (!box) return false;
+    box.click();
+    return true;
+  });
+  if (!clicked) throw new Error("스모크 행 완료 클릭 실패");
+  await desktop.waitForTimeout(600);
+
+  // Prefer top nav "한 일 N건"
+  await desktop
+    .locator("nav[aria-label='주요 메뉴']")
+    .first()
+    .getByRole("button", { name: /^한 일/ })
+    .click();
+  await desktop.waitForTimeout(500);
+
+  const findSmoke = () =>
+    desktop.evaluate(() =>
+      [...document.querySelectorAll("input")].some(
+        (el) => el.value === "진짜엑셀 스모크",
+      ),
+    );
+
+  let onDone = await findSmoke();
+  if (!onDone) {
+    await desktop.locator(".excel-wb").getByRole("button", { name: "한 일" }).click();
+    await desktop.waitForTimeout(400);
+    onDone = await findSmoke();
+  }
+  if (!onDone) throw new Error("한 일 시트에 스모크 항목 없음");
   await shot(desktop, "done-sheet");
 
-  // settings excel still present
-  await desktop.getByRole("button", { name: /^설정/ }).first().click();
+  await desktop
+    .locator("nav[aria-label='주요 메뉴']")
+    .first()
+    .getByRole("button", { name: /^설정/ })
+    .click();
   await desktop.getByText("엑셀 파일 연결").first().waitFor();
 
   await desktop.close();
@@ -68,7 +99,10 @@ async function main() {
   await mobile.evaluate(() => localStorage.clear());
   await mobile.reload({ waitUntil: "networkidle" });
   await dismissWelcome(mobile);
-  await mobile.getByRole("button", { name: "할 일" }).click();
+  await mobile
+    .locator("nav[aria-label='주요 메뉴']")
+    .getByRole("button", { name: "할 일" })
+    .click();
   await mobile.waitForTimeout(400);
   await shot(mobile, "mobile");
   await mobileCtx.close();

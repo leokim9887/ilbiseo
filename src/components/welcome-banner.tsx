@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 
 const SEEN_KEY = "ilbiseo-welcome-seen-v2";
 
-export function WelcomeBanner() {
+interface WelcomeBannerProps {
+  onStart?: () => void;
+}
+
+export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -25,21 +29,25 @@ export function WelcomeBanner() {
       /* ignore */
     }
     setOpen(false);
+    onStart?.();
   };
 
   return (
-    <div className="animate-fade-up rounded-lg border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-4 sm:px-5">
-      <p className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--brand)]">
-        아버지용 일비서
+    <div className="animate-fade-up rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] px-5 py-5 shadow-[0_1px_0_rgba(26,43,54,0.04)] sm:px-6">
+      <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--brand)]">
+        일비서
       </p>
-      <p className="mt-1.5 text-sm leading-relaxed text-[var(--ink-muted)]">
-        업무·개인·과제·팀원 네 틀에서 할 일/한 일·체크리스트를 관리합니다. 구글
-        캘린더는 별도 탭입니다. PC에서 「엑셀 파일 연결」하면 입력할 때마다
-        로컬 xlsx가 갱신되고, 매일 08:00 브리핑은 업무 이메일을 넣으면
-        발송을 준비합니다.
+      <p className="mt-2 text-sm leading-relaxed text-[var(--ink-muted)]">
+        아래 메뉴에서 <strong className="text-[var(--ink)]">할 일</strong> ·{" "}
+        <strong className="text-[var(--ink)]">한 일</strong> ·{" "}
+        <strong className="text-[var(--ink)]">체크리스트</strong>를 고르고, 네
+        틀(업무/개인/과제/팀원)을 누릅니다.{" "}
+        <strong className="text-[var(--ink)]">캘린더</strong>는 따로 보고,{" "}
+        <strong className="text-[var(--ink)]">설정·엑셀</strong>에서 PC 파일을
+        연결합니다.
       </p>
-      <div className="mt-3">
-        <Button type="button" size="sm" onClick={close}>
+      <div className="mt-4">
+        <Button type="button" size="lg" className="min-h-11" onClick={close}>
           시작하기
         </Button>
       </div>

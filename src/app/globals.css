@@ -50,51 +50,51 @@
 }
 
 :root {
-  /* Practical work-tool palette — cool slate + teal, not purple/cream */
-  --background: #e8eef2;
-  --foreground: #1a2b36;
-  --card: #f7fafb;
-  --card-foreground: #1a2b36;
-  --popover: #ffffff;
-  --popover-foreground: #1a2b36;
-  --primary: #0f5c66;
-  --primary-foreground: #f3fbfb;
-  --secondary: #d7e3e8;
-  --secondary-foreground: #1a2b36;
-  --muted: #dce6eb;
-  --muted-foreground: #5a6f7a;
-  --accent: #cfe3e6;
-  --accent-foreground: #0f5c66;
+  /* Calm professional — warm stone + deep teal, not purple/cream AI-slop */
+  --background: #ebe6df;
+  --foreground: #1c2420;
+  --card: #f7f5f1;
+  --card-foreground: #1c2420;
+  --popover: #fffcf8;
+  --popover-foreground: #1c2420;
+  --primary: #1a4d45;
+  --primary-foreground: #f4faf8;
+  --secondary: #ddd6cc;
+  --secondary-foreground: #1c2420;
+  --muted: #e3ddd4;
+  --muted-foreground: #5c655f;
+  --accent: #d5e4df;
+  --accent-foreground: #1a4d45;
   --destructive: #b42318;
-  --border: #c5d3da;
-  --input: #c5d3da;
-  --ring: #0f5c66;
-  --chart-1: #0f5c66;
-  --chart-2: #c47a2c;
+  --border: #c9c0b4;
+  --input: #c9c0b4;
+  --ring: #1a4d45;
+  --chart-1: #1a4d45;
+  --chart-2: #b86b2c;
   --chart-3: #3d6b9a;
-  --chart-4: #6b7c85;
-  --chart-5: #2f4a55;
-  --radius: 0.4rem;
-  --sidebar: #f7fafb;
-  --sidebar-foreground: #1a2b36;
-  --sidebar-primary: #0f5c66;
-  --sidebar-primary-foreground: #f3fbfb;
-  --sidebar-accent: #d7e3e8;
-  --sidebar-accent-foreground: #1a2b36;
-  --sidebar-border: #c5d3da;
-  --sidebar-ring: #0f5c66;
+  --chart-4: #6b736c;
+  --chart-5: #2f4a44;
+  --radius: 0.55rem;
+  --sidebar: #f7f5f1;
+  --sidebar-foreground: #1c2420;
+  --sidebar-primary: #1a4d45;
+  --sidebar-primary-foreground: #f4faf8;
+  --sidebar-accent: #ddd6cc;
+  --sidebar-accent-foreground: #1c2420;
+  --sidebar-border: #c9c0b4;
+  --sidebar-ring: #1a4d45;
 
-  --brand: #0b4f57;
-  --ink: #1a2b36;
-  --ink-muted: #5a6f7a;
-  --sheet: #fbfcfd;
-  --sheet-header: #eef4f6;
-  --grid-line: #c9d6dd;
-  --row-hover: #f0f7f8;
-  --group-bg: #e9f2f3;
-  --accent-spot: #c47a2c;
-  --accent-ongoing: #0f5c66;
-  --accent-someday: #6b7c85;
+  --brand: #163f39;
+  --ink: #1c2420;
+  --ink-muted: #5c655f;
+  --sheet: #fffcf8;
+  --sheet-header: #f0ebe3;
+  --grid-line: #d0c7bb;
+  --row-hover: #f3eee7;
+  --group-bg: #ddeae5;
+  --accent-spot: #b86b2c;
+  --accent-ongoing: #1a4d45;
+  --accent-someday: #6b736c;
 }
 
 @layer base {
@@ -104,9 +104,9 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      radial-gradient(ellipse 120% 80% at 0% 0%, rgba(15, 92, 102, 0.08), transparent 50%),
-      radial-gradient(ellipse 90% 60% at 100% 0%, rgba(196, 122, 44, 0.06), transparent 45%),
-      linear-gradient(180deg, #e8eef2 0%, #dfe8ed 100%);
+      radial-gradient(ellipse 100% 70% at 0% 0%, rgba(26, 77, 69, 0.09), transparent 55%),
+      radial-gradient(ellipse 80% 50% at 100% 0%, rgba(184, 107, 44, 0.07), transparent 50%),
+      linear-gradient(180deg, #ebe6df 0%, #e2dbd1 100%);
     background-attachment: fixed;
     min-height: 100dvh;
   }

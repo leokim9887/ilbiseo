@@ -68,7 +68,7 @@ export function OcrImport({ onImport, category }: OcrImportProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button type="button" variant="outline" size="sm">
+          <Button type="button" variant="outline" size="lg" className="min-h-11">
             <ImageIcon className="size-3.5" />
             사진 OCR
           </Button>

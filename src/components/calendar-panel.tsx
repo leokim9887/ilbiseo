@@ -7,6 +7,7 @@ import {
   formatCalendarWhen,
   parseIcsToEvents,
 } from "@/lib/calendar-data";
+import { PanelShell, EmptyState } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarDays } from "lucide-react";
@@ -60,51 +61,57 @@ export function CalendarPanel({
   const sorted = [...events].sort((a, b) => a.start.localeCompare(b.start));
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-[var(--accent-ongoing)]/30 bg-[var(--sheet)] p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="flex items-center gap-2 text-base font-semibold text-[var(--brand)]">
-              <CalendarDays className="size-4" />
-              구글 캘린더 (별도 영역)
-            </p>
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              프로그램 할 일·체크리스트와{" "}
-              <strong className="text-[var(--ink)]">섞지 않고</strong> 따로
-              보여 줍니다. OAuth 키가 없으면 mock/ICS로 확인하세요.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={loadMock}>
-              mock 샘플
+    <PanelShell
+      title="구글 캘린더"
+      description="프로그램 할 일·체크리스트와 섞지 않습니다. mock 또는 ICS로 확인할 수 있습니다."
+      icon={<CalendarDays className="size-5" />}
+      actions={
+        <>
+          <Button
+            type="button"
+            size="lg"
+            variant="secondary"
+            className="min-h-11"
+            onClick={loadMock}
+          >
+            mock 샘플
+          </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".ics,text/calendar"
+            className="hidden"
+            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+          />
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            className="min-h-11"
+            onClick={() => fileRef.current?.click()}
+          >
+            ICS 파일
+          </Button>
+          {hasGoogle ? (
+            <Button type="button" size="lg" className="min-h-11" disabled>
+              Google 연결 (준비됨)
             </Button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".ics,text/calendar"
-              className="hidden"
-              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-            />
+          ) : (
             <Button
               type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => fileRef.current?.click()}
+              size="lg"
+              variant="ghost"
+              className="min-h-11"
+              disabled
             >
-              ICS 파일
+              OAuth 미설정
             </Button>
-            {hasGoogle ? (
-              <Button type="button" size="sm" disabled>
-                Google 연결 (준비됨)
-              </Button>
-            ) : (
-              <Button type="button" size="sm" variant="ghost" disabled>
-                OAuth 미설정
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className="mt-3 space-y-2">
+          )}
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-2 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 p-3">
           <Textarea
             rows={3}
             className="font-mono text-xs"
@@ -114,8 +121,9 @@ export function CalendarPanel({
           />
           <Button
             type="button"
-            size="sm"
+            size="lg"
             variant="outline"
+            className="min-h-11"
             disabled={!icsText.trim()}
             onClick={importIcs}
           >
@@ -127,52 +135,38 @@ export function CalendarPanel({
             </p>
           ) : null}
         </div>
-      </div>
 
-      {sorted.length === 0 ? (
-        <div className="border border-dashed border-[var(--grid-line)] px-4 py-12 text-center text-sm text-[var(--ink-muted)]">
-          캘린더 일정이 없습니다. mock 샘플 또는 ICS를 불러오세요.
-        </div>
-      ) : (
-        <div className="overflow-x-auto border border-[var(--grid-line)] bg-[var(--sheet)]">
-          <table className="w-full min-w-[520px] border-collapse text-sm">
-            <thead>
-              <tr className="bg-[var(--sheet-header)] text-left text-[12px] font-semibold text-[var(--ink-muted)]">
-                <th className="border-b border-[var(--grid-line)] px-3 py-2.5">
-                  언제
-                </th>
-                <th className="border-b border-[var(--grid-line)] px-3 py-2.5">
-                  일정 (캘린더)
-                </th>
-                <th className="border-b border-[var(--grid-line)] px-3 py-2.5">
-                  메모
-                </th>
-                <th className="border-b border-[var(--grid-line)] px-3 py-2.5">
-                  출처
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((ev) => (
-                <tr key={ev.id} className="hover:bg-[var(--row-hover)]">
-                  <td className="border-b border-[var(--grid-line)] px-3 py-2.5 whitespace-nowrap text-[var(--ink-muted)]">
-                    {formatCalendarWhen(ev)}
-                  </td>
-                  <td className="border-b border-[var(--grid-line)] px-3 py-2.5 font-medium">
-                    {ev.title}
-                  </td>
-                  <td className="border-b border-[var(--grid-line)] px-3 py-2.5 text-[var(--ink-muted)]">
-                    {ev.notes || "—"}
-                  </td>
-                  <td className="border-b border-[var(--grid-line)] px-3 py-2.5 text-[12px] text-[var(--ink-muted)]">
-                    {ev.source}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+        {sorted.length === 0 ? (
+          <EmptyState
+            title="캘린더 일정이 없습니다"
+            description="「mock 샘플」또는 ICS 파일로 일정을 불러오세요."
+            action={
+              <Button type="button" size="lg" onClick={loadMock}>
+                mock 샘플 넣기
+              </Button>
+            }
+          />
+        ) : (
+          <ul className="space-y-2">
+            {sorted.map((ev) => (
+              <li
+                key={ev.id}
+                className="rounded-xl border border-[var(--grid-line)] border-l-[3px] border-l-[var(--accent-ongoing)] bg-[var(--sheet-header)]/30 px-3 py-3 sm:px-4"
+              >
+                <p className="text-[12px] font-medium text-[var(--brand)]">
+                  {formatCalendarWhen(ev)}
+                </p>
+                <p className="mt-0.5 text-base font-semibold text-[var(--ink)]">
+                  {ev.title}
+                </p>
+                <p className="mt-1 text-[12px] text-[var(--ink-muted)]">
+                  {ev.notes || "메모 없음"} · 출처 {ev.source}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </PanelShell>
   );
 }

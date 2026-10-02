@@ -35,7 +35,6 @@ export function ExcelLinker({
     try {
       const handle = await pickExcelFile();
       if (!handle) {
-        // fallback download
         const briefing = buildDailyBriefing(
           state.tasks,
           state.checklists,
@@ -84,42 +83,61 @@ export function ExcelLinker({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--grid-line)] bg-[var(--sheet-header)] px-3 py-2 text-sm">
-      <FileSpreadsheet className="size-4 text-[var(--brand)]" />
-      <span className="text-[var(--ink-muted)]">
-        {fsOk
-          ? linked
-            ? "엑셀 연결됨 — 변경 시 PC 파일 갱신"
-            : "PC 엑셀 파일 연결 (File System Access)"
-          : "이 브라우저는 파일 연결 미지원 — 다운로드로 저장"}
-      </span>
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        disabled={busy}
-        onClick={link}
-      >
-        <Link2 className="size-3.5" />
-        엑셀 파일 연결
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={busy}
-        onClick={download}
-      >
-        지금 저장/다운로드
-      </Button>
-      {linked ? (
-        <Button type="button" size="sm" variant="ghost" onClick={unlink}>
-          <Unlink className="size-3.5" />
-          연결 해제
+    <div className="space-y-3 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
+      <div className="flex items-start gap-3">
+        <div className="rounded-lg bg-[var(--group-bg)] p-2 text-[var(--brand)]">
+          <FileSpreadsheet className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[var(--ink)]">
+            PC 엑셀 파일 연결
+          </p>
+          <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
+            {fsOk
+              ? linked
+                ? "연결됨 — 할 일·체크리스트를 바꾸면 같은 파일이 덮어쓰기됩니다."
+                : "아버지 PC Chrome에서 파일을 고르면 입력할 때마다 갱신됩니다."
+              : "이 브라우저는 파일 연결을 지원하지 않습니다. 「지금 저장/다운로드」를 쓰세요."}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="lg"
+          className="min-h-11"
+          variant="secondary"
+          disabled={busy}
+          onClick={link}
+        >
+          <Link2 className="size-4" />
+          엑셀 파일 연결
         </Button>
-      ) : null}
+        <Button
+          type="button"
+          size="lg"
+          className="min-h-11"
+          variant="outline"
+          disabled={busy}
+          onClick={download}
+        >
+          지금 저장/다운로드
+        </Button>
+        {linked ? (
+          <Button
+            type="button"
+            size="lg"
+            className="min-h-11"
+            variant="ghost"
+            onClick={unlink}
+          >
+            <Unlink className="size-4" />
+            연결 해제
+          </Button>
+        ) : null}
+      </div>
       {status ? (
-        <span className="text-[11px] text-[var(--ink-muted)]">{status}</span>
+        <p className="text-[12px] text-[var(--ink-muted)]">{status}</p>
       ) : null}
     </div>
   );

@@ -76,7 +76,7 @@ export function InstallHint() {
     <div
       role="region"
       aria-label="홈 화면에 추가"
-      className="animate-fade-up sticky top-0 z-40 border-b border-[var(--grid-line)] bg-[var(--brand)] px-3 py-2.5 text-[var(--primary-foreground)] shadow-sm sm:px-4"
+      className="animate-fade-up sticky top-0 z-40 border-b border-[var(--grid-line)] bg-[var(--brand)]/95 px-3 py-2.5 text-[var(--primary-foreground)] backdrop-blur-sm sm:px-4"
     >
       <div className="mx-auto flex max-w-6xl items-start gap-3">
         <div className="mt-0.5 rounded-md bg-white/15 p-1.5">

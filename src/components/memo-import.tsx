@@ -47,7 +47,12 @@ export function MemoImport({ onImport, category }: MemoImportProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button type="button" variant="outline" size="lg" className="min-h-11">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 rounded-sm border-[#8a939a] bg-white"
+          >
             <StickyNote className="size-3.5" />
             메모 붙여넣기
           </Button>

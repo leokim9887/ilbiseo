@@ -2,24 +2,17 @@
 
 import { useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
-import { TodoGrid } from "@/components/todo-grid";
-import { CompletionLog } from "@/components/completion-log";
+import { ExcelWorkbook } from "@/components/excel-workbook";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { DailyBriefingPanel } from "@/components/daily-briefing";
 import { ExcelLinker } from "@/components/excel-linker";
-import { MemoImport } from "@/components/memo-import";
-import { OcrImport } from "@/components/ocr-import";
 import { InstallHint } from "@/components/install-hint";
 import { WelcomeBanner } from "@/components/welcome-banner";
 import { AppNav, type MainView } from "@/components/app-nav";
 import { PanelShell } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
-import {
-  CATEGORY_LABEL,
-  CATEGORY_ORDER,
-  type TaskCategory,
-} from "@/lib/types";
-import { Loader2, Plus, RotateCcw } from "lucide-react";
+import { type TaskCategory } from "@/lib/types";
+import { Loader2, RotateCcw } from "lucide-react";
 
 export function AssistantApp() {
   const app = useAppState();
@@ -49,12 +42,12 @@ export function AssistantApp() {
 
   const active = app.activeTasks(category);
   const done = app.completedTasks(category);
-  const showCategory = view === "todo" || view === "done";
+  const workbookOpen = view === "todo" || view === "done";
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <InstallHint />
-      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-7 sm:pb-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-3 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-7 sm:pb-10">
         <WelcomeBanner onStart={() => setView("todo")} />
 
         <header className="animate-fade-up space-y-3">
@@ -66,9 +59,9 @@ export function AssistantApp() {
               <h1 className="mt-0.5 font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--brand)] sm:text-5xl">
                 일비서
               </h1>
-              <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-[var(--ink-muted)]">
-                네 틀로 할 일·한 일을 엑셀처럼 관리하고, 캘린더는 따로, 매일
-                08:00 브리핑과 PC 엑셀까지.
+              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
+                할 일·한 일은 엑셀 장부처럼 쓰고, 캘린더는 따로, 매일 08:00
+                브리핑과 PC 파일 연결까지.
               </p>
             </div>
             <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">
@@ -95,7 +88,7 @@ export function AssistantApp() {
         </header>
 
         <AppNav
-          value={view}
+          value={view === "done" ? "done" : view === "todo" ? "todo" : view}
           onChange={setView}
           counts={{
             todo: app.allActive.length,
@@ -113,76 +106,22 @@ export function AssistantApp() {
           </p>
         ) : null}
 
-        {showCategory ? (
-          <div className="animate-sheet-in space-y-2">
-            <p className="text-[11px] font-semibold tracking-wide text-[var(--ink-muted)]">
-              네 틀 고르기
-            </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {CATEGORY_ORDER.map((c) => {
-                const selected = category === c;
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCategory(c)}
-                    className={`min-h-12 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                      selected
-                        ? "border-[var(--brand)] bg-[var(--group-bg)] text-[var(--brand)]"
-                        : "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)] hover:bg-[var(--row-hover)]"
-                    }`}
-                  >
-                    {CATEGORY_LABEL[c]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="animate-sheet-in" key={view}>
-          {view === "todo" ? (
-            <PanelShell
-              title={`${CATEGORY_LABEL[category]} · 할 일`}
-              description="엑셀처럼 칸을 바로 고칩니다. 위쪽부터 스팟 → 지속 → 언젠가 순입니다."
-              actions={
-                <>
-                  <Button
-                    type="button"
-                    size="lg"
-                    className="min-h-11"
-                    onClick={() => app.addTask({ category, kind: "spot" })}
-                  >
-                    <Plus className="size-4" />
-                    행 추가
-                  </Button>
-                  <MemoImport category={category} onImport={app.addMany} />
-                  <OcrImport category={category} onImport={app.addMany} />
-                </>
-              }
-            >
-              <TodoGrid
-                tasks={active}
-                hideCategory
-                onUpdate={app.updateTask}
-                onComplete={app.completeTask}
-                onDelete={app.deleteTask}
-                onAddItem={() => app.addTask({ category, kind: "spot" })}
-              />
-            </PanelShell>
-          ) : null}
-
-          {view === "done" ? (
-            <PanelShell
-              title={`${CATEGORY_LABEL[category]} · 한 일`}
-              description="끝낸 일 기록입니다. 필요하면 복원하세요."
-            >
-              <CompletionLog
-                tasks={done}
-                onRestore={app.restoreTask}
-                onDelete={app.deleteTask}
-              />
-            </PanelShell>
+        <div className="animate-sheet-in" key={workbookOpen ? "wb" : view}>
+          {workbookOpen ? (
+            <ExcelWorkbook
+              sheet={view === "done" ? "done" : "todo"}
+              onSheetChange={(s) => setView(s === "done" ? "done" : "todo")}
+              category={category}
+              onCategoryChange={setCategory}
+              activeTasks={active}
+              doneTasks={done}
+              onUpdate={app.updateTask}
+              onComplete={app.completeTask}
+              onRestore={app.restoreTask}
+              onDelete={app.deleteTask}
+              onAdd={() => app.addTask({ category, kind: "spot" })}
+              onImport={app.addMany}
+            />
           ) : null}
 
           {view === "calendar" ? (
@@ -219,9 +158,8 @@ export function AssistantApp() {
                     데이터
                   </p>
                   <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    할 일·한 일은 이 브라우저(localStorage)에 저장됩니다. 예전
-                    체크리스트가 있으면 미완료 항목만 할 일로 옮긴 뒤
-                    비웁니다.
+                    할 일·한 일은 이 브라우저(localStorage)에 저장됩니다. 장부
+                    UI와 PC xlsx 시트가 같은 구조입니다.
                   </p>
                   <Button
                     type="button"
@@ -234,10 +172,6 @@ export function AssistantApp() {
                     샘플 다시 넣기
                   </Button>
                 </div>
-                <p className="text-sm text-[var(--ink-muted)]">
-                  PWA로 홈 화면에 두면 앱처럼 열립니다. 엑셀 자동 갱신은 아버지
-                  PC Chrome에서 「엑셀 파일 연결」할 때만 됩니다.
-                </p>
               </div>
             </PanelShell>
           ) : null}

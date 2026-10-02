@@ -139,7 +139,7 @@ export function AssistantApp() {
                 onClick={() => app.addTask({ category, kind: "spot" })}
               >
                 <Plus className="size-3.5" />
-                행 추가
+                항목 추가
               </Button>
               <MemoImport
                 category={category}
@@ -171,9 +171,11 @@ export function AssistantApp() {
                   onUpdate={app.updateTask}
                   onComplete={app.completeTask}
                   onDelete={app.deleteTask}
+                  onAddItem={() => app.addTask({ category, kind: "spot" })}
                 />
                 <p className="text-[11px] text-[var(--ink-muted)]">
-                  정렬: 스팟 → 지속 → 언젠가 · 유사 묶음 · 메모는 행마다 입력
+                  위에서부터 오늘(스팟) → 지속 → 언젠가 · 비슷한 일은 묶음 ·
+                  체크하면 한 일로 이동 · ▾ 으로 기한·시급·중요·메모 편집
                 </p>
               </>
             ) : (

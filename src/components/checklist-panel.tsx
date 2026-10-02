@@ -5,7 +5,7 @@ import type { ChecklistItem, TaskCategory } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ListChecks, Trash2 } from "lucide-react";
+import { ListChecks, Plus, Trash2 } from "lucide-react";
 
 interface ChecklistPanelProps {
   items: ChecklistItem[];
@@ -30,13 +30,16 @@ export function ChecklistPanel({
     setTitle("");
   };
 
+  const open = items.filter((i) => !i.checked);
+  const done = items.filter((i) => i.checked);
+
   return (
-    <div className="space-y-3 rounded-lg border border-[var(--grid-line)] bg-[var(--sheet)] p-4">
-      <div className="flex items-center gap-2">
+    <div className="space-y-3 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] p-4">
+      <div className="flex flex-wrap items-center gap-2">
         <ListChecks className="size-4 text-[var(--brand)]" />
         <p className="text-sm font-semibold text-[var(--ink)]">체크리스트</p>
         <span className="text-[11px] text-[var(--ink-muted)]">
-          미완료 {items.filter((i) => !i.checked).length} / 전체 {items.length}
+          남음 {open.length} · 완료 {done.length}
         </span>
       </div>
       <div className="flex gap-2">
@@ -47,22 +50,23 @@ export function ChecklistPanel({
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
-          className="h-8"
+          className="h-9"
         />
         <Button type="button" size="sm" onClick={submit}>
+          <Plus className="size-3.5" />
           추가
         </Button>
       </div>
       {items.length === 0 ? (
-        <p className="py-4 text-center text-sm text-[var(--ink-muted)]">
-          아직 체크 항목이 없습니다.
-        </p>
+        <div className="rounded-lg border border-dashed border-[var(--grid-line)] px-3 py-6 text-center text-sm text-[var(--ink-muted)]">
+          아직 없습니다. 위칸에 적고 「추가」하세요.
+        </div>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-1">
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--row-hover)]"
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-[var(--row-hover)]"
             >
               <Checkbox
                 checked={item.checked}

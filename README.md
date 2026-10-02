@@ -3,6 +3,31 @@
 아버지 전용 할 일·일정 비서 (로그인 없음).  
 네 틀(업무/개인/과제/팀원) · 할 일/한 일 · 체크리스트 · 구글 캘린더(별도) · 매일 08:00 브리핑 · PC 엑셀 자동 갱신.
 
+## 노트북에서 테스트
+
+본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
+
+1. **공개 URL (바로 열기)**  
+   https://temporary-prompt-dune-t8orjkt.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=20449332-8ac2-4a77-a64e-56074ab97f31  
+   - 영구: `npx vercel login` 후 `npx vercel --prod`
+
+2. **zip으로 로컬 실행**  
+   - 파일: Project store `docs/ilbiseo-laptop.zip`  
+     (`/cursor/stores/self/docs/ilbiseo-laptop.zip`)  
+   - 안내: `/cursor/stores/self/docs/laptop-test.md`  
+   - 명령:
+
+```bash
+npm install
+npm run build
+npm run start -- -p 4317
+# → http://127.0.0.1:4317
+```
+
+3. **엑셀**: 노트북 Chrome에서 「엑셀 파일 연결」  
+4. **08:00 메일**: 업무 이메일 + `RESEND_API_KEY` 필요 (없으면 dry-run만)
+
 ## 아버지용 빠른 안내
 
 ### 1) PC에서 엑셀 자동 갱신

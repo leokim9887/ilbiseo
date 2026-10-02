@@ -1,10 +1,5 @@
 import ExcelJS from "exceljs";
-import {
-  CATEGORY_LABEL,
-  KIND_LABEL,
-  type CalendarEvent,
-  type Task,
-} from "./types";
+import { type CalendarEvent, type Task } from "./types";
 import { sortCompleted, sortTasks } from "./sort";
 import type { DailyBriefing } from "./briefing";
 import { formatCalendarWhen } from "./calendar-data";
@@ -12,21 +7,28 @@ import { formatCalendarWhen } from "./calendar-data";
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
   pattern: "solid",
-  fgColor: { argb: "FF163F39" },
+  fgColor: { argb: "FFF3F3F3" },
 };
 const HEADER_FONT: Partial<ExcelJS.Font> = {
-  color: { argb: "FFFFFFFF" },
+  color: { argb: "FF000000" },
   bold: true,
-  size: 11,
+  size: 12,
+};
+const THIN_BLACK: Partial<ExcelJS.Borders> = {
+  top: { style: "thin", color: { argb: "FF000000" } },
+  left: { style: "thin", color: { argb: "FF000000" } },
+  bottom: { style: "thin", color: { argb: "FF000000" } },
+  right: { style: "thin", color: { argb: "FF000000" } },
 };
 
 function styleHeader(row: ExcelJS.Row) {
   row.eachCell((cell) => {
     cell.fill = HEADER_FILL;
     cell.font = HEADER_FONT;
-    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = THIN_BLACK;
   });
-  row.height = 22;
+  row.height = 24;
 }
 
 export type WorkbookPayload = {
@@ -43,63 +45,56 @@ export async function buildWorkbook(
   wb.creator = "일비서";
   wb.created = new Date();
 
+  // Father TO DO LIST headers (exact): 순서 · 할일 LIST UP · 마감목표 · 중요도 · 시급성 · 완료여부
   const todo = wb.addWorksheet("할 일", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
   todo.columns = [
-    { header: "틀", key: "category", width: 10 },
-    { header: "제목", key: "title", width: 34 },
-    { header: "종류", key: "kind", width: 14 },
-    { header: "목표기일", key: "targetDate", width: 12 },
-    { header: "중요", key: "importance", width: 8 },
-    { header: "시급", key: "urgency", width: 8 },
-    { header: "묶음", key: "groupKey", width: 14 },
-    { header: "메모", key: "memo", width: 24 },
-    { header: "출처", key: "source", width: 10 },
+    { header: "순서", key: "order", width: 8 },
+    { header: "할일 LIST UP", key: "listup", width: 48 },
+    { header: "마감목표", key: "deadline", width: 14 },
+    { header: "중요도", key: "importance", width: 10 },
+    { header: "시급성", key: "urgency", width: 10 },
+    { header: "완료여부", key: "done", width: 10 },
   ];
   styleHeader(todo.getRow(1));
-  for (const t of sortTasks(tasks)) {
+  sortTasks(tasks).forEach((t, i) => {
+    const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
     todo.addRow({
-      category: CATEGORY_LABEL[t.category],
-      title: t.title,
-      kind: KIND_LABEL[t.kind],
-      targetDate: t.targetDate ?? "",
+      order: i + 1,
+      listup,
+      deadline: t.targetDate ?? "",
       importance: t.importance,
       urgency: t.urgency,
-      groupKey: t.groupKey,
-      memo: t.memo,
-      source: t.source,
+      done: "",
     });
-  }
+  });
+  todo.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
 
   const done = wb.addWorksheet("한 일", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
   done.columns = [
-    { header: "틀", key: "category", width: 10 },
-    { header: "한 일", key: "title", width: 34 },
-    { header: "종류", key: "kind", width: 14 },
-    { header: "목표기일", key: "targetDate", width: 12 },
-    { header: "중요", key: "importance", width: 8 },
-    { header: "시급", key: "urgency", width: 8 },
-    { header: "완료일", key: "completedAt", width: 20 },
-    { header: "메모", key: "memo", width: 24 },
+    { header: "순서", key: "order", width: 8 },
+    { header: "할일 LIST UP", key: "listup", width: 48 },
+    { header: "마감목표", key: "deadline", width: 14 },
+    { header: "중요도", key: "importance", width: 10 },
+    { header: "시급성", key: "urgency", width: 10 },
+    { header: "완료여부", key: "done", width: 10 },
   ];
   styleHeader(done.getRow(1));
-  for (const t of sortCompleted(tasks)) {
+  sortCompleted(tasks).forEach((t, i) => {
+    const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
     done.addRow({
-      category: CATEGORY_LABEL[t.category],
-      title: t.title,
-      kind: KIND_LABEL[t.kind],
-      targetDate: t.targetDate ?? "",
+      order: i + 1,
+      listup,
+      deadline: t.targetDate ?? "",
       importance: t.importance,
       urgency: t.urgency,
-      completedAt: t.completedAt
-        ? new Date(t.completedAt).toLocaleString("ko-KR")
-        : "",
-      memo: t.memo,
+      done: "완료",
     });
-  }
+  });
+  done.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
 
   const cal = wb.addWorksheet("구글캘린더", {
     views: [{ state: "frozen", ySplit: 1 }],

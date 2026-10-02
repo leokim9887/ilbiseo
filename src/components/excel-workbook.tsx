@@ -12,10 +12,8 @@ import {
 import {
   CATEGORY_LABEL,
   CATEGORY_ORDER,
-  KIND_LABEL,
   type Task,
   type TaskCategory,
-  type TaskKind,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { MemoImport } from "@/components/memo-import";
@@ -24,43 +22,25 @@ import { Plus, RotateCcw, Trash2 } from "lucide-react";
 
 export type WorkbookSheet = "todo" | "done";
 
-type ColKey =
-  | "done"
-  | "title"
-  | "kind"
-  | "date"
-  | "importance"
-  | "urgency"
-  | "memo"
-  | "actions";
+/** Father’s six columns only */
+type ColKey = "order" | "listup" | "deadline" | "importance" | "urgency" | "done";
 
-const TODO_COLS: { key: ColKey; letter: string; label: string; width: string }[] =
-  [
-    { key: "done", letter: "A", label: "완료", width: "56px" },
-    { key: "title", letter: "B", label: "제목", width: "220px" },
-    { key: "kind", letter: "C", label: "종류", width: "130px" },
-    { key: "date", letter: "D", label: "목표기일", width: "128px" },
-    { key: "importance", letter: "E", label: "중요", width: "64px" },
-    { key: "urgency", letter: "F", label: "시급", width: "64px" },
-    { key: "memo", letter: "G", label: "메모", width: "180px" },
-    { key: "actions", letter: "H", label: "", width: "52px" },
-  ];
+/** Exact father header row (above the red line in the reference photo). */
+const COLS: { key: ColKey; label: string; width: string }[] = [
+  { key: "order", label: "순서", width: "56px" },
+  { key: "listup", label: "할일 LIST UP", width: "46%" },
+  { key: "deadline", label: "마감목표", width: "108px" },
+  { key: "importance", label: "중요도", width: "72px" },
+  { key: "urgency", label: "시급성", width: "72px" },
+  { key: "done", label: "완료여부", width: "84px" },
+];
 
-const DONE_COLS: { key: ColKey; letter: string; label: string; width: string }[] =
-  [
-    { key: "date", letter: "A", label: "완료일", width: "140px" },
-    { key: "title", letter: "B", label: "한 일", width: "240px" },
-    { key: "kind", letter: "C", label: "종류", width: "120px" },
-    { key: "memo", letter: "D", label: "메모", width: "200px" },
-    { key: "actions", letter: "E", label: "", width: "120px" },
-  ];
-
-const KIND_ORDER: TaskKind[] = ["spot", "ongoing", "someday"];
-const KIND_BAND: Record<TaskKind, string> = {
-  spot: "① 스팟성 할일 — 오늘 안에 마무리",
-  ongoing: "② 지속성 할일 — 오늘부터 목표기일까지",
-  someday: "③ 언젠가 해야할 일 — 시급·중요 순",
-};
+const EDITABLE: ColKey[] = [
+  "listup",
+  "deadline",
+  "importance",
+  "urgency",
+];
 
 type FocusCell = { rowId: string; col: ColKey };
 
@@ -106,50 +86,29 @@ export function ExcelWorkbook({
     [],
   );
 
-  const cols = sheet === "todo" ? TODO_COLS : DONE_COLS;
-  const editableCols: ColKey[] =
-    sheet === "todo"
-      ? ["title", "kind", "date", "importance", "urgency", "memo"]
-      : ["title", "memo"];
-
-  const todoRows = useMemo(() => {
-    const rows: Array<
-      | { type: "band"; kind: TaskKind; label: string }
-      | { type: "task"; task: Task }
-    > = [];
-    for (const kind of KIND_ORDER) {
-      const items = activeTasks.filter((t) => t.kind === kind);
-      rows.push({ type: "band", kind, label: KIND_BAND[kind] });
-      if (items.length === 0) {
-        // empty band still shown for partition clarity
-      } else {
-        for (const task of items) rows.push({ type: "task", task });
-      }
-    }
-    return rows;
-  }, [activeTasks]);
+  const tasks = sheet === "todo" ? activeTasks : doneTasks;
+  const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
 
   const moveFocus = useCallback(
     (rowId: string, col: ColKey, dir: "next" | "prev" | "down" | "up") => {
-      const taskIds =
-        sheet === "todo"
-          ? todoRows.filter((r) => r.type === "task").map((r) => r.task.id)
-          : doneTasks.map((t) => t.id);
-      const colIdx = editableCols.indexOf(col);
+      const colIdx = EDITABLE.indexOf(col);
       const rowIdx = taskIds.indexOf(rowId);
-      if (rowIdx < 0) return;
+      if (rowIdx < 0 || colIdx < 0) return;
 
       if (dir === "next" || dir === "prev") {
         const n = dir === "next" ? colIdx + 1 : colIdx - 1;
-        if (n >= 0 && n < editableCols.length) {
-          setFocus({ rowId, col: editableCols[n] });
+        if (n >= 0 && n < EDITABLE.length) {
+          setFocus({ rowId, col: EDITABLE[n] });
           return;
         }
         const nr = dir === "next" ? rowIdx + 1 : rowIdx - 1;
         if (nr >= 0 && nr < taskIds.length) {
           setFocus({
             rowId: taskIds[nr],
-            col: dir === "next" ? editableCols[0] : editableCols[editableCols.length - 1],
+            col:
+              dir === "next"
+                ? EDITABLE[0]
+                : EDITABLE[EDITABLE.length - 1],
           });
         }
         return;
@@ -159,7 +118,7 @@ export function ExcelWorkbook({
         setFocus({ rowId: taskIds[nr], col });
       }
     },
-    [sheet, todoRows, doneTasks, editableCols],
+    [taskIds],
   );
 
   useEffect(() => {
@@ -176,28 +135,24 @@ export function ExcelWorkbook({
   }, [focus]);
 
   return (
-    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#9aa5ad] bg-[#e9ecef] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
-      {/* Title bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#b0b8bf] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2">
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold text-[#1a2420]">
-            일비서.xlsx
-            <span className="ml-2 text-[12px] font-normal text-[#5c655f]">
-              — 할 일 계획 및 정리
-            </span>
-          </p>
-        </div>
+    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2">
+        <p className="truncate text-[15px] font-semibold text-[#1a2420]">
+          일비서.xlsx
+          <span className="ml-2 text-[12px] font-normal text-[#5c655f]">
+            — TO DO LIST
+          </span>
+        </p>
         <p className="text-[13px] tabular-nums text-[#5c655f]">{today}</p>
       </div>
 
-      {/* Ribbon / meta band */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#b0b8bf] bg-[#f3f4f6] px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#9aa5ad] bg-[#f0f2f4] px-3 py-2">
         <label className="flex items-center gap-2 text-[13px] text-[#1a2420]">
           <span className="font-semibold">틀</span>
           <select
             value={category}
             onChange={(e) => onCategoryChange(e.target.value as TaskCategory)}
-            className="h-9 min-w-[7.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] font-medium shadow-inner outline-none focus:border-[#217346] focus:ring-1 focus:ring-[#217346]"
+            className="h-9 min-w-[7.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] font-medium outline-none focus:border-[#217346]"
           >
             {CATEGORY_ORDER.map((c) => (
               <option key={c} value={c}>
@@ -206,7 +161,6 @@ export function ExcelWorkbook({
             ))}
           </select>
         </label>
-        <div className="mx-1 hidden h-6 w-px bg-[#c5ccd2] sm:block" />
         {sheet === "todo" ? (
           <>
             <Button
@@ -223,47 +177,54 @@ export function ExcelWorkbook({
           </>
         ) : (
           <p className="text-[13px] text-[#5c655f]">
-            완료된 항목 · 복원하면 할 일 시트로 돌아갑니다
+            완료된 항목 · 완료여부 해제(복원) 가능
           </p>
         )}
+        {selectedRow ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 rounded-sm border-[#b42318]/40 text-[#b42318]"
+            onClick={() => onDelete(selectedRow)}
+          >
+            <Trash2 className="size-3.5" />
+            선택 행 삭제
+          </Button>
+        ) : null}
+        {selectedRow && sheet === "done" ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 rounded-sm"
+            onClick={() => onRestore(selectedRow)}
+          >
+            <RotateCcw className="size-3.5" />
+            복원
+          </Button>
+        ) : null}
         <span className="ml-auto text-[12px] text-[#5c655f]">
-          {CATEGORY_LABEL[category]} ·{" "}
-          {sheet === "todo"
-            ? `할 일 ${activeTasks.length}행`
-            : `한 일 ${doneTasks.length}행`}
+          {CATEGORY_LABEL[category]} · {tasks.length}행
         </span>
       </div>
 
-      {/* Sheet frame */}
       <div
         ref={scrollRef}
-        className="relative max-h-[min(68vh,720px)] min-h-[320px] overflow-auto bg-white"
+        className="relative max-h-[min(70vh,760px)] min-h-[340px] overflow-auto bg-white"
       >
-        <table className="w-full min-w-[860px] border-separate border-spacing-0 text-[15px] text-[#1a2420]">
+        <table className="w-full min-w-[780px] border-collapse text-[15px] text-black">
           <thead className="sticky top-0 z-20">
-            {/* Excel column letters */}
-            <tr className="bg-[#f3f4f6]">
-              <th className="sticky left-0 z-30 w-10 border-b border-r border-[#d0d4d9] bg-[#e9ecef] px-1 py-1 text-center text-[11px] font-normal text-[#6b736c]" />
-              {cols.map((c) => (
-                <th
-                  key={`L-${c.key}`}
-                  style={{ width: c.width, minWidth: c.width }}
-                  className="border-b border-r border-[#d0d4d9] px-1 py-1 text-center text-[11px] font-semibold tracking-wide text-[#5c655f]"
-                >
-                  {c.letter}
-                </th>
-              ))}
-            </tr>
-            {/* Korean headers */}
-            <tr className="bg-[#e8f0ea]">
-              <th className="sticky left-0 z-30 border-b-2 border-r border-[#217346]/40 bg-[#dce8df] px-1 py-2 text-center text-[12px] font-semibold text-[#217346]">
-                #
-              </th>
-              {cols.map((c) => (
+            <tr>
+              {COLS.map((c) => (
                 <th
                   key={`H-${c.key}`}
-                  style={{ width: c.width, minWidth: c.width }}
-                  className="border-b-2 border-r border-[#217346]/40 px-2 py-2 text-left text-[13px] font-bold text-[#163f39]"
+                  style={
+                    c.key === "listup"
+                      ? { width: c.width, minWidth: "280px" }
+                      : { width: c.width, minWidth: c.width }
+                  }
+                  className="border border-black bg-[#f3f3f3] px-2 py-3 text-center text-[15px] font-bold leading-tight text-black"
                 >
                   {c.label}
                 </th>
@@ -271,317 +232,194 @@ export function ExcelWorkbook({
             </tr>
           </thead>
           <tbody>
-            {sheet === "todo" ? (
-              activeTasks.length === 0 ? (
-                <EmptySheetRows
-                  colSpan={cols.length + 1}
-                  message="이 틀에 할 일이 없습니다. 「행 추가」로 첫 줄을 넣으세요."
-                  action={
-                    <button
-                      type="button"
-                      className="mt-2 text-[14px] font-semibold text-[#217346] underline"
-                      onClick={onAdd}
-                    >
-                      행 추가
-                    </button>
-                  }
-                />
-              ) : (
-                (() => {
-                  let dataRow = 0;
-                  return todoRows.map((row) => {
-                    if (row.type === "band") {
-                      const count = activeTasks.filter(
-                        (t) => t.kind === row.kind,
-                      ).length;
-                      return (
-                        <tr key={`band-${row.kind}`}>
-                          <td
-                            colSpan={cols.length + 1}
-                            className="border-b border-r border-[#c5ccd2] bg-[#fff8e8] px-3 py-2 text-[13px] font-bold text-[#8a5420]"
-                          >
-                            {row.label}
-                            <span className="ml-2 font-normal text-[#a07840]">
-                              ({count}건)
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    }
-                    dataRow += 1;
-                    const task = row.task;
-                    const zebra = dataRow % 2 === 0;
-                    const selected = selectedRow === task.id;
-                    return (
-                      <DataRow
-                        key={task.id}
-                        rowNum={dataRow}
-                        selected={selected}
-                        zebra={zebra}
-                        onSelect={() => setSelectedRow(task.id)}
+            {tasks.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="border border-black px-4 py-16 text-center text-[15px] text-[#555]"
+                >
+                  {sheet === "todo" ? (
+                    <>
+                      <p>할 일이 없습니다. 「행 추가」로 첫 줄을 넣으세요.</p>
+                      <button
+                        type="button"
+                        className="mt-2 text-[14px] font-semibold text-[#217346] underline"
+                        onClick={onAdd}
                       >
-                        <Cell
-                          active={focus?.rowId === task.id && focus.col === "done"}
-                          center
-                        >
+                        행 추가
+                      </button>
+                    </>
+                  ) : (
+                    <p>한 일이 없습니다. 할 일에서 완료여부를 체크하세요.</p>
+                  )}
+                </td>
+              </tr>
+            ) : (
+              tasks.map((task, idx) => {
+                const order = idx + 1;
+                const selected = selectedRow === task.id;
+                const zebra = order % 2 === 0;
+                return (
+                  <tr
+                    key={task.id}
+                    onClick={() => setSelectedRow(task.id)}
+                    className={
+                      selected
+                        ? "bg-[#e8f5ee]"
+                        : zebra
+                          ? "bg-[#fafafa]"
+                          : "bg-white"
+                    }
+                  >
+                    {/* 순서 */}
+                    <td className="border border-black px-1 py-1 text-center align-middle text-[14px] font-medium tabular-nums">
+                      {order}
+                    </td>
+
+                    {/* 할일 LIST UP — title + memo under */}
+                    <EditCell
+                      active={
+                        focus?.rowId === task.id && focus.col === "listup"
+                      }
+                      onFocusCell={() => {
+                        setSelectedRow(task.id);
+                        setFocus({ rowId: task.id, col: "listup" });
+                      }}
+                      onKeyNav={(e) =>
+                        handleNav(e, task.id, "listup", moveFocus)
+                      }
+                    >
+                      <div className="flex w-full flex-col gap-0.5 px-1.5 py-1.5">
+                        <textarea
+                          data-excel-cell={`${task.id}:listup`}
+                          value={task.title}
+                          rows={Math.min(
+                            5,
+                            Math.max(1, Math.ceil(task.title.length / 36)),
+                          )}
+                          onChange={(e) =>
+                            onUpdate(task.id, { title: e.target.value })
+                          }
+                          className="excel-textarea font-medium"
+                          aria-label="할일 LIST UP"
+                        />
+                        {task.memo || focus?.rowId === task.id ? (
                           <input
-                            type="checkbox"
-                            className="size-[18px] accent-[#217346]"
-                            aria-label={`${task.title} 완료`}
-                            onChange={() => onComplete(task.id)}
-                          />
-                        </Cell>
-                        <EditCell
-                          active={focus?.rowId === task.id && focus.col === "title"}
-                          onFocusCell={() => {
-                            setSelectedRow(task.id);
-                            setFocus({ rowId: task.id, col: "title" });
-                          }}
-                          onKeyNav={(e) =>
-                            handleNav(e, task.id, "title", moveFocus)
-                          }
-                        >
-                          <input
-                            data-excel-cell={`${task.id}:title`}
-                            value={task.title}
-                            onChange={(e) =>
-                              onUpdate(task.id, { title: e.target.value })
-                            }
-                            className="excel-input"
-                            aria-label="제목"
-                          />
-                        </EditCell>
-                        <EditCell
-                          active={focus?.rowId === task.id && focus.col === "kind"}
-                          onFocusCell={() => {
-                            setSelectedRow(task.id);
-                            setFocus({ rowId: task.id, col: "kind" });
-                          }}
-                          onKeyNav={(e) =>
-                            handleNav(e, task.id, "kind", moveFocus)
-                          }
-                        >
-                          <select
-                            data-excel-cell={`${task.id}:kind`}
-                            value={task.kind}
-                            onChange={(e) => {
-                              const v = e.target.value as TaskKind;
-                              onUpdate(task.id, {
-                                kind: v,
-                                targetDate:
-                                  v === "someday"
-                                    ? null
-                                    : task.targetDate ??
-                                      new Date().toISOString().slice(0, 10),
-                              });
-                            }}
-                            className="excel-input"
-                            aria-label="종류"
-                          >
-                            {(Object.keys(KIND_LABEL) as TaskKind[]).map((k) => (
-                              <option key={k} value={k}>
-                                {KIND_LABEL[k]}
-                              </option>
-                            ))}
-                          </select>
-                        </EditCell>
-                        <EditCell
-                          active={focus?.rowId === task.id && focus.col === "date"}
-                          onFocusCell={() => {
-                            setSelectedRow(task.id);
-                            setFocus({ rowId: task.id, col: "date" });
-                          }}
-                          onKeyNav={(e) =>
-                            handleNav(e, task.id, "date", moveFocus)
-                          }
-                        >
-                          <input
-                            data-excel-cell={`${task.id}:date`}
-                            type="date"
-                            value={task.targetDate ?? ""}
-                            disabled={task.kind === "someday"}
-                            onChange={(e) =>
-                              onUpdate(task.id, {
-                                targetDate: e.target.value || null,
-                              })
-                            }
-                            className="excel-input disabled:opacity-40"
-                            aria-label="목표기일"
-                          />
-                        </EditCell>
-                        <EditCell
-                          active={
-                            focus?.rowId === task.id && focus.col === "importance"
-                          }
-                          center
-                          onFocusCell={() => {
-                            setSelectedRow(task.id);
-                            setFocus({ rowId: task.id, col: "importance" });
-                          }}
-                          onKeyNav={(e) =>
-                            handleNav(e, task.id, "importance", moveFocus)
-                          }
-                        >
-                          <ScoreSelect
-                            cellId={`${task.id}:importance`}
-                            value={task.importance}
-                            onChange={(n) =>
-                              onUpdate(task.id, { importance: n })
-                            }
-                            label="중요"
-                          />
-                        </EditCell>
-                        <EditCell
-                          active={
-                            focus?.rowId === task.id && focus.col === "urgency"
-                          }
-                          center
-                          onFocusCell={() => {
-                            setSelectedRow(task.id);
-                            setFocus({ rowId: task.id, col: "urgency" });
-                          }}
-                          onKeyNav={(e) =>
-                            handleNav(e, task.id, "urgency", moveFocus)
-                          }
-                        >
-                          <ScoreSelect
-                            cellId={`${task.id}:urgency`}
-                            value={task.urgency}
-                            onChange={(n) => onUpdate(task.id, { urgency: n })}
-                            label="시급"
-                          />
-                        </EditCell>
-                        <EditCell
-                          active={focus?.rowId === task.id && focus.col === "memo"}
-                          onFocusCell={() => {
-                            setSelectedRow(task.id);
-                            setFocus({ rowId: task.id, col: "memo" });
-                          }}
-                          onKeyNav={(e) =>
-                            handleNav(e, task.id, "memo", moveFocus)
-                          }
-                        >
-                          <input
-                            data-excel-cell={`${task.id}:memo`}
                             value={task.memo}
                             placeholder="메모"
                             onChange={(e) =>
                               onUpdate(task.id, { memo: e.target.value })
                             }
-                            className="excel-input"
+                            className="excel-input min-h-0 py-0.5 text-[12px] text-[#555]"
                             aria-label="메모"
                           />
-                        </EditCell>
-                        <Cell center>
-                          <button
-                            type="button"
-                            className="inline-flex size-8 items-center justify-center text-[#6b736c] hover:text-[#b42318]"
-                            aria-label="삭제"
-                            onClick={() => onDelete(task.id)}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </Cell>
-                      </DataRow>
-                    );
-                  });
-                })()
-              )
-            ) : doneTasks.length === 0 ? (
-              <EmptySheetRows
-                colSpan={cols.length + 1}
-                message="한 일이 없습니다. 할 일 시트에서 완료하면 여기로 옵니다."
-              />
-            ) : (
-              doneTasks.map((task, i) => {
-                const zebra = (i + 1) % 2 === 0;
-                const selected = selectedRow === task.id;
-                return (
-                  <DataRow
-                    key={task.id}
-                    rowNum={i + 1}
-                    selected={selected}
-                    zebra={zebra}
-                    onSelect={() => setSelectedRow(task.id)}
-                  >
-                    <Cell>
-                      <span className="px-1 text-[13px] text-[#5c655f]">
-                        {task.completedAt
-                          ? new Date(task.completedAt).toLocaleString("ko-KR", {
-                              month: "2-digit",
-                              day: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "—"}
-                      </span>
-                    </Cell>
-                    <EditCell
-                      active={focus?.rowId === task.id && focus.col === "title"}
-                      onFocusCell={() => {
-                        setSelectedRow(task.id);
-                        setFocus({ rowId: task.id, col: "title" });
-                      }}
-                      onKeyNav={(e) =>
-                        handleNav(e, task.id, "title", moveFocus)
-                      }
-                    >
-                      <input
-                        data-excel-cell={`${task.id}:title`}
-                        value={task.title}
-                        onChange={(e) =>
-                          onUpdate(task.id, { title: e.target.value })
-                        }
-                        className="excel-input font-medium"
-                        aria-label="한 일 제목"
-                      />
-                    </EditCell>
-                    <Cell>
-                      <span className="px-1 text-[13px]">
-                        {KIND_LABEL[task.kind]}
-                      </span>
-                    </Cell>
-                    <EditCell
-                      active={focus?.rowId === task.id && focus.col === "memo"}
-                      onFocusCell={() => {
-                        setSelectedRow(task.id);
-                        setFocus({ rowId: task.id, col: "memo" });
-                      }}
-                      onKeyNav={(e) =>
-                        handleNav(e, task.id, "memo", moveFocus)
-                      }
-                    >
-                      <input
-                        data-excel-cell={`${task.id}:memo`}
-                        value={task.memo}
-                        onChange={(e) =>
-                          onUpdate(task.id, { memo: e.target.value })
-                        }
-                        className="excel-input"
-                        aria-label="메모"
-                      />
-                    </EditCell>
-                    <Cell>
-                      <div className="flex items-center gap-0.5 px-0.5">
-                        <button
-                          type="button"
-                          className="inline-flex h-8 items-center gap-1 rounded-sm px-2 text-[12px] font-medium text-[#217346] hover:bg-[#e8f0ea]"
-                          onClick={() => onRestore(task.id)}
-                        >
-                          <RotateCcw className="size-3" />
-                          복원
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex size-8 items-center justify-center text-[#6b736c] hover:text-[#b42318]"
-                          aria-label="삭제"
-                          onClick={() => onDelete(task.id)}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        ) : null}
                       </div>
-                    </Cell>
-                  </DataRow>
+                    </EditCell>
+
+                    {/* 마감목표 */}
+                    <EditCell
+                      active={
+                        focus?.rowId === task.id && focus.col === "deadline"
+                      }
+                      center
+                      onFocusCell={() => {
+                        setSelectedRow(task.id);
+                        setFocus({ rowId: task.id, col: "deadline" });
+                      }}
+                      onKeyNav={(e) =>
+                        handleNav(e, task.id, "deadline", moveFocus)
+                      }
+                    >
+                      <input
+                        data-excel-cell={`${task.id}:deadline`}
+                        value={task.targetDate ?? ""}
+                        placeholder="예: 9/1"
+                        disabled={task.kind === "someday" && sheet === "todo"}
+                        onChange={(e) =>
+                          onUpdate(task.id, {
+                            targetDate: e.target.value || null,
+                          })
+                        }
+                        className="excel-input text-center disabled:opacity-40"
+                        aria-label="마감목표"
+                      />
+                    </EditCell>
+
+                    {/* 중요도 */}
+                    <EditCell
+                      active={
+                        focus?.rowId === task.id && focus.col === "importance"
+                      }
+                      center
+                      onFocusCell={() => {
+                        setSelectedRow(task.id);
+                        setFocus({ rowId: task.id, col: "importance" });
+                      }}
+                      onKeyNav={(e) =>
+                        handleNav(e, task.id, "importance", moveFocus)
+                      }
+                    >
+                      <ScoreSelect
+                        cellId={`${task.id}:importance`}
+                        value={task.importance}
+                        onChange={(n) =>
+                          onUpdate(task.id, { importance: n })
+                        }
+                        label="중요도"
+                      />
+                    </EditCell>
+
+                    {/* 시급성 */}
+                    <EditCell
+                      active={
+                        focus?.rowId === task.id && focus.col === "urgency"
+                      }
+                      center
+                      onFocusCell={() => {
+                        setSelectedRow(task.id);
+                        setFocus({ rowId: task.id, col: "urgency" });
+                      }}
+                      onKeyNav={(e) =>
+                        handleNav(e, task.id, "urgency", moveFocus)
+                      }
+                    >
+                      <ScoreSelect
+                        cellId={`${task.id}:urgency`}
+                        value={task.urgency}
+                        onChange={(n) => onUpdate(task.id, { urgency: n })}
+                        label="시급성"
+                      />
+                    </EditCell>
+
+                    {/* 완료여부 */}
+                    <td className="border border-black px-1 py-1 text-center align-middle">
+                      {sheet === "todo" ? (
+                        <input
+                          type="checkbox"
+                          className="size-[18px] accent-[#217346]"
+                          aria-label={`${task.title} 완료여부`}
+                          onChange={() => onComplete(task.id)}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-[13px] font-medium text-[#217346]"
+                          onClick={() => onRestore(task.id)}
+                          title="클릭하면 할 일로 복원"
+                        >
+                          <input
+                            type="checkbox"
+                            checked
+                            readOnly
+                            className="size-[16px] accent-[#217346]"
+                            tabIndex={-1}
+                          />
+                          완료
+                        </button>
+                      )}
+                    </td>
+                  </tr>
                 );
               })
             )}
@@ -589,12 +427,10 @@ export function ExcelWorkbook({
         </table>
       </div>
 
-      {/* Formula-ish status + sheet tabs */}
-      <div className="flex flex-col border-t border-[#9aa5ad] bg-[#f3f4f6]">
-        <div className="border-b border-[#d0d4d9] px-3 py-1 text-[11px] text-[#5c655f]">
-          {focus
-            ? `셀 ${cols.find((c) => c.key === focus.col)?.letter ?? ""} · Tab/Enter로 이동 · 자동 저장`
-            : "셀을 누르면 바로 고칩니다 · 비슷한 일은 위→아래 스팟·지속·언젠가 순"}
+      <div className="flex flex-col border-t border-[#7a8288] bg-[#f0f2f4]">
+        <div className="border-b border-[#c5ccd2] px-3 py-1 text-[11px] text-[#5c655f]">
+          헤더(아버지 표와 동일): 순서 · 할일 LIST UP · 마감목표 · 중요도 ·
+          시급성 · 완료여부
         </div>
         <div className="flex items-end gap-0 overflow-x-auto px-1 pt-1">
           <SheetTab
@@ -633,60 +469,12 @@ function SheetTab({
       onClick={onClick}
       className={`relative min-w-[4.5rem] rounded-t-md border border-b-0 px-4 py-2 text-[13px] font-semibold transition-colors ${
         active
-          ? "z-10 -mb-px border-[#9aa5ad] bg-white text-[#217346]"
-          : "border-transparent bg-[#dfe3e6] text-[#5c655f] hover:bg-[#e9ecef]"
+          ? "z-10 -mb-px border-[#7a8288] bg-white text-[#217346]"
+          : "border-transparent bg-[#cfd4d8] text-[#5c655f] hover:bg-[#e9ecef]"
       }`}
     >
       {children}
     </button>
-  );
-}
-
-function DataRow({
-  rowNum,
-  selected,
-  zebra,
-  onSelect,
-  children,
-}: {
-  rowNum: number;
-  selected: boolean;
-  zebra: boolean;
-  onSelect: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <tr
-      onClick={onSelect}
-      className={`${selected ? "bg-[#e3f0e8]" : zebra ? "bg-[#fafafa]" : "bg-white"}`}
-    >
-      <td className="sticky left-0 z-10 border-b border-r border-[#d0d4d9] bg-inherit px-1 py-0 text-center text-[12px] tabular-nums text-[#6b736c]">
-        {rowNum}
-      </td>
-      {children}
-    </tr>
-  );
-}
-
-function Cell({
-  children,
-  center,
-  active,
-}: {
-  children: ReactNode;
-  center?: boolean;
-  active?: boolean;
-}) {
-  return (
-    <td
-      className={`border-b border-r border-[#d0d4d9] px-1 py-0 align-middle ${
-        center ? "text-center" : ""
-      } ${active ? "outline outline-2 outline-[#217346] outline-offset-[-2px]" : ""}`}
-    >
-      <div className={`flex min-h-10 items-center ${center ? "justify-center" : ""}`}>
-        {children}
-      </div>
-    </td>
   );
 }
 
@@ -705,40 +493,18 @@ function EditCell({
 }) {
   return (
     <td
-      className={`border-b border-r border-[#d0d4d9] p-0 align-middle ${
-        active ? "outline outline-2 outline-[#217346] outline-offset-[-2px] bg-[#eef7f1]" : ""
-      }`}
+      className={`border border-black p-0 align-middle ${
+        active ? "bg-[#eef7f1] outline outline-2 outline-[#217346] outline-offset-[-2px]" : ""
+      } ${center ? "text-center" : ""}`}
       onClick={onFocusCell}
       onKeyDown={onKeyNav}
     >
       <div
-        className={`flex min-h-10 items-stretch ${center ? "justify-center" : ""}`}
+        className={`flex min-h-11 items-stretch ${center ? "justify-center" : ""}`}
       >
         {children}
       </div>
     </td>
-  );
-}
-
-function EmptySheetRows({
-  colSpan,
-  message,
-  action,
-}: {
-  colSpan: number;
-  message: string;
-  action?: ReactNode;
-}) {
-  return (
-    <tr>
-      <td
-        colSpan={colSpan}
-        className="border-b border-[#d0d4d9] px-4 py-16 text-center text-[15px] text-[#5c655f]"
-      >
-        <p>{message}</p>
-        {action}
-      </td>
-    </tr>
   );
 }
 
@@ -783,7 +549,7 @@ function handleNav(
   if (e.key === "Tab") {
     e.preventDefault();
     move(rowId, col, e.shiftKey ? "prev" : "next");
-  } else if (e.key === "Enter") {
+  } else if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
     e.preventDefault();
     move(rowId, col, e.shiftKey ? "up" : "down");
   }

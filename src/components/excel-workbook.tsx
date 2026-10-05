@@ -9,14 +9,17 @@ import {
   type ReactNode,
 } from "react";
 import {
-  CATEGORY_LABEL,
-  CATEGORY_ORDER,
+  FRAME_LABEL,
+  FRAME_ORDER,
+  isTaskCategory,
   type CalendarEvent,
+  type FrameId,
   type Task,
   type TaskCategory,
 } from "@/lib/types";
 import {
-  buildTodoSheetRows,
+  buildGcalFrameRows,
+  buildTaskOnlyRows,
   calendarListUpTitle,
   formatEventDeadline,
 } from "@/lib/sheet-rows";
@@ -30,7 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
-import { Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 export type WorkbookSheet = "todo" | "done";
 
@@ -52,8 +55,9 @@ type FocusCell = { rowId: string; col: ColKey };
 interface ExcelWorkbookProps {
   sheet: WorkbookSheet;
   onSheetChange: (sheet: WorkbookSheet) => void;
-  category: TaskCategory;
-  onCategoryChange: (c: TaskCategory) => void;
+  frame: FrameId;
+  onFrameChange: (f: FrameId) => void;
+  /** Tasks for the selected program frame (ignored when frame=gcal) */
   activeTasks: Task[];
   doneTasks: Task[];
   onUpdate: (id: string, patch: Partial<Task>) => void;
@@ -62,15 +66,14 @@ interface ExcelWorkbookProps {
   onDelete: (id: string) => void;
   onAdd: () => void;
   onImport: (tasks: Task[]) => void;
-  /** 할 일 시트에만 ICS/OAuth 일정 행으로 합침 (읽기 전용) */
   calendarEvents?: CalendarEvent[];
 }
 
 export function ExcelWorkbook({
   sheet,
   onSheetChange,
-  category,
-  onCategoryChange,
+  frame,
+  onFrameChange,
   activeTasks,
   doneTasks,
   onUpdate,
@@ -81,13 +84,21 @@ export function ExcelWorkbook({
   onImport,
   calendarEvents = [],
 }: ExcelWorkbookProps) {
+  const isGcal = frame === "gcal";
   const [focus, setFocus] = useState<FocusCell | null>(null);
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [filterStart, setFilterStart] = useState<string>("");
   const [filterEnd, setFilterEnd] = useState<string>("");
   const [periodSort, setPeriodSort] = useState<PeriodSort>("default");
   const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
-
+  /** Google Calendar 틀: anchor day for calendar filter */
+  const [gcalDay, setGcalDay] = useState(todayIso());
+  /** from = 그날부터 앞으로 / day = 그날만 */
+  const [gcalMode, setGcalMode] = useState<"from" | "day">("from");
+  const [pickerMonth, setPickerMonth] = useState(() => {
+    const t = todayIso();
+    return t.slice(0, 7); // YYYY-MM
+  });
   const todayLabel = useMemo(
     () =>
       new Date().toLocaleDateString("ko-KR", {
@@ -100,23 +111,32 @@ export function ExcelWorkbook({
 
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
 
-  const rows = useMemo(
-    () =>
-      buildTodoSheetRows(baseTasks, calendarEvents, {
-        filterStart: filterStart || null,
-        filterEnd: filterEnd || null,
-        periodSort,
-        includeCalendar: sheet === "todo",
-      }),
-    [
-      baseTasks,
-      calendarEvents,
-      filterStart,
-      filterEnd,
+  const rows = useMemo(() => {
+    if (isGcal && sheet === "todo") {
+      return buildGcalFrameRows(calendarEvents, {
+        anchorDay: gcalDay,
+        mode: gcalMode,
+      });
+    }
+    if (isGcal && sheet === "done") {
+      return [];
+    }
+    return buildTaskOnlyRows(baseTasks, {
+      filterStart: filterStart || null,
+      filterEnd: filterEnd || null,
       periodSort,
-      sheet,
-    ],
-  );
+    });
+  }, [
+    isGcal,
+    sheet,
+    calendarEvents,
+    gcalDay,
+    gcalMode,
+    baseTasks,
+    filterStart,
+    filterEnd,
+    periodSort,
+  ]);
 
   const taskIds = useMemo(
     () => rows.filter((r) => r.kind === "task").map((r) => r.task.id),
@@ -190,7 +210,7 @@ export function ExcelWorkbook({
   useEffect(() => {
     setFocus(null);
     setSelectedRow(null);
-  }, [sheet, category]);
+  }, [sheet, frame]);
 
   useEffect(() => {
     if (!focus) return;
@@ -206,6 +226,34 @@ export function ExcelWorkbook({
         ? "border-[#217346] bg-[#217346] text-white"
         : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1]"
     }`;
+
+  const shiftPickerMonth = (delta: number) => {
+    const [y, m] = pickerMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    setPickerMonth(`${yy}-${mm}`);
+  };
+
+  const pickerCells = useMemo(() => {
+    const [y, m] = pickerMonth.split("-").map(Number);
+    const first = new Date(y, m - 1, 1);
+    const startPad = (first.getDay() + 6) % 7; // Mon=0
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const cells: Array<{ day: number | null; iso: string | null }> = [];
+    for (let i = 0; i < startPad; i++) cells.push({ day: null, iso: null });
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      cells.push({ day: d, iso });
+    }
+    while (cells.length % 7 !== 0) cells.push({ day: null, iso: null });
+    return cells;
+  }, [pickerMonth]);
+
+  const monthTitle = useMemo(() => {
+    const [y, m] = pickerMonth.split("-").map(Number);
+    return `${y}년 ${m}월`;
+  }, [pickerMonth]);
 
   return (
     <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
@@ -224,18 +272,19 @@ export function ExcelWorkbook({
         <label className="flex items-center gap-2 text-[13px] text-[#1a2420]">
           <span className="font-semibold">틀</span>
           <select
-            value={category}
-            onChange={(e) => onCategoryChange(e.target.value as TaskCategory)}
-            className="h-9 min-w-[7.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] font-medium outline-none focus:border-[#217346]"
+            value={frame}
+            onChange={(e) => onFrameChange(e.target.value as FrameId)}
+            className="h-9 min-w-[8.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] font-medium outline-none focus:border-[#217346]"
+            aria-label="틀"
           >
-            {CATEGORY_ORDER.map((c) => (
+            {FRAME_ORDER.map((c) => (
               <option key={c} value={c}>
-                {CATEGORY_LABEL[c]}
+                {FRAME_LABEL[c]}
               </option>
             ))}
           </select>
         </label>
-        {sheet === "todo" ? (
+        {!isGcal && sheet === "todo" ? (
           <>
             <Button
               type="button"
@@ -246,13 +295,28 @@ export function ExcelWorkbook({
               <Plus className="size-3.5" />
               행 추가
             </Button>
-            <MemoImport category={category} onImport={onImport} />
-            <OcrImport category={category} onImport={onImport} />
+            {isTaskCategory(frame) ? (
+              <>
+                <MemoImport category={frame} onImport={onImport} />
+                <OcrImport category={frame} onImport={onImport} />
+              </>
+            ) : null}
           </>
-        ) : (
+        ) : null}
+        {isGcal && sheet === "todo" ? (
+          <p className="text-[13px] text-[#1a3a6b]">
+            구글 캘린더 틀 · 읽기 전용 · ICS/연결은 「캘린더」메뉴
+          </p>
+        ) : null}
+        {!isGcal && sheet === "done" ? (
           <p className="text-[13px] text-[#5c655f]">한 일 · 완료여부 복원 가능</p>
-        )}
-        {selectedRow ? (
+        ) : null}
+        {isGcal && sheet === "done" ? (
+          <p className="text-[13px] text-[#5c655f]">
+            캘린더 일정은 한 일 시트로 옮기지 않습니다.
+          </p>
+        ) : null}
+        {selectedRow && !isGcal ? (
           <Button
             type="button"
             size="sm"
@@ -264,7 +328,7 @@ export function ExcelWorkbook({
             선택 행 삭제
           </Button>
         ) : null}
-        {selectedRow && sheet === "done" ? (
+        {selectedRow && sheet === "done" && !isGcal ? (
           <Button
             type="button"
             size="sm"
@@ -277,15 +341,118 @@ export function ExcelWorkbook({
           </Button>
         ) : null}
         <span className="ml-auto text-[12px] text-[#5c655f]">
-          {CATEGORY_LABEL[category]} · {rows.length}행
-          {sheet === "todo" && calCount > 0
-            ? ` (할 일 ${taskCount} · 캘린더 ${calCount})`
-            : ""}
-          {filterActive ? ` · 필터 적용` : ""}
+          {FRAME_LABEL[frame]} · {rows.length}행
+          {isGcal && calCount > 0 ? ` (캘린더)` : ""}
+          {!isGcal && filterActive ? ` · 필터 적용` : ""}
         </span>
       </div>
 
-      {/* Period filter bar */}
+      {/* Period filter OR Google calendar picker */}
+      {isGcal && sheet === "todo" ? (
+        <div className="flex flex-col gap-3 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-3 sm:flex-row sm:items-start">
+          <div className="min-w-[240px] rounded-sm border border-[#8a939a] bg-white p-2 shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-1">
+              <button
+                type="button"
+                className="rounded p-1 hover:bg-[#eef3fa]"
+                aria-label="이전 달"
+                onClick={() => shiftPickerMonth(-1)}
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <p className="text-[13px] font-semibold text-[#1a2420]">
+                {monthTitle}
+              </p>
+              <button
+                type="button"
+                className="rounded p-1 hover:bg-[#eef3fa]"
+                aria-label="다음 달"
+                onClick={() => shiftPickerMonth(1)}
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+            <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[10px] text-[#5c655f]">
+              {["월", "화", "수", "목", "금", "토", "일"].map((d) => (
+                <span key={d}>{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-0.5" role="grid" aria-label="날짜 선택 달력">
+              {pickerCells.map((c, i) =>
+                c.iso ? (
+                  <button
+                    key={c.iso}
+                    type="button"
+                    role="gridcell"
+                    aria-selected={gcalDay === c.iso}
+                    onClick={() => {
+                      setGcalDay(c.iso!);
+                      setPickerMonth(c.iso!.slice(0, 7));
+                    }}
+                    className={`h-8 rounded text-[13px] tabular-nums ${
+                      gcalDay === c.iso
+                        ? "bg-[#3b6ea5] font-semibold text-white"
+                        : c.iso === todayIso()
+                          ? "bg-[#eef3fa] font-medium text-[#1a3a6b]"
+                          : "text-[#1a2420] hover:bg-[#f0f4f8]"
+                    }`}
+                  >
+                    {c.day}
+                  </button>
+                ) : (
+                  <span key={`e-${i}`} className="h-8" />
+                ),
+              )}
+            </div>
+          </div>
+          <div className="flex flex-1 flex-col gap-2">
+            <p className="text-[13px] font-semibold text-[#1a2420]">
+              선택한 날:{" "}
+              <span className="tabular-nums text-[#3b6ea5]">{gcalDay}</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`h-8 rounded-sm border px-2.5 text-[13px] font-medium ${
+                  gcalMode === "from"
+                    ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
+                    : "border-[#8a939a] bg-white"
+                }`}
+                onClick={() => setGcalMode("from")}
+              >
+                이날부터 앞으로
+              </button>
+              <button
+                type="button"
+                className={`h-8 rounded-sm border px-2.5 text-[13px] font-medium ${
+                  gcalMode === "day"
+                    ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
+                    : "border-[#8a939a] bg-white"
+                }`}
+                onClick={() => setGcalMode("day")}
+              >
+                이날만
+              </button>
+              <button
+                type="button"
+                className="h-8 rounded-sm border border-[#8a939a] bg-white px-2.5 text-[13px]"
+                onClick={() => {
+                  const t = todayIso();
+                  setGcalDay(t);
+                  setGcalMode("from");
+                  setPickerMonth(t.slice(0, 7));
+                }}
+              >
+                오늘부터
+              </button>
+            </div>
+            <p className="text-[11px] text-[#5c655f]">
+              기본은 오늘부터 앞의 일정만 보입니다. 달력에서 과거 날짜도 고를 수
+              있습니다.
+            </p>
+          </div>
+        </div>
+      ) : !isGcal ? (
       <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-[#1a2420]">기간</span>
@@ -352,10 +519,11 @@ export function ExcelWorkbook({
             <option value="end">마감(종료)일 순</option>
           </select>
           <p className="text-[11px] text-[#5c655f]">
-            할 일·캘린더 행 모두 기간 겹침 기준 · 날짜 없는 할 일은 「전체」에서만
+            이 틀의 할 일만 표시 · 날짜 없는 행은 「전체」에서만
           </p>
         </div>
       </div>
+      ) : null}
 
       <div className="relative max-h-[min(66vh,720px)] min-h-[300px] overflow-auto bg-white">
         <table className="w-full min-w-[820px] border-collapse text-[15px] text-black">
@@ -383,10 +551,14 @@ export function ExcelWorkbook({
                   colSpan={6}
                   className="border border-black px-4 py-16 text-center text-[15px] text-[#555]"
                 >
-                  {filterActive ? (
+                  {filterActive && !isGcal ? (
                     <p>
-                      이 기간에 겹치는 할 일·캘린더 행이 없습니다. 「전체」를
-                      누르거나 캘린더를 불러오세요.
+                      이 기간에 겹치는 할 일이 없습니다. 「전체」를 누르세요.
+                    </p>
+                  ) : isGcal && sheet === "todo" ? (
+                    <p>
+                      이 날짜 조건에 일정이 없습니다. ICS·Google을 「캘린더」
+                      메뉴에서 불러오거나 달력에서 다른 날을 고르세요.
                     </p>
                   ) : sheet === "todo" ? (
                     <>
@@ -646,7 +818,9 @@ export function ExcelWorkbook({
 
       <div className="flex flex-col border-t border-[#7a8288] bg-[#f0f2f4]">
         <div className="border-b border-[#c5ccd2] px-3 py-1 text-[11px] text-[#5c655f]">
-          할 일(편집) + [캘린더] 행(파랑·읽기 전용) · 기간 필터는 둘 다 적용
+          {isGcal
+            ? "구글 캘린더 틀 · [캘린더] 행만 · 읽기 전용 · 달력으로 날짜 선택"
+            : "프로그램 할 일만 (틀별) · 캘린더는 「구글 캘린더」 틀에서"}
         </div>
         <div className="flex items-end gap-0 overflow-x-auto px-1 pt-1">
           <SheetTab
@@ -662,7 +836,7 @@ export function ExcelWorkbook({
             한 일
           </SheetTab>
           <span className="mb-1.5 ml-2 hidden text-[11px] text-[#8a939a] sm:inline">
-            캘린더 불러오기는 「캘린더」메뉴 · 일정은 할 일 표에 합쳐짐
+            틀에 「구글 캘린더」 · ICS는 캘린더 메뉴
           </span>
         </div>
       </div>

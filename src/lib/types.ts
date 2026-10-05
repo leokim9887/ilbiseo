@@ -2,6 +2,8 @@ export type TaskKind = "spot" | "ongoing" | "someday";
 export type TaskSource = "manual" | "memo" | "ocr" | "import";
 export type TaskStatus = "active" | "completed";
 export type TaskCategory = "work" | "personal" | "project" | "team";
+/** 틀 dropdown: 4 program frames + Google Calendar frame */
+export type FrameId = TaskCategory | "gcal";
 export type CalendarSource = "mock" | "ics" | "google";
 
 export interface Task {
@@ -66,12 +68,29 @@ export const CATEGORY_ORDER: TaskCategory[] = [
   "team",
 ];
 
+export const FRAME_ORDER: FrameId[] = [
+  "work",
+  "personal",
+  "project",
+  "team",
+  "gcal",
+];
+
 export const CATEGORY_LABEL: Record<TaskCategory, string> = {
   work: "업무용",
   personal: "개인용",
   project: "과제용",
   team: "팀원용",
 };
+
+export const FRAME_LABEL: Record<FrameId, string> = {
+  ...CATEGORY_LABEL,
+  gcal: "구글 캘린더",
+};
+
+export function isTaskCategory(f: FrameId): f is TaskCategory {
+  return f !== "gcal";
+}
 
 export const KIND_LABEL: Record<TaskKind, string> = {
   spot: "스팟(당일)",

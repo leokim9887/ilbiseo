@@ -3,6 +3,7 @@ import {
   filterByPeriod,
   sortByPeriod,
   taskDateRange,
+  todayIso,
 } from "./date-range";
 import { filterEventsByPeriod } from "./unified";
 
@@ -49,6 +50,78 @@ export function calendarListUpTitle(ev: CalendarEvent): string {
   return loc ? `${base} · ${loc}` : base;
 }
 
+/** Events on/after fromDay (inclusive). */
+export function eventsFromDay(
+  events: CalendarEvent[],
+  fromDay: string,
+): CalendarEvent[] {
+  return events.filter((e) => {
+    const end = (e.end?.slice(0, 10) || e.start.slice(0, 10));
+    return end >= fromDay;
+  });
+}
+
+/** Events that touch a single calendar day. */
+export function eventsOnDay(
+  events: CalendarEvent[],
+  day: string,
+): CalendarEvent[] {
+  return events.filter((e) => {
+    const start = e.start.slice(0, 10);
+    const end = e.end?.slice(0, 10) || start;
+    return start <= day && end >= day;
+  });
+}
+
+/** Program-task-only rows for a normal 틀. */
+export function buildTaskOnlyRows(
+  tasks: Task[],
+  opts: {
+    filterStart: string | null;
+    filterEnd: string | null;
+    periodSort: "default" | "start" | "end";
+  },
+): SheetRow[] {
+  const filtered = filterByPeriod(
+    tasks,
+    opts.filterStart,
+    opts.filterEnd,
+  );
+  const sorted =
+    opts.periodSort === "default"
+      ? filtered
+      : sortByPeriod(filtered, opts.periodSort);
+  return sorted.map((task) => ({
+    kind: "task" as const,
+    id: task.id,
+    task,
+    sortKey: taskSortKey(task),
+  }));
+}
+
+/** Google Calendar 틀 — calendar events only. */
+export function buildGcalFrameRows(
+  events: CalendarEvent[],
+  opts: {
+    /** Anchor day (default today). Shows from that day forward, or single day if mode=day */
+    anchorDay: string;
+    mode: "from" | "day";
+  },
+): SheetRow[] {
+  const day = opts.anchorDay || todayIso();
+  const list =
+    opts.mode === "day" ? eventsOnDay(events, day) : eventsFromDay(events, day);
+  return [...list]
+    .sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)))
+    .map((event) => ({
+      kind: "calendar" as const,
+      id: `cal:${event.id}`,
+      event,
+      sortKey: eventSortKey(event),
+    }));
+}
+
+/** @deprecated Prefer buildTaskOnlyRows / buildGcalFrameRows */
 export function buildTodoSheetRows(
   tasks: Task[],
   events: CalendarEvent[],
@@ -59,44 +132,23 @@ export function buildTodoSheetRows(
     includeCalendar: boolean;
   },
 ): SheetRow[] {
-  const filteredTasks = filterByPeriod(
-    tasks,
+  if (!opts.includeCalendar) {
+    return buildTaskOnlyRows(tasks, opts);
+  }
+  const rows = buildTaskOnlyRows(tasks, opts);
+  const filteredEvents = filterEventsByPeriod(
+    events,
     opts.filterStart,
     opts.filterEnd,
   );
-  const sortedTasks =
-    opts.periodSort === "default"
-      ? filteredTasks
-      : sortByPeriod(filteredTasks, opts.periodSort);
-
-  const rows: SheetRow[] = sortedTasks.map((task) => ({
-    kind: "task",
-    id: task.id,
-    task,
-    sortKey: taskSortKey(task),
-  }));
-
-  if (opts.includeCalendar) {
-    const filteredEvents = filterEventsByPeriod(
-      events,
-      opts.filterStart,
-      opts.filterEnd,
-    );
-    for (const event of filteredEvents) {
-      rows.push({
-        kind: "calendar",
-        id: `cal:${event.id}`,
-        event,
-        sortKey: eventSortKey(event),
-      });
-    }
-    rows.sort(
-      (a, b) =>
-        a.sortKey.localeCompare(b.sortKey) ||
-        (a.kind === "calendar" && b.kind === "task" ? 1 : 0) ||
-        (a.kind === "task" && b.kind === "calendar" ? -1 : 0),
-    );
+  for (const event of filteredEvents) {
+    rows.push({
+      kind: "calendar",
+      id: `cal:${event.id}`,
+      event,
+      sortKey: eventSortKey(event),
+    });
   }
-
+  rows.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   return rows;
 }

@@ -10,7 +10,6 @@ import {
   type TaskCategory,
 } from "./types";
 import { createId } from "./id";
-import { createMockCalendarEvents } from "./calendar-data";
 import { inferGroupKey } from "./sort";
 import { clampPriority } from "./priority";
 
@@ -142,15 +141,6 @@ export function loadState(): AppState | null {
         calendarEvents: [],
       });
       if (n) {
-        if (n.calendarEvents.length === 0) {
-          n.calendarEvents = createMockCalendarEvents();
-        }
-        n.tasks = n.tasks.map((t, i) => ({
-          ...t,
-          category: (["work", "personal", "project", "team"] as TaskCategory[])[
-            i % 4
-          ],
-        }));
         saveState(n);
         return n;
       }
@@ -171,157 +161,9 @@ export function saveState(state: AppState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
 }
 
+/** @deprecated Prefer createEmptyState — no seed data. */
 export function createSampleState(): AppState {
-  const today = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  const inDays = (n: number) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + n);
-    return iso(d);
-  };
-
-  const task = (
-    partial: Omit<Task, "id" | "createdAt" | "completedAt" | "status"> & {
-      status?: Task["status"];
-      completedAt?: string | null;
-    },
-  ): Task => ({
-    id: createId(),
-    createdAt: new Date().toISOString(),
-    completedAt: partial.completedAt ?? null,
-    status: partial.status ?? "active",
-    ...partial,
-  });
-
-  return {
-    version: APP_VERSION,
-    tasks: [
-      task({
-        title: "후보자 A 이력서 검토",
-        category: "work",
-        kind: "spot",
-        startDate: iso(today),
-        targetDate: iso(today),
-        urgency: 3,
-        importance: 3,
-        groupKey: "후보자 이력서",
-        source: "manual",
-        memo: "오늘 안에 피드백 전달",
-      }),
-      task({
-        title: "클라이언트 B 미팅 자료",
-        category: "work",
-        kind: "spot",
-        startDate: iso(today),
-        targetDate: iso(today),
-        urgency: 3,
-        importance: 3,
-        groupKey: "클라이언트 미팅",
-        source: "manual",
-        memo: "제안서 초안 지참",
-      }),
-      task({
-        title: "포지션 JD 초안 작성",
-        category: "project",
-        kind: "ongoing",
-        startDate: iso(today),
-        targetDate: inDays(5),
-        urgency: 2,
-        importance: 3,
-        groupKey: "포지션 JD",
-        source: "memo",
-        memo: "",
-      }),
-      task({
-        title: "포지션 JD 최종 검수",
-        category: "project",
-        kind: "ongoing",
-        startDate: inDays(3),
-        targetDate: inDays(7),
-        urgency: 2,
-        importance: 3,
-        groupKey: "포지션 JD",
-        source: "manual",
-        memo: "팀 리뷰 반영",
-      }),
-      task({
-        title: "가족 저녁 약속 확인",
-        category: "personal",
-        kind: "spot",
-        startDate: iso(today),
-        targetDate: iso(today),
-        urgency: 2,
-        importance: 3,
-        groupKey: "가족",
-        source: "manual",
-        memo: "장소 확인",
-      }),
-      task({
-        title: "건강검진 예약",
-        category: "personal",
-        kind: "someday",
-        startDate: null,
-        targetDate: null,
-        urgency: 1,
-        importance: 3,
-        groupKey: "건강",
-        source: "manual",
-        memo: "",
-      }),
-      task({
-        title: "신입 온보딩 체크 공유",
-        category: "team",
-        kind: "ongoing",
-        startDate: iso(today),
-        targetDate: inDays(3),
-        urgency: 2,
-        importance: 3,
-        groupKey: "온보딩",
-        source: "manual",
-        memo: "김대리 담당",
-      }),
-      task({
-        title: "주간 리포트 양식",
-        category: "team",
-        kind: "someday",
-        startDate: null,
-        targetDate: null,
-        urgency: 1,
-        importance: 2,
-        groupKey: "리포트",
-        source: "manual",
-        memo: "",
-      }),
-      task({
-        title: "네트워킹 명함 정리",
-        category: "work",
-        kind: "someday",
-        startDate: null,
-        targetDate: null,
-        urgency: 1,
-        importance: 2,
-        groupKey: "네트워킹",
-        source: "manual",
-        memo: "",
-      }),
-      task({
-        title: "헤드헌팅 소개서 템플릿",
-        category: "project",
-        kind: "someday",
-        startDate: null,
-        targetDate: null,
-        urgency: 1,
-        importance: 2,
-        groupKey: "소개서",
-        source: "ocr",
-        memo: "OCR로 가져온 후보",
-        status: "completed",
-        completedAt: new Date().toISOString(),
-      }),
-    ],
-    checklists: [],
-    calendarEvents: createMockCalendarEvents(),
-  };
+  return createEmptyState();
 }
 
 export { CATEGORY_LABEL };

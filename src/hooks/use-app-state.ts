@@ -9,7 +9,6 @@ import type {
 } from "@/lib/types";
 import {
   createEmptyState,
-  createSampleState,
   loadState,
   saveState,
 } from "@/lib/storage";
@@ -37,12 +36,12 @@ export function useAppState() {
   useEffect(() => {
     try {
       const loaded = loadState();
-      if (loaded && loaded.tasks.length > 0) {
+      if (loaded) {
         setState(loaded);
       } else {
-        const seeded = createSampleState();
-        setState(seeded);
-        saveState(seeded);
+        const empty = createEmptyState();
+        setState(empty);
+        saveState(empty);
       }
       setStatus("ready");
       loadExcelHandle().then((h) => setExcelLinked(Boolean(h)));
@@ -236,8 +235,8 @@ export function useAppState() {
     [persist, state],
   );
 
-  const resetSamples = useCallback(() => {
-    persist(createSampleState());
+  const clearAllData = useCallback(() => {
+    persist(createEmptyState());
   }, [persist]);
 
   const forceExcelSync = useCallback(async () => {
@@ -267,7 +266,8 @@ export function useAppState() {
     deleteTask,
     setCalendarEvents,
     replaceCalendar,
-    resetSamples,
+    clearAllData,
+    resetSamples: clearAllData,
     excelLinked,
     excelStatus,
     setExcelLinked,

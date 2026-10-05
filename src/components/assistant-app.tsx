@@ -11,7 +11,11 @@ import { WelcomeBanner } from "@/components/welcome-banner";
 import { AppNav, type MainView } from "@/components/app-nav";
 import { PanelShell } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
-import { type TaskCategory } from "@/lib/types";
+import {
+  isTaskCategory,
+  type FrameId,
+  type TaskCategory,
+} from "@/lib/types";
 import { Loader2, RotateCcw } from "lucide-react";
 
 function readViewFromUrl(): MainView | null {
@@ -31,7 +35,7 @@ function readViewFromUrl(): MainView | null {
 
 export function AssistantApp() {
   const app = useAppState();
-  const [category, setCategory] = useState<TaskCategory>("work");
+  const [frame, setFrame] = useState<FrameId>("work");
   const [view, setView] = useState<MainView>("todo");
   const [gcalBanner, setGcalBanner] = useState<{
     kind: "ok" | "error";
@@ -84,9 +88,17 @@ export function AssistantApp() {
     );
   }
 
-  const active = app.activeTasks(category);
-  const done = app.completedTasks(category);
+  const taskFrame: TaskCategory | undefined = isTaskCategory(frame)
+    ? frame
+    : undefined;
+  const active = taskFrame ? app.activeTasks(taskFrame) : [];
+  const done = taskFrame ? app.completedTasks(taskFrame) : [];
   const workbookOpen = view === "todo" || view === "done";
+
+  const handleFrameChange = (f: FrameId) => {
+    setFrame(f);
+    if (f === "gcal" && view === "done") setView("todo");
+  };
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -104,8 +116,8 @@ export function AssistantApp() {
                 일비서
               </h1>
               <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
-                할 일 엑셀 표에 [캘린더] 일정을 같은 6열로 합치고, 파랑 줄·읽기
-                전용으로 구분합니다. 매일 08:00 브리핑·PC 파일 연결.
+                틀에서 업무·개인·과제·팀원·구글 캘린더를 고릅니다. 캘린더 틀은
+                읽기 전용 6열 표와 달력으로 날짜를 고릅니다.
               </p>
             </div>
             <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">
@@ -155,8 +167,8 @@ export function AssistantApp() {
             <ExcelWorkbook
               sheet={view === "done" ? "done" : "todo"}
               onSheetChange={(s) => setView(s === "done" ? "done" : "todo")}
-              category={category}
-              onCategoryChange={setCategory}
+              frame={frame}
+              onFrameChange={handleFrameChange}
               activeTasks={active}
               doneTasks={done}
               calendarEvents={app.calendarEvents}
@@ -164,7 +176,12 @@ export function AssistantApp() {
               onComplete={app.completeTask}
               onRestore={app.restoreTask}
               onDelete={app.deleteTask}
-              onAdd={() => app.addTask({ category, kind: "spot" })}
+              onAdd={() =>
+                app.addTask({
+                  category: isTaskCategory(frame) ? frame : "work",
+                  kind: "spot",
+                })
+              }
               onImport={app.addMany}
             />
           ) : null}
@@ -212,10 +229,10 @@ export function AssistantApp() {
                     variant="outline"
                     size="lg"
                     className="mt-3 min-h-11"
-                    onClick={app.resetSamples}
+                    onClick={app.clearAllData}
                   >
                     <RotateCcw className="size-4" />
-                    샘플 다시 넣기
+                    데이터 비우기
                   </Button>
                 </div>
               </div>

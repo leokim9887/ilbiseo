@@ -8,8 +8,8 @@
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-brisk-granite-qkrzuvu.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=705b337f-689c-4867-8729-314200a30967  
+   https://temporary-zippy-bugle-g1af23d.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=969e6035-314d-4b19-aac7-48772dffd130  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  

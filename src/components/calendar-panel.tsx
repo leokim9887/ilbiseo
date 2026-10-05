@@ -127,6 +127,7 @@ export function CalendarPanel({
   };
 
   const loadMock = () => {
+    // Optional demo only — not auto-loaded
     onReplace(createMockCalendarEvents());
     setError(null);
   };

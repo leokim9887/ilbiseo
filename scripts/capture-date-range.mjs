@@ -38,12 +38,13 @@ async function main() {
   // edit deadline range on first row
   await desktop.getByLabel("마감목표").first().click();
   await desktop.waitForTimeout(200);
-  await desktop.getByLabel("시작일").fill("2026-10-01");
-  await desktop.getByLabel("종료일").fill("2026-10-15");
+  await desktop.getByLabel("시작일", { exact: true }).fill("2026-10-01");
+  await desktop.getByLabel("종료일", { exact: true }).fill("2026-10-15");
   await desktop.waitForTimeout(200);
   await shot(desktop, "edit-range");
 
   // click outside to collapse edit
+  await desktop.keyboard.press("Escape");
   await desktop.getByRole("columnheader", { name: "마감목표" }).click();
   await desktop.waitForTimeout(200);
 

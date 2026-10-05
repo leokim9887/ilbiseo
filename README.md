@@ -8,8 +8,8 @@
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-express-mesa-zdr7zr0.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=2097a63b-191e-496e-919d-e38130bc0022  
+   https://temporary-instant-glacier-vytli8h.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=1d127544-4f26-43e7-8a3f-2ae366dd4b4b  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  

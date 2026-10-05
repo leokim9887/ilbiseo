@@ -47,39 +47,7 @@ export function createMockCalendarEvents(): CalendarEvent[] {
   ];
 }
 
-export function parseIcsToEvents(text: string): CalendarEvent[] {
-  const events = text.split("BEGIN:VEVENT").slice(1);
-  if (events.length === 0) {
-    throw new Error("ICS에서 일정을 찾지 못했습니다.");
-  }
-  return events.map((block) => {
-    const summary =
-      block.match(/SUMMARY[^:]*:(.+)/)?.[1]?.trim().replace(/\\,/g, ",") ??
-      "제목 없는 일정";
-    const dt =
-      block.match(/DTSTART[^:]*:(\d{8}T\d{6})/)?.[1] ??
-      block.match(/DTSTART[^:]*:(\d{8})/)?.[1];
-    let start = todayIso();
-    let allDay = true;
-    if (dt) {
-      if (/^\d{8}T/.test(dt)) {
-        start = `${dt.slice(0, 4)}-${dt.slice(4, 6)}-${dt.slice(6, 8)}T${dt.slice(9, 11)}:${dt.slice(11, 13)}:00`;
-        allDay = false;
-      } else if (/^\d{8}$/.test(dt)) {
-        start = `${dt.slice(0, 4)}-${dt.slice(4, 6)}-${dt.slice(6, 8)}`;
-      }
-    }
-    return {
-      id: createId(),
-      title: summary,
-      start,
-      end: null,
-      allDay,
-      notes: "ICS import",
-      source: "ics" as const,
-    };
-  });
-}
+export { parseIcsToEvents, importIcsFromInput, looksLikeCalendarUrl } from "./ics";
 
 export function formatCalendarWhen(ev: CalendarEvent): string {
   if (ev.allDay || ev.start.length === 10) {

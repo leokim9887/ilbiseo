@@ -5,7 +5,7 @@ import type { CalendarEvent } from "@/lib/types";
 import {
   createMockCalendarEvents,
   formatCalendarWhen,
-  parseIcsToEvents,
+  looksLikeCalendarUrl,
 } from "@/lib/calendar-data";
 import { PanelShell, EmptyState } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,9 @@ export function CalendarPanel({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<GoogleStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
-  const [busy, setBusy] = useState<"refresh" | "disconnect" | null>(null);
+  const [busy, setBusy] = useState<"refresh" | "disconnect" | "ics" | null>(
+    null,
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const autoFetched = useRef(false);
 
@@ -129,23 +131,50 @@ export function CalendarPanel({
     setError(null);
   };
 
-  const importIcs = () => {
+  const importIcsViaServer = async (input: string, mode: "append" | "replace") => {
+    setBusy("ics");
+    setError(null);
+    const trimmed = input.trim();
+    if (!trimmed) {
+      setError("붙여 넣을 ICS 내용 또는 iCal URL을 입력하세요.");
+      setBusy(null);
+      return;
+    }
     try {
-      const parsed = parseIcsToEvents(icsText);
-      onAppend(parsed);
+      const body = looksLikeCalendarUrl(trimmed)
+        ? { url: trimmed }
+        : { text: trimmed };
+      const res = await fetch("/api/calendar/ics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        events?: CalendarEvent[];
+        count?: number;
+      };
+      if (!res.ok) {
+        throw new Error(json.error || "ICS 가져오기 실패");
+      }
+      const events = json.events ?? [];
+      if (mode === "replace") onReplace(events);
+      else onAppend(events);
       setIcsText("");
-      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "ICS 가져오기 실패");
+    } finally {
+      setBusy(null);
     }
   };
+
+  const importIcs = () => void importIcsViaServer(icsText, "append");
 
   const onFile = async (file: File | null) => {
     if (!file) return;
     try {
       const text = await file.text();
-      onAppend(parseIcsToEvents(text));
-      setError(null);
+      await importIcsViaServer(text, "append");
     } catch (e) {
       setError(e instanceof Error ? e.message : "파일 읽기 실패");
     }
@@ -294,24 +323,35 @@ export function CalendarPanel({
 
         <div className="space-y-2 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 p-3">
           <p className="text-xs font-medium text-[var(--ink-muted)]">
-            ICS 가져오기 (구글 없이도 동작)
+            ICS 가져오기 · Google iCal URL (서버가 대신 받아옵니다 — CORS 없음)
           </p>
           <Textarea
             rows={3}
             className="font-mono text-xs"
-            placeholder="ICS 붙여넣기 (BEGIN:VCALENDAR …)"
+            placeholder="https://calendar.google.com/calendar/ical/…/public/basic.ics 또는 BEGIN:VCALENDAR …"
             value={icsText}
             onChange={(e) => setIcsText(e.target.value)}
           />
+          <p className="text-[11px] text-[var(--ink-muted)]">
+            webcal:// 주소도 됩니다. 공개 URL이 안 되면 Google 설정의{" "}
+            <strong>비밀 iCal 주소</strong>를 쓰세요.
+          </p>
           <Button
             type="button"
             size="lg"
             variant="outline"
             className="min-h-11"
-            disabled={!icsText.trim()}
+            disabled={!icsText.trim() || busy === "ics"}
             onClick={importIcs}
           >
-            ICS 반영
+            {busy === "ics" ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                가져오는 중…
+              </>
+            ) : (
+              "ICS / URL 가져오기"
+            )}
           </Button>
           {error ? (
             <p className="text-sm text-destructive" role="alert">

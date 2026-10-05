@@ -11,14 +11,18 @@ import {
 import {
   CATEGORY_LABEL,
   CATEGORY_ORDER,
+  type CalendarEvent,
   type Task,
   type TaskCategory,
 } from "@/lib/types";
 import {
-  filterByPeriod,
+  buildTodoSheetRows,
+  calendarListUpTitle,
+  formatEventDeadline,
+} from "@/lib/sheet-rows";
+import {
   formatDeadlineRange,
   monthRangeContaining,
-  sortByPeriod,
   todayIso,
   weekRangeContaining,
   type PeriodSort,
@@ -58,6 +62,8 @@ interface ExcelWorkbookProps {
   onDelete: (id: string) => void;
   onAdd: () => void;
   onImport: (tasks: Task[]) => void;
+  /** 할 일 시트에만 ICS/OAuth 일정 행으로 합침 (읽기 전용) */
+  calendarEvents?: CalendarEvent[];
 }
 
 export function ExcelWorkbook({
@@ -73,6 +79,7 @@ export function ExcelWorkbook({
   onDelete,
   onAdd,
   onImport,
+  calendarEvents = [],
 }: ExcelWorkbookProps) {
   const [focus, setFocus] = useState<FocusCell | null>(null);
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
@@ -93,16 +100,30 @@ export function ExcelWorkbook({
 
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
 
-  const tasks = useMemo(() => {
-    const filtered = filterByPeriod(
+  const rows = useMemo(
+    () =>
+      buildTodoSheetRows(baseTasks, calendarEvents, {
+        filterStart: filterStart || null,
+        filterEnd: filterEnd || null,
+        periodSort,
+        includeCalendar: sheet === "todo",
+      }),
+    [
       baseTasks,
-      filterStart || null,
-      filterEnd || null,
-    );
-    return sortByPeriod(filtered, periodSort);
-  }, [baseTasks, filterStart, filterEnd, periodSort]);
+      calendarEvents,
+      filterStart,
+      filterEnd,
+      periodSort,
+      sheet,
+    ],
+  );
 
-  const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
+  const taskIds = useMemo(
+    () => rows.filter((r) => r.kind === "task").map((r) => r.task.id),
+    [rows],
+  );
+  const calCount = rows.filter((r) => r.kind === "calendar").length;
+  const taskCount = rows.filter((r) => r.kind === "task").length;
   const filterActive = Boolean(filterStart || filterEnd);
 
   const applyChip = (c: "all" | "today" | "week" | "month") => {
@@ -256,8 +277,11 @@ export function ExcelWorkbook({
           </Button>
         ) : null}
         <span className="ml-auto text-[12px] text-[#5c655f]">
-          {CATEGORY_LABEL[category]} · {tasks.length}행
-          {filterActive ? ` (필터 ${baseTasks.length}중)` : ""}
+          {CATEGORY_LABEL[category]} · {rows.length}행
+          {sheet === "todo" && calCount > 0
+            ? ` (할 일 ${taskCount} · 캘린더 ${calCount})`
+            : ""}
+          {filterActive ? ` · 필터 적용` : ""}
         </span>
       </div>
 
@@ -328,7 +352,7 @@ export function ExcelWorkbook({
             <option value="end">마감(종료)일 순</option>
           </select>
           <p className="text-[11px] text-[#5c655f]">
-            겹치는 행만 표시 · 날짜 없는 행은 「전체」에서만 보임
+            할 일·캘린더 행 모두 기간 겹침 기준 · 날짜 없는 할 일은 「전체」에서만
           </p>
         </div>
       </div>
@@ -353,14 +377,17 @@ export function ExcelWorkbook({
             </tr>
           </thead>
           <tbody>
-            {tasks.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td
                   colSpan={6}
                   className="border border-black px-4 py-16 text-center text-[15px] text-[#555]"
                 >
                   {filterActive ? (
-                    <p>이 기간에 겹치는 할 일이 없습니다. 필터를 넓히거나 「전체」를 누르세요.</p>
+                    <p>
+                      이 기간에 겹치는 할 일·캘린더 행이 없습니다. 「전체」를
+                      누르거나 캘린더를 불러오세요.
+                    </p>
                   ) : sheet === "todo" ? (
                     <>
                       <p>할 일이 없습니다. 「행 추가」로 첫 줄을 넣으세요.</p>
@@ -378,7 +405,47 @@ export function ExcelWorkbook({
                 </td>
               </tr>
             ) : (
-              tasks.map((task, idx) => {
+              rows.map((row, idx) => {
+                if (row.kind === "calendar") {
+                  const ev = row.event;
+                  const order = idx + 1;
+                  return (
+                    <tr
+                      key={row.id}
+                      className="bg-[#eef3fa] ring-1 ring-inset ring-[#3b6ea5]/20"
+                      aria-label="캘린더 일정 행"
+                    >
+                      <td className="border border-black px-1 py-1 text-center align-middle text-[14px] font-medium tabular-nums text-[#1a3a6b]">
+                        {order}
+                      </td>
+                      <td className="border border-black border-l-[4px] border-l-[#3b6ea5] px-2 py-2 align-top">
+                        <p className="text-[14px] font-semibold leading-snug text-[#1a2420]">
+                          {calendarListUpTitle(ev)}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-[#3b6ea5]">
+                          {ev.calendarName || "Google/ICS"} · 읽기 전용
+                        </p>
+                      </td>
+                      <td className="border border-black px-1 py-2 text-center align-middle text-[13px] text-[#1a2420]">
+                        {formatEventDeadline(ev)}
+                      </td>
+                      <td className="border border-black px-1 py-2 text-center align-middle text-[#888]">
+                        —
+                      </td>
+                      <td className="border border-black px-1 py-2 text-center align-middle text-[#888]">
+                        —
+                      </td>
+                      <td
+                        className="border border-black px-1 py-2 text-center align-middle text-[12px] text-[#5c655f]"
+                        title="캘린더 일정은 완료 체크 불가"
+                      >
+                        —
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const task = row.task;
                 const order = idx + 1;
                 const selected = selectedRow === task.id;
                 const zebra = order % 2 === 0;
@@ -579,7 +646,7 @@ export function ExcelWorkbook({
 
       <div className="flex flex-col border-t border-[#7a8288] bg-[#f0f2f4]">
         <div className="border-b border-[#c5ccd2] px-3 py-1 text-[11px] text-[#5c655f]">
-          마감목표 = 시작일 ~ 종료일 · 기간 필터는 구간이 겹치는 행만 표시
+          할 일(편집) + [캘린더] 행(파랑·읽기 전용) · 기간 필터는 둘 다 적용
         </div>
         <div className="flex items-end gap-0 overflow-x-auto px-1 pt-1">
           <SheetTab
@@ -595,7 +662,7 @@ export function ExcelWorkbook({
             한 일
           </SheetTab>
           <span className="mb-1.5 ml-2 hidden text-[11px] text-[#8a939a] sm:inline">
-            캘린더·브리핑은 위 메뉴(장부 밖)
+            캘린더 불러오기는 「캘린더」메뉴 · 일정은 할 일 표에 합쳐짐
           </span>
         </div>
       </div>

@@ -3,14 +3,12 @@
 import {
   CalendarDays,
   CheckSquare,
-  Layers,
   ListTodo,
   Newspaper,
   Settings2,
 } from "lucide-react";
 
 export type MainView =
-  | "unified"
   | "todo"
   | "done"
   | "calendar"
@@ -23,7 +21,6 @@ const NAV: {
   short: string;
   icon: typeof ListTodo;
 }[] = [
-  { id: "unified", label: "통합", short: "통합", icon: Layers },
   { id: "todo", label: "할 일", short: "할 일", icon: ListTodo },
   { id: "done", label: "한 일", short: "한 일", icon: CheckSquare },
   { id: "calendar", label: "캘린더", short: "일정", icon: CalendarDays },
@@ -42,7 +39,7 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
     <>
       <nav
         aria-label="주요 메뉴"
-        className="hidden gap-1.5 sm:grid sm:grid-cols-3 lg:grid-cols-6"
+        className="hidden gap-1.5 sm:grid sm:grid-cols-3 lg:grid-cols-5"
       >
         {NAV.map((item) => {
           const active = value === item.id;
@@ -89,7 +86,7 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--grid-line)] bg-[var(--sheet)]/95 backdrop-blur-md sm:hidden"
         style={{ paddingBottom: "max(0.35rem, env(safe-area-inset-bottom))" }}
       >
-        <ul className="mx-auto grid max-w-lg grid-cols-6 gap-0.5 px-0.5 pt-1">
+        <ul className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pt-1">
           {NAV.map((item) => {
             const active = value === item.id;
             const Icon = item.icon;

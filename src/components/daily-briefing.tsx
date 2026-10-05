@@ -300,7 +300,7 @@ export function DailyBriefingPanel({
 
             <section className="px-4 py-3">
               <h4 className="mb-2 text-sm font-semibold text-[var(--brand)]">
-                【구글 캘린더 — 별도】
+                【구글 캘린더】
               </h4>
               {preview.calendarLines.length === 0 ? (
                 <p className="text-sm text-[var(--ink-muted)]">근접 일정 없음</p>
@@ -310,6 +310,12 @@ export function DailyBriefingPanel({
                     <li key={`${c.title}-${i}`} className="text-sm">
                       <span className="text-[var(--ink-muted)]">{c.when}</span>{" "}
                       {c.title}
+                      {c.calendarName ? (
+                        <span className="text-[var(--ink-muted)]">
+                          {" "}
+                          · {c.calendarName}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

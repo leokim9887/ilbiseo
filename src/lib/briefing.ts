@@ -43,7 +43,12 @@ export type DailyBriefing = {
   headline: string;
   summaryLine: string;
   sections: BriefingSection[];
-  calendarLines: { when: string; title: string; notes: string }[];
+  calendarLines: {
+    when: string;
+    title: string;
+    notes: string;
+    calendarName?: string;
+  }[];
   plaintext: string;
   activeCount: number;
   completedCount: number;
@@ -136,6 +141,7 @@ export function buildDailyBriefing(
       when: formatCalendarWhen(e),
       title: e.title,
       notes: e.notes,
+      calendarName: e.calendarName,
     }));
 
   const headline = `일비서 브리핑 · ${formatKoDate(date)}`;
@@ -178,12 +184,13 @@ export function buildDailyBriefing(
     parts.push("");
   }
 
-  parts.push("【구글 캘린더 — 별도】");
+  parts.push("【구글 캘린더】");
   if (calendarLines.length === 0) {
     parts.push("  (근접 일정 없음)");
   } else {
     for (const c of calendarLines) {
-      parts.push(`  • ${c.when}  ${c.title}`);
+      const cal = c.calendarName ? ` · ${c.calendarName}` : "";
+      parts.push(`  • ${c.when}  ${c.title}${cal}`);
       if (c.notes) parts.push(`    ${c.notes}`);
     }
   }

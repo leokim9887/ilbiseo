@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
 import {
   createMockCalendarEvents,
@@ -10,26 +10,119 @@ import {
 import { PanelShell, EmptyState } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarDays } from "lucide-react";
+import {
+  CalendarDays,
+  Link2,
+  Link2Off,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 
 interface CalendarPanelProps {
   events: CalendarEvent[];
   onReplace: (events: CalendarEvent[]) => void;
   onAppend: (events: CalendarEvent[]) => void;
+  banner?: { kind: "ok" | "error"; text: string } | null;
 }
+
+type GoogleStatus = {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+  missing: string[];
+  setupHint: string;
+};
 
 export function CalendarPanel({
   events,
   onReplace,
   onAppend,
+  banner,
 }: CalendarPanelProps) {
   const [icsText, setIcsText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<GoogleStatus | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [busy, setBusy] = useState<"refresh" | "disconnect" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const autoFetched = useRef(false);
 
-  const hasGoogle =
-    Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) ||
-    Boolean(process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_ENABLED);
+  const loadStatus = useCallback(async () => {
+    setStatusLoading(true);
+    try {
+      const res = await fetch("/api/google/status");
+      const json = (await res.json()) as GoogleStatus;
+      setStatus(json);
+    } catch {
+      setStatus({
+        configured: false,
+        connected: false,
+        email: null,
+        missing: [
+          "GOOGLE_CLIENT_ID",
+          "GOOGLE_CLIENT_SECRET",
+          "GOOGLE_REDIRECT_URI",
+        ],
+        setupHint: "상태 확인에 실패했습니다. ICS·mock으로 확인하세요.",
+      });
+    } finally {
+      setStatusLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStatus();
+  }, [loadStatus]);
+
+  const refreshGoogle = useCallback(async () => {
+    setBusy("refresh");
+    setError(null);
+    try {
+      const res = await fetch("/api/google/events?days=14");
+      const json = (await res.json()) as {
+        error?: string;
+        events?: CalendarEvent[];
+        email?: string | null;
+      };
+      if (!res.ok) {
+        throw new Error(json.error || "일정을 가져오지 못했습니다.");
+      }
+      onReplace(json.events ?? []);
+      setStatus((s) =>
+        s
+          ? {
+              ...s,
+              connected: true,
+              email: json.email ?? s.email,
+            }
+          : s,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "가져오기 실패");
+    } finally {
+      setBusy(null);
+    }
+  }, [onReplace]);
+
+  useEffect(() => {
+    if (!status?.connected || autoFetched.current) return;
+    autoFetched.current = true;
+    void refreshGoogle();
+  }, [status?.connected, refreshGoogle]);
+
+  const disconnect = async () => {
+    setBusy("disconnect");
+    setError(null);
+    try {
+      await fetch("/api/google/disconnect", { method: "POST" });
+      autoFetched.current = false;
+      await loadStatus();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "연결 해제 실패");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const loadMock = () => {
     onReplace(createMockCalendarEvents());
@@ -59,14 +152,57 @@ export function CalendarPanel({
   };
 
   const sorted = [...events].sort((a, b) => a.start.localeCompare(b.start));
+  const configured = status?.configured ?? false;
+  const connected = status?.connected ?? false;
 
   return (
     <PanelShell
       title="구글 캘린더"
-      description="프로그램 할 일과 섞지 않습니다. mock 또는 ICS로 확인할 수 있습니다."
+      description="엑셀 할 일 표와 섞지 않습니다. 구글 연결 · ICS · mock으로 일정을 따로 봅니다."
       icon={<CalendarDays className="size-5" />}
       actions={
         <>
+          {configured && connected ? (
+            <>
+              <Button
+                type="button"
+                size="lg"
+                className="min-h-11"
+                disabled={busy !== null}
+                onClick={() => void refreshGoogle()}
+              >
+                {busy === "refresh" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+                새로고침
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="min-h-11"
+                disabled={busy !== null}
+                onClick={() => void disconnect()}
+              >
+                <Link2Off className="size-4" />
+                연결 해제
+              </Button>
+            </>
+          ) : configured ? (
+            <a
+              href="/api/google/auth"
+              className="inline-flex h-11 min-h-11 items-center justify-center gap-1.5 rounded-lg bg-[#217346] px-3 text-sm font-medium text-white hover:bg-[#1a5c38]"
+            >
+              <Link2 className="size-4" />
+              Google 캘린더 연결
+            </a>
+          ) : (
+            <Button type="button" size="lg" variant="ghost" className="min-h-11" disabled>
+              OAuth 미설정
+            </Button>
+          )}
           <Button
             type="button"
             size="lg"
@@ -81,7 +217,7 @@ export function CalendarPanel({
             type="file"
             accept=".ics,text/calendar"
             className="hidden"
-            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
           />
           <Button
             type="button"
@@ -92,26 +228,74 @@ export function CalendarPanel({
           >
             ICS 파일
           </Button>
-          {hasGoogle ? (
-            <Button type="button" size="lg" className="min-h-11" disabled>
-              Google 연결 (준비됨)
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="lg"
-              variant="ghost"
-              className="min-h-11"
-              disabled
-            >
-              OAuth 미설정
-            </Button>
-          )}
         </>
       }
     >
       <div className="space-y-4">
+        {banner ? (
+          <p
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              banner.kind === "ok"
+                ? "border-[#217346]/30 bg-[#217346]/10 text-[#1a5c38]"
+                : "border-destructive/30 bg-destructive/5 text-destructive"
+            }`}
+            role="status"
+          >
+            {banner.text}
+          </p>
+        ) : null}
+
+        <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/40 px-4 py-3 text-sm">
+          {statusLoading ? (
+            <p className="flex items-center gap-2 text-[var(--ink-muted)]">
+              <Loader2 className="size-4 animate-spin" />
+              Google 연결 상태 확인 중…
+            </p>
+          ) : configured && connected ? (
+            <p className="text-[var(--ink)]">
+              <span className="font-semibold text-[#217346]">연결됨</span>
+              {status?.email ? ` · ${status.email}` : ""} · 앞으로 14일 일정을
+              불러옵니다.
+            </p>
+          ) : configured ? (
+            <p className="text-[var(--ink)]">
+              Google 설정은 되어 있습니다. 「Google 캘린더 연결」을 누르면
+              로그인합니다.
+            </p>
+          ) : (
+            <div className="space-y-2 text-[var(--ink)]">
+              <p className="font-semibold">아직 Google 키가 없습니다</p>
+              <p className="text-[var(--ink-muted)]">
+                로컬/배포 환경에{" "}
+                <code className="rounded bg-black/5 px-1">GOOGLE_CLIENT_ID</code>
+                ,{" "}
+                <code className="rounded bg-black/5 px-1">
+                  GOOGLE_CLIENT_SECRET
+                </code>
+                ,{" "}
+                <code className="rounded bg-black/5 px-1">
+                  GOOGLE_REDIRECT_URI
+                </code>
+                를 넣으면 연결 버튼이 살아납니다.
+              </p>
+              {status?.missing?.length ? (
+                <p className="text-xs text-[var(--ink-muted)]">
+                  없는 값: {status.missing.join(", ")}
+                </p>
+              ) : null}
+              <p className="text-xs text-[var(--ink-muted)]">
+                설정 안내: 프로젝트 store{" "}
+                <code>docs/google-calendar-setup.md</code> · 그전까지는 mock·ICS로
+                확인하세요.
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="space-y-2 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 p-3">
+          <p className="text-xs font-medium text-[var(--ink-muted)]">
+            ICS 가져오기 (구글 없이도 동작)
+          </p>
           <Textarea
             rows={3}
             className="font-mono text-xs"
@@ -139,7 +323,7 @@ export function CalendarPanel({
         {sorted.length === 0 ? (
           <EmptyState
             title="캘린더 일정이 없습니다"
-            description="「mock 샘플」또는 ICS 파일로 일정을 불러오세요."
+            description="Google 연결·「mock 샘플」·ICS로 일정을 불러오세요. 할 일 엑셀 표와는 별도입니다."
             action={
               <Button type="button" size="lg" onClick={loadMock}>
                 mock 샘플 넣기
@@ -147,7 +331,7 @@ export function CalendarPanel({
             }
           />
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2" aria-label="캘린더 일정 목록">
             {sorted.map((ev) => (
               <li
                 key={ev.id}
@@ -155,12 +339,28 @@ export function CalendarPanel({
               >
                 <p className="text-[12px] font-medium text-[var(--brand)]">
                   {formatCalendarWhen(ev)}
+                  {ev.end && !ev.allDay ? (
+                    <span className="text-[var(--ink-muted)]">
+                      {" "}
+                      ~{" "}
+                      {formatCalendarWhen({
+                        ...ev,
+                        start: ev.end,
+                      })}
+                    </span>
+                  ) : null}
                 </p>
                 <p className="mt-0.5 text-base font-semibold text-[var(--ink)]">
                   {ev.title}
                 </p>
                 <p className="mt-1 text-[12px] text-[var(--ink-muted)]">
-                  {ev.notes || "메모 없음"} · 출처 {ev.source}
+                  {ev.calendarName ? `${ev.calendarName} · ` : ""}
+                  {ev.notes || "메모 없음"} · 출처{" "}
+                  {ev.source === "google"
+                    ? "Google"
+                    : ev.source === "ics"
+                      ? "ICS"
+                      : "mock"}
                 </p>
               </li>
             ))}

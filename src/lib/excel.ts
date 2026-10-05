@@ -113,6 +113,7 @@ export async function buildWorkbook(
   cal.columns = [
     { header: "언제", key: "when", width: 18 },
     { header: "일정", key: "title", width: 34 },
+    { header: "캘린더", key: "calendarName", width: 16 },
     { header: "메모", key: "notes", width: 24 },
     { header: "출처", key: "source", width: 10 },
   ];
@@ -123,6 +124,7 @@ export async function buildWorkbook(
     cal.addRow({
       when: formatCalendarWhen(e),
       title: e.title,
+      calendarName: e.calendarName || "",
       notes: e.notes,
       source: e.source,
     });

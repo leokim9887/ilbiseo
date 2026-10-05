@@ -22,6 +22,7 @@ export function createMockCalendarEvents(): CalendarEvent[] {
       allDay: false,
       notes: "mock 구글 캘린더",
       source: "mock",
+      calendarName: "mock",
     },
     {
       id: createId(),
@@ -31,6 +32,7 @@ export function createMockCalendarEvents(): CalendarEvent[] {
       allDay: false,
       notes: "",
       source: "mock",
+      calendarName: "mock",
     },
     {
       id: createId(),
@@ -40,6 +42,7 @@ export function createMockCalendarEvents(): CalendarEvent[] {
       allDay: true,
       notes: "참석 여부 검토",
       source: "mock",
+      calendarName: "mock",
     },
   ];
 }

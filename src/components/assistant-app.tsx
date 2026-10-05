@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { ExcelWorkbook } from "@/components/excel-workbook";
 import { CalendarPanel } from "@/components/calendar-panel";
@@ -14,10 +14,54 @@ import { Button } from "@/components/ui/button";
 import { type TaskCategory } from "@/lib/types";
 import { Loader2, RotateCcw } from "lucide-react";
 
+function readViewFromUrl(): MainView | null {
+  if (typeof window === "undefined") return null;
+  const v = new URLSearchParams(window.location.search).get("view");
+  if (
+    v === "todo" ||
+    v === "done" ||
+    v === "calendar" ||
+    v === "briefing" ||
+    v === "settings"
+  ) {
+    return v;
+  }
+  return null;
+}
+
 export function AssistantApp() {
   const app = useAppState();
   const [category, setCategory] = useState<TaskCategory>("work");
   const [view, setView] = useState<MainView>("todo");
+  const [gcalBanner, setGcalBanner] = useState<{
+    kind: "ok" | "error";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const fromUrl = readViewFromUrl();
+    if (fromUrl) setView(fromUrl);
+    const params = new URLSearchParams(window.location.search);
+    const gcal = params.get("gcal");
+    if (gcal === "connected") {
+      setGcalBanner({
+        kind: "ok",
+        text: "Google 캘린더에 연결되었습니다. 일정을 불러오는 중입니다.",
+      });
+    } else if (gcal === "error") {
+      setGcalBanner({
+        kind: "error",
+        text: params.get("msg") || "Google 연결에 실패했습니다.",
+      });
+    }
+    if (fromUrl || gcal) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("view");
+      url.searchParams.delete("gcal");
+      url.searchParams.delete("msg");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, []);
 
   if (app.status === "loading") {
     return (
@@ -129,6 +173,7 @@ export function AssistantApp() {
               events={app.calendarEvents}
               onReplace={(events) => app.replaceCalendar(events, "replace")}
               onAppend={(events) => app.replaceCalendar(events, "append")}
+              banner={gcalBanner}
             />
           ) : null}
 

@@ -43,6 +43,8 @@ export interface CalendarEvent {
   allDay: boolean;
   notes: string;
   source: CalendarSource;
+  /** Google 캘린더 이름(표시용). mock/ICS는 비움 */
+  calendarName?: string;
 }
 
 export interface AppState {

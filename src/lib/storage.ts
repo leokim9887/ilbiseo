@@ -25,12 +25,21 @@ export function createEmptyState(): AppState {
 function migrateTask(raw: Record<string, unknown>): Task {
   const title = String(raw.title ?? "할 일");
   const notes = String(raw.notes ?? raw.memo ?? "");
+  // Old single 마감목표 → end date; startDate empty unless already present
+  const end =
+    (raw.targetDate as string | null) ??
+    (raw.endDate as string | null) ??
+    null;
+  const start =
+    (raw.startDate as string | null) ??
+    null;
   return {
     id: String(raw.id ?? createId()),
     title,
     category: (raw.category as TaskCategory) || "work",
     kind: (raw.kind as Task["kind"]) || "someday",
-    targetDate: (raw.targetDate as string | null) ?? null,
+    startDate: start,
+    targetDate: end,
     urgency: Number(raw.urgency ?? 3) || 3,
     importance: Number(raw.importance ?? 3) || 3,
     groupKey: String(raw.groupKey ?? title),
@@ -67,6 +76,7 @@ function foldChecklistsIntoTasks(
       title,
       category: c.category,
       kind: "someday",
+      startDate: null,
       targetDate: null,
       urgency: 3,
       importance: 3,
@@ -107,9 +117,17 @@ export function loadState(): AppState | null {
       const parsed = JSON.parse(v2) as { checklists?: unknown[] };
       const hadChecks =
         Array.isArray(parsed.checklists) && parsed.checklists.length > 0;
+      const rawTasks = Array.isArray(
+        (parsed as { tasks?: unknown[] }).tasks,
+      )
+        ? ((parsed as { tasks: Record<string, unknown>[] }).tasks)
+        : [];
+      const needsStartMigrate = rawTasks.some(
+        (t) => t && typeof t === "object" && !("startDate" in t),
+      );
       const n = normalizeState(parsed);
       if (n) {
-        if (hadChecks) saveState(n);
+        if (hadChecks || needsStartMigrate) saveState(n);
         return n;
       }
     }
@@ -181,6 +199,7 @@ export function createSampleState(): AppState {
         title: "후보자 A 이력서 검토",
         category: "work",
         kind: "spot",
+        startDate: iso(today),
         targetDate: iso(today),
         urgency: 5,
         importance: 5,
@@ -192,6 +211,7 @@ export function createSampleState(): AppState {
         title: "클라이언트 B 미팅 자료",
         category: "work",
         kind: "spot",
+        startDate: iso(today),
         targetDate: iso(today),
         urgency: 4,
         importance: 5,
@@ -203,6 +223,7 @@ export function createSampleState(): AppState {
         title: "포지션 JD 초안 작성",
         category: "project",
         kind: "ongoing",
+        startDate: iso(today),
         targetDate: inDays(5),
         urgency: 3,
         importance: 4,
@@ -214,6 +235,7 @@ export function createSampleState(): AppState {
         title: "포지션 JD 최종 검수",
         category: "project",
         kind: "ongoing",
+        startDate: inDays(3),
         targetDate: inDays(7),
         urgency: 3,
         importance: 4,
@@ -225,6 +247,7 @@ export function createSampleState(): AppState {
         title: "가족 저녁 약속 확인",
         category: "personal",
         kind: "spot",
+        startDate: iso(today),
         targetDate: iso(today),
         urgency: 3,
         importance: 4,
@@ -236,6 +259,7 @@ export function createSampleState(): AppState {
         title: "건강검진 예약",
         category: "personal",
         kind: "someday",
+        startDate: null,
         targetDate: null,
         urgency: 2,
         importance: 4,
@@ -247,6 +271,7 @@ export function createSampleState(): AppState {
         title: "신입 온보딩 체크 공유",
         category: "team",
         kind: "ongoing",
+        startDate: iso(today),
         targetDate: inDays(3),
         urgency: 3,
         importance: 4,
@@ -258,6 +283,7 @@ export function createSampleState(): AppState {
         title: "주간 리포트 양식",
         category: "team",
         kind: "someday",
+        startDate: null,
         targetDate: null,
         urgency: 2,
         importance: 3,
@@ -269,6 +295,7 @@ export function createSampleState(): AppState {
         title: "네트워킹 명함 정리",
         category: "work",
         kind: "someday",
+        startDate: null,
         targetDate: null,
         urgency: 2,
         importance: 3,
@@ -280,6 +307,7 @@ export function createSampleState(): AppState {
         title: "헤드헌팅 소개서 템플릿",
         category: "project",
         kind: "someday",
+        startDate: null,
         targetDate: null,
         urgency: 1,
         importance: 4,

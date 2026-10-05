@@ -58,15 +58,17 @@ export function parseMemoText(
       const targetDate = parseDateFromLine(line);
       const title = cleanTitle(line) || line;
       const kind = detectKind(line, Boolean(targetDate), targetDate);
+      const end =
+        kind === "someday"
+          ? null
+          : targetDate ?? (kind === "spot" ? todayIso() : inDays(7));
       return {
         id: createId(),
         title,
         category,
         kind,
-        targetDate:
-          kind === "someday"
-            ? null
-            : targetDate ?? (kind === "spot" ? todayIso() : inDays(7)),
+        startDate: end,
+        targetDate: end,
         urgency: /긴급|asap|당장|최우선/.test(line)
           ? 5
           : /급|우선|빨리/.test(line)

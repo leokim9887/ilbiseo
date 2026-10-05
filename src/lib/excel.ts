@@ -3,6 +3,7 @@ import { type CalendarEvent, type Task } from "./types";
 import { sortCompleted, sortTasks } from "./sort";
 import type { DailyBriefing } from "./briefing";
 import { formatCalendarWhen } from "./calendar-data";
+import { formatDeadlineRange } from "./date-range";
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
@@ -52,7 +53,7 @@ export async function buildWorkbook(
   todo.columns = [
     { header: "순서", key: "order", width: 8 },
     { header: "할일 LIST UP", key: "listup", width: 48 },
-    { header: "마감목표", key: "deadline", width: 14 },
+    { header: "마감목표", key: "deadline", width: 22 },
     { header: "중요도", key: "importance", width: 10 },
     { header: "시급성", key: "urgency", width: 10 },
     { header: "완료여부", key: "done", width: 10 },
@@ -63,13 +64,18 @@ export async function buildWorkbook(
     todo.addRow({
       order: i + 1,
       listup,
-      deadline: t.targetDate ?? "",
+      deadline: formatDeadlineRange(t),
       importance: t.importance,
       urgency: t.urgency,
       done: "",
     });
   });
   todo.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
+  todo.getColumn("deadline").alignment = {
+    wrapText: true,
+    vertical: "middle",
+    horizontal: "center",
+  };
 
   const done = wb.addWorksheet("한 일", {
     views: [{ state: "frozen", ySplit: 1 }],
@@ -77,7 +83,7 @@ export async function buildWorkbook(
   done.columns = [
     { header: "순서", key: "order", width: 8 },
     { header: "할일 LIST UP", key: "listup", width: 48 },
-    { header: "마감목표", key: "deadline", width: 14 },
+    { header: "마감목표", key: "deadline", width: 22 },
     { header: "중요도", key: "importance", width: 10 },
     { header: "시급성", key: "urgency", width: 10 },
     { header: "완료여부", key: "done", width: 10 },
@@ -88,13 +94,18 @@ export async function buildWorkbook(
     done.addRow({
       order: i + 1,
       listup,
-      deadline: t.targetDate ?? "",
+      deadline: formatDeadlineRange(t),
       importance: t.importance,
       urgency: t.urgency,
       done: "완료",
     });
   });
   done.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
+  done.getColumn("deadline").alignment = {
+    wrapText: true,
+    vertical: "middle",
+    horizontal: "center",
+  };
 
   const cal = wb.addWorksheet("구글캘린더", {
     views: [{ state: "frozen", ySplit: 1 }],

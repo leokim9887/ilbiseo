@@ -112,6 +112,11 @@ export function useAppState() {
         title,
         category: partial?.category ?? "work",
         kind: partial?.kind ?? "spot",
+        startDate:
+          partial?.startDate ??
+          (partial?.kind === "someday"
+            ? null
+            : new Date().toISOString().slice(0, 10)),
         targetDate:
           partial?.targetDate ??
           (partial?.kind === "someday"

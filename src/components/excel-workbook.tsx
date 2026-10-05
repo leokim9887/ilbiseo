@@ -4,7 +4,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
@@ -15,32 +14,34 @@ import {
   type Task,
   type TaskCategory,
 } from "@/lib/types";
+import {
+  filterByPeriod,
+  formatDeadlineRange,
+  monthRangeContaining,
+  sortByPeriod,
+  todayIso,
+  weekRangeContaining,
+  type PeriodSort,
+} from "@/lib/date-range";
 import { Button } from "@/components/ui/button";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
-import { Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 export type WorkbookSheet = "todo" | "done";
 
-/** Father’s six columns only */
 type ColKey = "order" | "listup" | "deadline" | "importance" | "urgency" | "done";
 
-/** Exact father header row (above the red line in the reference photo). */
 const COLS: { key: ColKey; label: string; width: string }[] = [
   { key: "order", label: "순서", width: "56px" },
-  { key: "listup", label: "할일 LIST UP", width: "46%" },
-  { key: "deadline", label: "마감목표", width: "108px" },
+  { key: "listup", label: "할일 LIST UP", width: "42%" },
+  { key: "deadline", label: "마감목표", width: "168px" },
   { key: "importance", label: "중요도", width: "72px" },
   { key: "urgency", label: "시급성", width: "72px" },
   { key: "done", label: "완료여부", width: "84px" },
 ];
 
-const EDITABLE: ColKey[] = [
-  "listup",
-  "deadline",
-  "importance",
-  "urgency",
-];
+const EDITABLE: ColKey[] = ["listup", "deadline", "importance", "urgency"];
 
 type FocusCell = { rowId: string; col: ColKey };
 
@@ -75,8 +76,12 @@ export function ExcelWorkbook({
 }: ExcelWorkbookProps) {
   const [focus, setFocus] = useState<FocusCell | null>(null);
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const today = useMemo(
+  const [filterStart, setFilterStart] = useState<string>("");
+  const [filterEnd, setFilterEnd] = useState<string>("");
+  const [periodSort, setPeriodSort] = useState<PeriodSort>("default");
+  const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
+
+  const todayLabel = useMemo(
     () =>
       new Date().toLocaleDateString("ko-KR", {
         year: "numeric",
@@ -86,15 +91,55 @@ export function ExcelWorkbook({
     [],
   );
 
-  const tasks = sheet === "todo" ? activeTasks : doneTasks;
+  const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
+
+  const tasks = useMemo(() => {
+    const filtered = filterByPeriod(
+      baseTasks,
+      filterStart || null,
+      filterEnd || null,
+    );
+    return sortByPeriod(filtered, periodSort);
+  }, [baseTasks, filterStart, filterEnd, periodSort]);
+
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
+  const filterActive = Boolean(filterStart || filterEnd);
+
+  const applyChip = (c: "all" | "today" | "week" | "month") => {
+    setChip(c);
+    if (c === "all") {
+      setFilterStart("");
+      setFilterEnd("");
+      return;
+    }
+    const t = todayIso();
+    if (c === "today") {
+      setFilterStart(t);
+      setFilterEnd(t);
+      return;
+    }
+    if (c === "week") {
+      const w = weekRangeContaining(t);
+      setFilterStart(w.start);
+      setFilterEnd(w.end);
+      return;
+    }
+    const m = monthRangeContaining(t);
+    setFilterStart(m.start);
+    setFilterEnd(m.end);
+  };
+
+  const clearFilter = () => {
+    setChip("all");
+    setFilterStart("");
+    setFilterEnd("");
+  };
 
   const moveFocus = useCallback(
     (rowId: string, col: ColKey, dir: "next" | "prev" | "down" | "up") => {
       const colIdx = EDITABLE.indexOf(col);
       const rowIdx = taskIds.indexOf(rowId);
       if (rowIdx < 0 || colIdx < 0) return;
-
       if (dir === "next" || dir === "prev") {
         const n = dir === "next" ? colIdx + 1 : colIdx - 1;
         if (n >= 0 && n < EDITABLE.length) {
@@ -134,6 +179,13 @@ export function ExcelWorkbook({
     el?.focus();
   }, [focus]);
 
+  const chipClass = (c: typeof chip) =>
+    `h-8 rounded-sm px-2.5 text-[13px] font-medium border ${
+      chip === c
+        ? "border-[#217346] bg-[#217346] text-white"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1]"
+    }`;
+
   return (
     <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2">
@@ -143,9 +195,10 @@ export function ExcelWorkbook({
             — TO DO LIST
           </span>
         </p>
-        <p className="text-[13px] tabular-nums text-[#5c655f]">{today}</p>
+        <p className="text-[13px] tabular-nums text-[#5c655f]">{todayLabel}</p>
       </div>
 
+      {/* Ribbon */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[#9aa5ad] bg-[#f0f2f4] px-3 py-2">
         <label className="flex items-center gap-2 text-[13px] text-[#1a2420]">
           <span className="font-semibold">틀</span>
@@ -176,9 +229,7 @@ export function ExcelWorkbook({
             <OcrImport category={category} onImport={onImport} />
           </>
         ) : (
-          <p className="text-[13px] text-[#5c655f]">
-            완료된 항목 · 완료여부 해제(복원) 가능
-          </p>
+          <p className="text-[13px] text-[#5c655f]">한 일 · 완료여부 복원 가능</p>
         )}
         {selectedRow ? (
           <Button
@@ -206,14 +257,84 @@ export function ExcelWorkbook({
         ) : null}
         <span className="ml-auto text-[12px] text-[#5c655f]">
           {CATEGORY_LABEL[category]} · {tasks.length}행
+          {filterActive ? ` (필터 ${baseTasks.length}중)` : ""}
         </span>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="relative max-h-[min(70vh,760px)] min-h-[340px] overflow-auto bg-white"
-      >
-        <table className="w-full min-w-[780px] border-collapse text-[15px] text-black">
+      {/* Period filter bar */}
+      <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13px] font-semibold text-[#1a2420]">기간</span>
+          <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+            시작일
+            <input
+              type="date"
+              value={filterStart}
+              onChange={(e) => {
+                setFilterStart(e.target.value);
+                setChip("all");
+              }}
+              className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+              aria-label="기간 시작일"
+            />
+          </label>
+          <span className="text-[#5c655f]">~</span>
+          <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+            종료일
+            <input
+              type="date"
+              value={filterEnd}
+              onChange={(e) => {
+                setFilterEnd(e.target.value);
+                setChip("all");
+              }}
+              className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+              aria-label="기간 종료일"
+            />
+          </label>
+          <button type="button" className={chipClass("today")} onClick={() => applyChip("today")}>
+            오늘
+          </button>
+          <button type="button" className={chipClass("week")} onClick={() => applyChip("week")}>
+            이번 주
+          </button>
+          <button type="button" className={chipClass("month")} onClick={() => applyChip("month")}>
+            이번 달
+          </button>
+          <button type="button" className={chipClass("all")} onClick={() => applyChip("all")}>
+            전체
+          </button>
+          {filterActive ? (
+            <button
+              type="button"
+              onClick={clearFilter}
+              className="inline-flex h-8 items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px] text-[#5c655f]"
+            >
+              <X className="size-3.5" />
+              필터 지우기
+            </button>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13px] font-semibold text-[#1a2420]">정렬</span>
+          <select
+            value={periodSort}
+            onChange={(e) => setPeriodSort(e.target.value as PeriodSort)}
+            className="h-8 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px]"
+            aria-label="기간 정렬"
+          >
+            <option value="default">기본(스팟·지속·언젠가)</option>
+            <option value="start">시작일 순</option>
+            <option value="end">마감(종료)일 순</option>
+          </select>
+          <p className="text-[11px] text-[#5c655f]">
+            겹치는 행만 표시 · 날짜 없는 행은 「전체」에서만 보임
+          </p>
+        </div>
+      </div>
+
+      <div className="relative max-h-[min(66vh,720px)] min-h-[300px] overflow-auto bg-white">
+        <table className="w-full min-w-[820px] border-collapse text-[15px] text-black">
           <thead className="sticky top-0 z-20">
             <tr>
               {COLS.map((c) => (
@@ -221,7 +342,7 @@ export function ExcelWorkbook({
                   key={`H-${c.key}`}
                   style={
                     c.key === "listup"
-                      ? { width: c.width, minWidth: "280px" }
+                      ? { width: c.width, minWidth: "260px" }
                       : { width: c.width, minWidth: c.width }
                   }
                   className="border border-black bg-[#f3f3f3] px-2 py-3 text-center text-[15px] font-bold leading-tight text-black"
@@ -238,7 +359,9 @@ export function ExcelWorkbook({
                   colSpan={6}
                   className="border border-black px-4 py-16 text-center text-[15px] text-[#555]"
                 >
-                  {sheet === "todo" ? (
+                  {filterActive ? (
+                    <p>이 기간에 겹치는 할 일이 없습니다. 필터를 넓히거나 「전체」를 누르세요.</p>
+                  ) : sheet === "todo" ? (
                     <>
                       <p>할 일이 없습니다. 「행 추가」로 첫 줄을 넣으세요.</p>
                       <button
@@ -250,7 +373,7 @@ export function ExcelWorkbook({
                       </button>
                     </>
                   ) : (
-                    <p>한 일이 없습니다. 할 일에서 완료여부를 체크하세요.</p>
+                    <p>한 일이 없습니다.</p>
                   )}
                 </td>
               </tr>
@@ -259,6 +382,8 @@ export function ExcelWorkbook({
                 const order = idx + 1;
                 const selected = selectedRow === task.id;
                 const zebra = order % 2 === 0;
+                const deadlineFocused =
+                  focus?.rowId === task.id && focus.col === "deadline";
                 return (
                   <tr
                     key={task.id}
@@ -271,16 +396,12 @@ export function ExcelWorkbook({
                           : "bg-white"
                     }
                   >
-                    {/* 순서 */}
                     <td className="border border-black px-1 py-1 text-center align-middle text-[14px] font-medium tabular-nums">
                       {order}
                     </td>
 
-                    {/* 할일 LIST UP — title + memo under */}
                     <EditCell
-                      active={
-                        focus?.rowId === task.id && focus.col === "listup"
-                      }
+                      active={focus?.rowId === task.id && focus.col === "listup"}
                       onFocusCell={() => {
                         setSelectedRow(task.id);
                         setFocus({ rowId: task.id, col: "listup" });
@@ -317,11 +438,9 @@ export function ExcelWorkbook({
                       </div>
                     </EditCell>
 
-                    {/* 마감목표 */}
+                    {/* 마감목표: 시작일 ~ 종료일 */}
                     <EditCell
-                      active={
-                        focus?.rowId === task.id && focus.col === "deadline"
-                      }
+                      active={deadlineFocused}
                       center
                       onFocusCell={() => {
                         setSelectedRow(task.id);
@@ -331,21 +450,55 @@ export function ExcelWorkbook({
                         handleNav(e, task.id, "deadline", moveFocus)
                       }
                     >
-                      <input
-                        data-excel-cell={`${task.id}:deadline`}
-                        value={task.targetDate ?? ""}
-                        placeholder="예: 9/1"
-                        onChange={(e) =>
-                          onUpdate(task.id, {
-                            targetDate: e.target.value || null,
-                          })
-                        }
-                        className="excel-input text-center"
-                        aria-label="마감목표"
-                      />
+                      {deadlineFocused ? (
+                        <div className="flex w-full flex-col gap-1 px-1.5 py-1.5">
+                          <label className="flex flex-col items-stretch gap-0.5 text-[10px] text-[#5c655f]">
+                            시작일
+                            <input
+                              data-excel-cell={`${task.id}:deadline`}
+                              type="date"
+                              value={task.startDate ?? ""}
+                              onChange={(e) =>
+                                onUpdate(task.id, {
+                                  startDate: e.target.value || null,
+                                })
+                              }
+                              className="excel-input min-h-8 text-center text-[13px]"
+                              aria-label="시작일"
+                            />
+                          </label>
+                          <label className="flex flex-col items-stretch gap-0.5 text-[10px] text-[#5c655f]">
+                            종료일
+                            <input
+                              type="date"
+                              value={task.targetDate ?? ""}
+                              onChange={(e) =>
+                                onUpdate(task.id, {
+                                  targetDate: e.target.value || null,
+                                })
+                              }
+                              className="excel-input min-h-8 text-center text-[13px]"
+                              aria-label="종료일"
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="min-h-11 w-full px-1 text-center text-[13px] leading-snug"
+                          onClick={() => {
+                            setSelectedRow(task.id);
+                            setFocus({ rowId: task.id, col: "deadline" });
+                          }}
+                          aria-label="마감목표"
+                        >
+                          {formatDeadlineRange(task) || (
+                            <span className="text-[#999]">시작 ~ 종료</span>
+                          )}
+                        </button>
+                      )}
                     </EditCell>
 
-                    {/* 중요도 */}
                     <EditCell
                       active={
                         focus?.rowId === task.id && focus.col === "importance"
@@ -369,7 +522,6 @@ export function ExcelWorkbook({
                       />
                     </EditCell>
 
-                    {/* 시급성 */}
                     <EditCell
                       active={
                         focus?.rowId === task.id && focus.col === "urgency"
@@ -391,7 +543,6 @@ export function ExcelWorkbook({
                       />
                     </EditCell>
 
-                    {/* 완료여부 */}
                     <td className="border border-black px-1 py-1 text-center align-middle">
                       {sheet === "todo" ? (
                         <input
@@ -428,8 +579,7 @@ export function ExcelWorkbook({
 
       <div className="flex flex-col border-t border-[#7a8288] bg-[#f0f2f4]">
         <div className="border-b border-[#c5ccd2] px-3 py-1 text-[11px] text-[#5c655f]">
-          헤더(아버지 표와 동일): 순서 · 할일 LIST UP · 마감목표 · 중요도 ·
-          시급성 · 완료여부
+          마감목표 = 시작일 ~ 종료일 · 기간 필터는 구간이 겹치는 행만 표시
         </div>
         <div className="flex items-end gap-0 overflow-x-auto px-1 pt-1">
           <SheetTab
@@ -493,7 +643,9 @@ function EditCell({
   return (
     <td
       className={`border border-black p-0 align-middle ${
-        active ? "bg-[#eef7f1] outline outline-2 outline-[#217346] outline-offset-[-2px]" : ""
+        active
+          ? "bg-[#eef7f1] outline outline-2 outline-[#217346] outline-offset-[-2px]"
+          : ""
       } ${center ? "text-center" : ""}`}
       onClick={onFocusCell}
       onKeyDown={onKeyNav}
@@ -548,7 +700,10 @@ function handleNav(
   if (e.key === "Tab") {
     e.preventDefault();
     move(rowId, col, e.shiftKey ? "prev" : "next");
-  } else if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
+  } else if (
+    e.key === "Enter" &&
+    (e.target as HTMLElement).tagName !== "TEXTAREA"
+  ) {
     e.preventDefault();
     move(rowId, col, e.shiftKey ? "up" : "down");
   }

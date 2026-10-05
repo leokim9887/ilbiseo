@@ -9,7 +9,9 @@ export interface Task {
   title: string;
   category: TaskCategory;
   kind: TaskKind;
-  /** YYYY-MM-DD */
+  /** 시작일 YYYY-MM-DD (마감목표 구간) */
+  startDate: string | null;
+  /** 종료일(마감) YYYY-MM-DD — legacy field name kept for migration */
   targetDate: string | null;
   urgency: number;
   importance: number;

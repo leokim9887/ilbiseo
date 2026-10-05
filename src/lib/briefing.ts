@@ -150,9 +150,9 @@ export function buildDailyBriefing(
   const parts: string[] = [
     headline,
     summaryLine,
-    "※ 일비서 할 일과 구글 캘린더는 구분되어 있습니다.",
+    "※ 같은 기간으로 합쳐 보되, 【할 일】과 【구글 캘린더】는 출처를 구분합니다.",
     "",
-    "【일비서 할 일】",
+    "【할 일】",
   ];
 
   for (const section of sections) {

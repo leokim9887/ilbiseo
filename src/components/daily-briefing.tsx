@@ -253,7 +253,9 @@ export function DailyBriefingPanel({
 
           <div className="divide-y divide-[var(--grid-line)]">
             <section className="px-4 py-3">
-              <h4 className="mb-2 text-sm font-semibold">【일비서 할 일】</h4>
+              <h4 className="mb-2 text-sm font-semibold text-[#217346]">
+                【할 일】
+              </h4>
               {preview.sections.length === 0 ? (
                 <p className="text-sm text-[var(--ink-muted)]">활성 할 일 없음</p>
               ) : (
@@ -299,7 +301,7 @@ export function DailyBriefingPanel({
             </section>
 
             <section className="px-4 py-3">
-              <h4 className="mb-2 text-sm font-semibold text-[var(--brand)]">
+              <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
                 【구글 캘린더】
               </h4>
               {preview.calendarLines.length === 0 ? (

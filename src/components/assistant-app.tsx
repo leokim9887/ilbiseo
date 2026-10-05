@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { ExcelWorkbook } from "@/components/excel-workbook";
 import { CalendarPanel } from "@/components/calendar-panel";
+import { UnifiedView } from "@/components/unified-view";
 import { DailyBriefingPanel } from "@/components/daily-briefing";
 import { ExcelLinker } from "@/components/excel-linker";
 import { InstallHint } from "@/components/install-hint";
@@ -18,6 +19,7 @@ function readViewFromUrl(): MainView | null {
   if (typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("view");
   if (
+    v === "unified" ||
     v === "todo" ||
     v === "done" ||
     v === "calendar" ||
@@ -32,7 +34,7 @@ function readViewFromUrl(): MainView | null {
 export function AssistantApp() {
   const app = useAppState();
   const [category, setCategory] = useState<TaskCategory>("work");
-  const [view, setView] = useState<MainView>("todo");
+  const [view, setView] = useState<MainView>("unified");
   const [gcalBanner, setGcalBanner] = useState<{
     kind: "ok" | "error";
     text: string;
@@ -92,7 +94,7 @@ export function AssistantApp() {
     <div className="flex min-h-full flex-1 flex-col">
       <InstallHint />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-3 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-7 sm:pb-10">
-        <WelcomeBanner onStart={() => setView("todo")} />
+        <WelcomeBanner onStart={() => setView("unified")} />
 
         <header className="animate-fade-up space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -104,8 +106,8 @@ export function AssistantApp() {
                 일비서
               </h1>
               <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
-                할 일·한 일은 엑셀 장부처럼 쓰고, 캘린더는 따로, 매일 08:00
-                브리핑과 PC 파일 연결까지.
+                통합 보기에서 하루를 한눈에, 할 일은 엑셀 장부·캘린더는 읽기
+                전용으로 구분합니다. 매일 08:00 브리핑·PC 파일 연결.
               </p>
             </div>
             <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">
@@ -132,9 +134,10 @@ export function AssistantApp() {
         </header>
 
         <AppNav
-          value={view === "done" ? "done" : view === "todo" ? "todo" : view}
+          value={view}
           onChange={setView}
           counts={{
+            unified: app.allActive.length + app.calendarEvents.length,
             todo: app.allActive.length,
             done: app.allCompleted.length,
             calendar: app.calendarEvents.length,
@@ -151,6 +154,15 @@ export function AssistantApp() {
         ) : null}
 
         <div className="animate-sheet-in" key={workbookOpen ? "wb" : view}>
+          {view === "unified" ? (
+            <UnifiedView
+              tasks={app.state.tasks}
+              events={app.calendarEvents}
+              onOpenWorkbook={() => setView("todo")}
+              onOpenCalendar={() => setView("calendar")}
+            />
+          ) : null}
+
           {workbookOpen ? (
             <ExcelWorkbook
               sheet={view === "done" ? "done" : "todo"}

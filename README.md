@@ -8,8 +8,8 @@
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-brisk-dune-ynu3tru.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=1e5cf418-34b7-4463-aa90-3ce8299f1aba  
+   https://temporary-express-mesa-zdr7zr0.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=2097a63b-191e-496e-919d-e38130bc0022  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  

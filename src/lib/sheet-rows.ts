@@ -100,17 +100,30 @@ export function buildTaskOnlyRows(
 }
 
 /** Google Calendar 틀 — calendar events only. */
+export type GcalViewMode = "todayForward" | "day" | "range";
+
 export function buildGcalFrameRows(
   events: CalendarEvent[],
   opts: {
-    /** Anchor day (default today). Shows from that day forward, or single day if mode=day */
-    anchorDay: string;
-    mode: "from" | "day";
+    mode: GcalViewMode;
+    /** For mode=day */
+    selectedDay: string;
+    /** For mode=range */
+    rangeStart?: string | null;
+    rangeEnd?: string | null;
   },
 ): SheetRow[] {
-  const day = opts.anchorDay || todayIso();
-  const list =
-    opts.mode === "day" ? eventsOnDay(events, day) : eventsFromDay(events, day);
+  let list: CalendarEvent[];
+  if (opts.mode === "day") {
+    list = eventsOnDay(events, opts.selectedDay || todayIso());
+  } else if (opts.mode === "range") {
+    const fs = opts.rangeStart || opts.rangeEnd || todayIso();
+    const fe = opts.rangeEnd || opts.rangeStart || fs;
+    list = filterEventsByPeriod(events, fs, fe);
+  } else {
+    // todayForward — 오늘부터
+    list = eventsFromDay(events, todayIso());
+  }
   return [...list]
     .sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)))
     .map((event) => ({

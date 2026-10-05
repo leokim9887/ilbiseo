@@ -22,6 +22,7 @@ import {
   buildTaskOnlyRows,
   calendarListUpTitle,
   formatEventDeadline,
+  type GcalViewMode,
 } from "@/lib/sheet-rows";
 import {
   formatDeadlineRange,
@@ -91,14 +92,19 @@ export function ExcelWorkbook({
   const [filterEnd, setFilterEnd] = useState<string>("");
   const [periodSort, setPeriodSort] = useState<PeriodSort>("default");
   const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
-  /** Google Calendar 틀: anchor day for calendar filter */
+  /** Google Calendar 틀: selected day (이날만) */
   const [gcalDay, setGcalDay] = useState(todayIso());
-  /** from = 그날부터 앞으로 / day = 그날만 */
-  const [gcalMode, setGcalMode] = useState<"from" | "day">("from");
-  const [pickerMonth, setPickerMonth] = useState(() => {
-    const t = todayIso();
-    return t.slice(0, 7); // YYYY-MM
-  });
+  /** todayForward = 오늘부터 (default) · day = 이날만 · range = 기간 입력/칩 */
+  const [gcalMode, setGcalMode] = useState<GcalViewMode>("todayForward");
+  const [gcalRangeStart, setGcalRangeStart] = useState("");
+  const [gcalRangeEnd, setGcalRangeEnd] = useState("");
+  const [gcalChip, setGcalChip] = useState<
+    "none" | "today" | "week" | "month"
+  >("none");
+  const [pickerMonth, setPickerMonth] = useState(() => todayIso().slice(0, 7));
+  const [pickerYear, setPickerYear] = useState(() =>
+    new Date().getFullYear(),
+  );
   const todayLabel = useMemo(
     () =>
       new Date().toLocaleDateString("ko-KR", {
@@ -114,8 +120,10 @@ export function ExcelWorkbook({
   const rows = useMemo(() => {
     if (isGcal && sheet === "todo") {
       return buildGcalFrameRows(calendarEvents, {
-        anchorDay: gcalDay,
         mode: gcalMode,
+        selectedDay: gcalDay,
+        rangeStart: gcalRangeStart || null,
+        rangeEnd: gcalRangeEnd || null,
       });
     }
     if (isGcal && sheet === "done") {
@@ -132,6 +140,8 @@ export function ExcelWorkbook({
     calendarEvents,
     gcalDay,
     gcalMode,
+    gcalRangeStart,
+    gcalRangeEnd,
     baseTasks,
     filterStart,
     filterEnd,
@@ -232,8 +242,60 @@ export function ExcelWorkbook({
     const d = new Date(y, m - 1 + delta, 1);
     const yy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
+    setPickerYear(yy);
     setPickerMonth(`${yy}-${mm}`);
   };
+
+  const setPickerYearAndKeepMonth = (year: number) => {
+    const m = pickerMonth.split("-")[1] || "01";
+    setPickerYear(year);
+    setPickerMonth(`${year}-${m}`);
+  };
+
+  const yearOptions = useMemo(() => {
+    const now = new Date().getFullYear();
+    const years: number[] = [];
+    for (let y = now - 15; y <= now + 5; y++) years.push(y);
+    if (!years.includes(pickerYear)) years.push(pickerYear);
+    return years.sort((a, b) => a - b);
+  }, [pickerYear]);
+
+  const applyGcalChip = (c: "today" | "week" | "month") => {
+    const t = todayIso();
+    setGcalChip(c);
+    setGcalMode("range");
+    if (c === "today") {
+      setGcalRangeStart(t);
+      setGcalRangeEnd(t);
+      setGcalDay(t);
+      setPickerMonth(t.slice(0, 7));
+      setPickerYear(Number(t.slice(0, 4)));
+      return;
+    }
+    if (c === "week") {
+      const w = weekRangeContaining(t);
+      setGcalRangeStart(w.start);
+      setGcalRangeEnd(w.end);
+      return;
+    }
+    const m = monthRangeContaining(t);
+    setGcalRangeStart(m.start);
+    setGcalRangeEnd(m.end);
+  };
+
+  const gcalChipClass = (c: typeof gcalChip) =>
+    `h-8 rounded-sm px-2.5 text-[13px] font-medium border ${
+      gcalChip === c
+        ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa]"
+    }`;
+
+  const modeClass = (active: boolean) =>
+    `h-8 rounded-sm border px-2.5 text-[13px] font-medium ${
+      active
+        ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa]"
+    }`;
 
   const pickerCells = useMemo(() => {
     const [y, m] = pickerMonth.split("-").map(Number);
@@ -250,10 +312,7 @@ export function ExcelWorkbook({
     return cells;
   }, [pickerMonth]);
 
-  const monthTitle = useMemo(() => {
-    const [y, m] = pickerMonth.split("-").map(Number);
-    return `${y}년 ${m}월`;
-  }, [pickerMonth]);
+  const monthNum = Number(pickerMonth.split("-")[1] || 1);
 
   return (
     <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
@@ -349,107 +408,221 @@ export function ExcelWorkbook({
 
       {/* Period filter OR Google calendar picker */}
       {isGcal && sheet === "todo" ? (
-        <div className="flex flex-col gap-3 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-3 sm:flex-row sm:items-start">
-          <div className="min-w-[240px] rounded-sm border border-[#8a939a] bg-white p-2 shadow-sm">
-            <div className="mb-2 flex items-center justify-between gap-1">
-              <button
-                type="button"
-                className="rounded p-1 hover:bg-[#eef3fa]"
-                aria-label="이전 달"
-                onClick={() => shiftPickerMonth(-1)}
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <p className="text-[13px] font-semibold text-[#1a2420]">
-                {monthTitle}
-              </p>
-              <button
-                type="button"
-                className="rounded p-1 hover:bg-[#eef3fa]"
-                aria-label="다음 달"
-                onClick={() => shiftPickerMonth(1)}
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
-            <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[10px] text-[#5c655f]">
-              {["월", "화", "수", "목", "금", "토", "일"].map((d) => (
-                <span key={d}>{d}</span>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-0.5" role="grid" aria-label="날짜 선택 달력">
-              {pickerCells.map((c, i) =>
-                c.iso ? (
-                  <button
-                    key={c.iso}
-                    type="button"
-                    role="gridcell"
-                    aria-selected={gcalDay === c.iso}
-                    onClick={() => {
-                      setGcalDay(c.iso!);
-                      setPickerMonth(c.iso!.slice(0, 7));
-                    }}
-                    className={`h-8 rounded text-[13px] tabular-nums ${
-                      gcalDay === c.iso
-                        ? "bg-[#3b6ea5] font-semibold text-white"
-                        : c.iso === todayIso()
-                          ? "bg-[#eef3fa] font-medium text-[#1a3a6b]"
-                          : "text-[#1a2420] hover:bg-[#f0f4f8]"
-                    }`}
-                  >
-                    {c.day}
-                  </button>
-                ) : (
-                  <span key={`e-${i}`} className="h-8" />
-                ),
-              )}
-            </div>
-          </div>
-          <div className="flex flex-1 flex-col gap-2">
-            <p className="text-[13px] font-semibold text-[#1a2420]">
-              선택한 날:{" "}
-              <span className="tabular-nums text-[#3b6ea5]">{gcalDay}</span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`h-8 rounded-sm border px-2.5 text-[13px] font-medium ${
-                  gcalMode === "from"
-                    ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
-                    : "border-[#8a939a] bg-white"
-                }`}
-                onClick={() => setGcalMode("from")}
-              >
-                이날부터 앞으로
-              </button>
-              <button
-                type="button"
-                className={`h-8 rounded-sm border px-2.5 text-[13px] font-medium ${
-                  gcalMode === "day"
-                    ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
-                    : "border-[#8a939a] bg-white"
-                }`}
-                onClick={() => setGcalMode("day")}
-              >
-                이날만
-              </button>
-              <button
-                type="button"
-                className="h-8 rounded-sm border border-[#8a939a] bg-white px-2.5 text-[13px]"
-                onClick={() => {
-                  const t = todayIso();
-                  setGcalDay(t);
-                  setGcalMode("from");
-                  setPickerMonth(t.slice(0, 7));
+        <div className="flex flex-col gap-3 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-3">
+          {/* Period bar like task filter */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[13px] font-semibold text-[#1a2420]">기간</span>
+            <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+              시작일
+              <input
+                type="date"
+                value={gcalRangeStart}
+                onChange={(e) => {
+                  setGcalRangeStart(e.target.value);
+                  setGcalChip("none");
+                  setGcalMode("range");
+                  if (e.target.value) {
+                    setGcalDay(e.target.value);
+                    setPickerMonth(e.target.value.slice(0, 7));
+                    setPickerYear(Number(e.target.value.slice(0, 4)));
+                  }
                 }}
+                className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+                aria-label="캘린더 기간 시작일"
+              />
+            </label>
+            <span className="text-[#5c655f]">~</span>
+            <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+              종료일
+              <input
+                type="date"
+                value={gcalRangeEnd}
+                onChange={(e) => {
+                  setGcalRangeEnd(e.target.value);
+                  setGcalChip("none");
+                  setGcalMode("range");
+                }}
+                className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+                aria-label="캘린더 기간 종료일"
+              />
+            </label>
+            <button
+              type="button"
+              className={gcalChipClass("today")}
+              onClick={() => applyGcalChip("today")}
+            >
+              오늘
+            </button>
+            <button
+              type="button"
+              className={gcalChipClass("week")}
+              onClick={() => applyGcalChip("week")}
+            >
+              이번 주
+            </button>
+            <button
+              type="button"
+              className={gcalChipClass("month")}
+              onClick={() => applyGcalChip("month")}
+            >
+              이번 달
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            {/* Mini calendar with year jump */}
+            <div className="min-w-[260px] rounded-sm border border-[#8a939a] bg-white p-2 shadow-sm">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+                <button
+                  type="button"
+                  className="rounded px-1.5 py-1 text-[12px] font-semibold text-[#3b6ea5] hover:bg-[#eef3fa]"
+                  aria-label="이전 해"
+                  onClick={() => setPickerYearAndKeepMonth(pickerYear - 1)}
+                >
+                  ≪
+                </button>
+                <button
+                  type="button"
+                  className="rounded p-1 hover:bg-[#eef3fa]"
+                  aria-label="이전 달"
+                  onClick={() => shiftPickerMonth(-1)}
+                >
+                  <ChevronLeft className="size-4" />
+                </button>
+                <div className="flex items-center gap-1">
+                  <select
+                    aria-label="연도 선택"
+                    className="h-8 rounded-sm border border-[#8a939a] bg-white px-1 text-[13px] font-semibold"
+                    value={pickerYear}
+                    onChange={(e) =>
+                      setPickerYearAndKeepMonth(Number(e.target.value))
+                    }
+                  >
+                    {yearOptions.map((y) => (
+                      <option key={y} value={y}>
+                        {y}년
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="월 선택"
+                    className="h-8 rounded-sm border border-[#8a939a] bg-white px-1 text-[13px] font-semibold"
+                    value={monthNum}
+                    onChange={(e) => {
+                      const mm = String(Number(e.target.value)).padStart(2, "0");
+                      setPickerMonth(`${pickerYear}-${mm}`);
+                    }}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m}>
+                        {m}월
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="rounded p-1 hover:bg-[#eef3fa]"
+                  aria-label="다음 달"
+                  onClick={() => shiftPickerMonth(1)}
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  className="rounded px-1.5 py-1 text-[12px] font-semibold text-[#3b6ea5] hover:bg-[#eef3fa]"
+                  aria-label="다음 해"
+                  onClick={() => setPickerYearAndKeepMonth(pickerYear + 1)}
+                >
+                  ≫
+                </button>
+              </div>
+              <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[10px] text-[#5c655f]">
+                {["월", "화", "수", "목", "금", "토", "일"].map((d) => (
+                  <span key={d}>{d}</span>
+                ))}
+              </div>
+              <div
+                className="grid grid-cols-7 gap-0.5"
+                role="grid"
+                aria-label="날짜 선택 달력"
               >
-                오늘부터
-              </button>
+                {pickerCells.map((c, i) =>
+                  c.iso ? (
+                    <button
+                      key={c.iso}
+                      type="button"
+                      role="gridcell"
+                      aria-selected={gcalDay === c.iso}
+                      onClick={() => {
+                        setGcalDay(c.iso!);
+                        setPickerMonth(c.iso!.slice(0, 7));
+                        setPickerYear(Number(c.iso!.slice(0, 4)));
+                        setGcalMode("day");
+                        setGcalChip("none");
+                        setGcalRangeStart(c.iso!);
+                        setGcalRangeEnd(c.iso!);
+                      }}
+                      className={`h-8 rounded text-[13px] tabular-nums ${
+                        gcalDay === c.iso
+                          ? "bg-[#3b6ea5] font-semibold text-white"
+                          : c.iso === todayIso()
+                            ? "bg-[#eef3fa] font-medium text-[#1a3a6b]"
+                            : "text-[#1a2420] hover:bg-[#f0f4f8]"
+                      }`}
+                    >
+                      {c.day}
+                    </button>
+                  ) : (
+                    <span key={`e-${i}`} className="h-8" />
+                  ),
+                )}
+              </div>
             </div>
-            <p className="text-[11px] text-[#5c655f]">
-              기본은 오늘부터 앞의 일정만 보입니다. 달력에서 과거 날짜도 고를 수
-              있습니다.
-            </p>
+
+            <div className="flex flex-1 flex-col gap-2">
+              {(gcalMode === "day" || gcalDay) && (
+                <p className="text-[13px] font-semibold text-[#1a2420]">
+                  선택한 날:{" "}
+                  <span className="tabular-nums text-[#3b6ea5]">{gcalDay}</span>
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={modeClass(gcalMode === "todayForward")}
+                  onClick={() => {
+                    const t = todayIso();
+                    setGcalMode("todayForward");
+                    setGcalDay(t);
+                    setGcalRangeStart("");
+                    setGcalRangeEnd("");
+                    setGcalChip("none");
+                    setPickerMonth(t.slice(0, 7));
+                    setPickerYear(Number(t.slice(0, 4)));
+                  }}
+                >
+                  오늘부터
+                </button>
+                <button
+                  type="button"
+                  className={modeClass(gcalMode === "day")}
+                  onClick={() => {
+                    setGcalMode("day");
+                    setGcalChip("none");
+                    setGcalRangeStart(gcalDay);
+                    setGcalRangeEnd(gcalDay);
+                  }}
+                >
+                  이날만
+                </button>
+              </div>
+              <p className="text-[11px] text-[#5c655f]">
+                기본은 「오늘부터」입니다. 기간·오늘/이번 주/이번 달로 구간을
+                고르거나, 달력에서 날을 고른 뒤 「이날만」을 쓰세요. 연도는
+                드롭다운·≪ ≫로 바로 바꿀 수 있습니다.
+              </p>
+            </div>
           </div>
         </div>
       ) : !isGcal ? (

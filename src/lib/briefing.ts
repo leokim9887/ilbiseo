@@ -8,6 +8,11 @@ import {
 } from "./types";
 import { sortCompleted, sortTasks } from "./sort";
 import { formatCalendarWhen } from "./calendar-data";
+import {
+  importanceLabel,
+  priorityTag as makePriorityTag,
+  urgencyLabel,
+} from "./priority";
 
 export type BriefingLine = {
   title: string;
@@ -50,28 +55,6 @@ const SECTION_TITLE: Record<TaskKind, string> = {
   someday: "③ 언젠가 — 시급·중요 순",
 };
 
-function importanceLabel(n: number): string {
-  if (n >= 5) return "매우 중요";
-  if (n >= 4) return "중요";
-  if (n >= 3) return "보통";
-  if (n >= 2) return "낮음";
-  return "여유";
-}
-
-function urgencyLabel(n: number): string {
-  if (n >= 5) return "매우 시급";
-  if (n >= 4) return "시급";
-  if (n >= 3) return "보통";
-  if (n >= 2) return "여유";
-  return "느긋";
-}
-
-function priorityTag(task: Task): string {
-  if (task.importance >= 5 || task.urgency >= 5) return "★최우선";
-  if (task.importance >= 4 || task.urgency >= 4) return "◆우선";
-  return "";
-}
-
 function todayIso(d = new Date()): string {
   return d.toISOString().slice(0, 10);
 }
@@ -105,7 +88,7 @@ export function buildDailyBriefing(
 
   const focus = sorted.filter((t) => {
     if (t.kind === "spot") return true;
-    if (t.kind === "someday") return t.importance >= 4 || t.urgency >= 4;
+    if (t.kind === "someday") return t.importance >= 3 || t.urgency >= 3;
     if (t.targetDate) return nearWindow(t.targetDate, date, 7);
     return true;
   });
@@ -136,7 +119,7 @@ export function buildDailyBriefing(
         urgencyLabel: urgencyLabel(t.urgency),
         groupKey: t.groupKey,
         memo: t.memo,
-        priorityTag: priorityTag(t),
+        priorityTag: makePriorityTag(t.importance, t.urgency),
       }));
       return {
         kind,

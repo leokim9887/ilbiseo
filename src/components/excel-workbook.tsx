@@ -670,15 +670,16 @@ function ScoreSelect({
   label: string;
   cellId?: string;
 }) {
+  const safe = Math.min(3, Math.max(1, Number(value) || 1));
   return (
     <select
       data-excel-cell={cellId}
-      value={value}
+      value={safe}
       aria-label={label}
       onChange={(e) => onChange(Number(e.target.value))}
       className="excel-input text-center"
     >
-      {[1, 2, 3, 4, 5].map((n) => (
+      {[1, 2, 3].map((n) => (
         <option key={n} value={n}>
           {n}
         </option>

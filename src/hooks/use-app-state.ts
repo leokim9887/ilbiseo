@@ -22,6 +22,7 @@ import {
   supportsFileSystemAccess,
   writeBufferToHandle,
 } from "@/lib/excel-link";
+import { clampPriority } from "@/lib/priority";
 
 type Status = "loading" | "ready" | "error";
 
@@ -122,8 +123,8 @@ export function useAppState() {
           (partial?.kind === "someday"
             ? null
             : new Date().toISOString().slice(0, 10)),
-        urgency: partial?.urgency ?? 3,
-        importance: partial?.importance ?? 3,
+        urgency: clampPriority(partial?.urgency, 2),
+        importance: clampPriority(partial?.importance, 2),
         groupKey: partial?.groupKey ?? inferGroupKey(title),
         memo: partial?.memo ?? "",
         source: partial?.source ?? "manual",
@@ -140,7 +141,12 @@ export function useAppState() {
   const addMany = useCallback(
     (tasks: Task[]) => {
       if (tasks.length === 0) return;
-      persist({ ...state, tasks: [...state.tasks, ...tasks] });
+      const normalized = tasks.map((t) => ({
+        ...t,
+        urgency: clampPriority(t.urgency),
+        importance: clampPriority(t.importance),
+      }));
+      persist({ ...state, tasks: [...state.tasks, ...normalized] });
     },
     [persist, state],
   );
@@ -152,6 +158,12 @@ export function useAppState() {
         tasks: state.tasks.map((t) => {
           if (t.id !== id) return t;
           const next = { ...t, ...patch };
+          if (patch.urgency !== undefined) {
+            next.urgency = clampPriority(patch.urgency);
+          }
+          if (patch.importance !== undefined) {
+            next.importance = clampPriority(patch.importance);
+          }
           if (patch.title && !patch.groupKey) {
             next.groupKey = inferGroupKey(patch.title);
           }

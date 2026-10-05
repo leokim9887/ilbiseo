@@ -70,11 +70,11 @@ export function parseMemoText(
         startDate: end,
         targetDate: end,
         urgency: /긴급|asap|당장|최우선/.test(line)
-          ? 5
+          ? 3
           : /급|우선|빨리/.test(line)
-            ? 4
-            : 3,
-        importance: /중요|핵심|필수|반드시/.test(line) ? 5 : 3,
+            ? 2
+            : 1,
+        importance: /중요|핵심|필수|반드시/.test(line) ? 3 : 2,
         groupKey: inferGroupKey(title),
         memo: line !== title ? `원문: ${line}` : "",
         source,

@@ -117,7 +117,7 @@ export function AssistantApp() {
               </h1>
               <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
                 틀에서 업무·개인·과제·팀원·구글 캘린더를 고릅니다. 캘린더 틀은
-                읽기 전용 6열 표와 달력으로 날짜를 고릅니다.
+                읽기 전용 6열 표와 기간(시작~종료)으로 날짜를 고릅니다.
               </p>
             </div>
             <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">

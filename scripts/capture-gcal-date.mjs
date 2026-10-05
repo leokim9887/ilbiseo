@@ -36,31 +36,22 @@ async function main() {
   await page.getByLabel("틀").selectOption("gcal");
   await page.waitForTimeout(400);
 
-  // default 오늘부터 — no 「이날부터 앞으로」
-  await page.getByRole("button", { name: "오늘부터", exact: true }).waitFor();
-  const bad = await page.getByRole("button", { name: "이날부터 앞으로" }).count();
-  if (bad > 0) throw new Error("이날부터 앞으로 still present");
+  const wb = page.locator(".excel-wb");
+  await wb.getByLabel("캘린더 기간 시작일").waitFor();
 
   await page.screenshot({
     path: `${OUT}/ilbiseo-gcal-date-bar.png`,
     fullPage: true,
   });
-  await page.locator(".excel-wb").screenshot({
+  await wb.screenshot({
     path: `${OUT}/ilbiseo-gcal-date-sheet.png`,
   });
 
-  // year dropdown
-  await page.getByLabel("연도 선택").selectOption("2025");
+  await wb.getByLabel("캘린더 기간 시작일").fill("2025-09-01");
+  await wb.getByLabel("캘린더 기간 종료일").fill("2025-09-30");
   await page.waitForTimeout(200);
   await page.screenshot({
     path: `${OUT}/ilbiseo-gcal-date-year.png`,
-    fullPage: true,
-  });
-
-  await page.getByRole("button", { name: "이날만", exact: true }).click();
-  await page.waitForTimeout(200);
-  await page.screenshot({
-    path: `${OUT}/ilbiseo-gcal-date-day-only.png`,
     fullPage: true,
   });
 

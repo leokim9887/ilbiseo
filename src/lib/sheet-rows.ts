@@ -99,30 +99,22 @@ export function buildTaskOnlyRows(
   }));
 }
 
-/** Google Calendar 틀 — calendar events only. */
-export type GcalViewMode = "todayForward" | "day" | "range";
-
+/** Google Calendar 틀 — calendar events only (기간 시작~종료; 비어 있으면 오늘부터). */
 export function buildGcalFrameRows(
   events: CalendarEvent[],
   opts: {
-    mode: GcalViewMode;
-    /** For mode=day */
-    selectedDay: string;
-    /** For mode=range */
     rangeStart?: string | null;
     rangeEnd?: string | null;
   },
 ): SheetRow[] {
+  const hasRange = Boolean(opts.rangeStart || opts.rangeEnd);
   let list: CalendarEvent[];
-  if (opts.mode === "day") {
-    list = eventsOnDay(events, opts.selectedDay || todayIso());
-  } else if (opts.mode === "range") {
+  if (!hasRange) {
+    list = eventsFromDay(events, todayIso());
+  } else {
     const fs = opts.rangeStart || opts.rangeEnd || todayIso();
     const fe = opts.rangeEnd || opts.rangeStart || fs;
     list = filterEventsByPeriod(events, fs, fe);
-  } else {
-    // todayForward — 오늘부터
-    list = eventsFromDay(events, todayIso());
   }
   return [...list]
     .sort((a, b) => eventSortKey(a).localeCompare(eventSortKey(b)))

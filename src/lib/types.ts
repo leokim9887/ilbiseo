@@ -1,24 +1,19 @@
 export type TaskKind = "spot" | "ongoing" | "someday";
 export type TaskSource = "manual" | "memo" | "ocr" | "import";
 export type TaskStatus = "active" | "completed";
-export type TaskCategory =
-  | "work"
-  | "personal"
-  | "project"
-  | "team"
-  | "guideline"
-  | "habit";
-/** 틀 dropdown: program frames + Google Calendar frame */
+export type TaskCategory = "work" | "personal" | "project" | "team";
+/** 틀 dropdown: 4 program frames + Google Calendar frame */
 export type FrameId = TaskCategory | "gcal";
 export type CalendarSource = "mock" | "ics" | "google";
+
+/** 장부 아래 별도 영역 — 지침 / 습관 (틀이 아님) */
+export type SideListKind = "guideline" | "habit";
 
 export const TASK_CATEGORIES: readonly TaskCategory[] = [
   "work",
   "personal",
   "project",
   "team",
-  "guideline",
-  "habit",
 ] as const;
 
 export interface Task {
@@ -64,17 +59,29 @@ export interface CalendarEvent {
   calendarName?: string;
 }
 
+/** Editable items for 지침 / 습관 sections below the workbook. */
+export interface SideListItem {
+  id: string;
+  title: string;
+  memo: string;
+  done: boolean;
+  createdAt: string;
+  completedAt: string | null;
+}
+
 export interface AppState {
   version: number;
   tasks: Task[];
   /** Always empty after migration; field kept for load compatibility. */
   checklists: ChecklistItem[];
   calendarEvents: CalendarEvent[];
+  guidelines: SideListItem[];
+  habits: SideListItem[];
 }
 
 export const STORAGE_KEY = "ilbiseo-state-v2";
 export const LEGACY_STORAGE_KEY = "ilbiseo-tasks-v1";
-export const APP_VERSION = 2;
+export const APP_VERSION = 3;
 
 export const CATEGORY_ORDER: TaskCategory[] = [...TASK_CATEGORIES];
 
@@ -85,8 +92,6 @@ export const CATEGORY_LABEL: Record<TaskCategory, string> = {
   personal: "개인용",
   project: "과제용",
   team: "팀원용",
-  guideline: "지침",
-  habit: "습관",
 };
 
 export const FRAME_LABEL: Record<FrameId, string> = {
@@ -94,17 +99,30 @@ export const FRAME_LABEL: Record<FrameId, string> = {
   gcal: "구글 캘린더",
 };
 
+export const SIDE_LIST_LABEL: Record<SideListKind, string> = {
+  guideline: "지침",
+  habit: "습관",
+};
+
 export function isTaskCategory(f: FrameId | string): f is TaskCategory {
   return (TASK_CATEGORIES as readonly string[]).includes(f);
 }
 
-/** Parse stored/imported category; unknown → work (safe migrate). */
+/** Parse stored/imported category; unknown / legacy guideline·habit → work. */
 export function parseTaskCategory(raw: unknown): TaskCategory {
   if (typeof raw !== "string") return "work";
+  if (raw === "guideline" || raw === "habit") return "work";
   if (isTaskCategory(raw)) return raw;
   const byLabel = (Object.entries(CATEGORY_LABEL) as [TaskCategory, string][])
     .find(([, label]) => label === raw || label.replace(/용$/, "") === raw);
   return byLabel?.[0] ?? "work";
+}
+
+/** Legacy category values that belonged to side lists (not 틀). */
+export function isLegacySideCategory(
+  raw: unknown,
+): raw is "guideline" | "habit" {
+  return raw === "guideline" || raw === "habit";
 }
 
 export const KIND_LABEL: Record<TaskKind, string> = {

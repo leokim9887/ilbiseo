@@ -1,15 +1,15 @@
 # 일비서
 
 아버지 전용 할 일·일정 비서 (로그인 없음).  
-틀(업무/개인/과제/팀원/지침/습관) · 할 일/한 일(엑셀형 표) · 구글 캘린더(별도 틀) · 매일 08:00 브리핑 · PC 엑셀 자동 갱신.
+틀(업무/개인/과제/팀원) · 할 일/한 일(엑셀형 표) · 장부 아래 지침·습관 · 구글 캘린더(별도 틀) · 매일 08:00 브리핑 · PC 엑셀 자동 갱신.
 
 ## 노트북에서 테스트
 
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-sonic-xenon-s0hsy0j.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=fb29754a-2438-48e2-b96a-88a776da4192  
+   https://temporary-express-nitrogen-qc9zc7i.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=90fac156-63f2-4239-aa59-e54f1b734dc5  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  
@@ -82,7 +82,7 @@ CRON_SECRET=optional
 
 | 되는 것 | 대기(아버지 확정·키) |
 |--------|---------------------|
-| 6틀(업무·개인·과제·팀원·지침·습관) + 구글 캘린더 틀 + 기간필터 + 중요 1–3 | 업무 이메일 주소 |
+| 4틀 + 구글 캘린더 틀 + 장부 아래 지침·습관 + 기간필터 + 중요 1–3 | 업무 이메일 주소 |
 | 캘린더 별도 패널 + OAuth 코드 경로 + mock/ICS | Google Cloud에 키 넣고 실연결 |
 | 브리핑 【구글 캘린더】 분리 블록 · xlsx · API dry-run | Resend로 08:00 실발송 |
 | PC 엑셀 연결(브라우저 FS Access) | 아버지 PC에서 연결 |

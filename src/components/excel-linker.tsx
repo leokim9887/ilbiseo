@@ -38,11 +38,16 @@ export function ExcelLinker({
         const briefing = buildDailyBriefing(
           state.tasks,
           state.calendarEvents,
+          undefined,
+          state.guidelines,
+          state.habits,
         );
         const buf = await buildWorkbook({
           tasks: state.tasks,
           calendarEvents: state.calendarEvents,
           briefing,
+          guidelines: state.guidelines,
+          habits: state.habits,
         });
         downloadXlsx(buf, briefingFilename(briefing.date));
         return;
@@ -65,11 +70,16 @@ export function ExcelLinker({
       const briefing = buildDailyBriefing(
         state.tasks,
         state.calendarEvents,
+        undefined,
+        state.guidelines,
+        state.habits,
       );
       const buf = await buildWorkbook({
         tasks: state.tasks,
         calendarEvents: state.calendarEvents,
         briefing,
+        guidelines: state.guidelines,
+        habits: state.habits,
       });
       downloadXlsx(buf, briefingFilename(briefing.date));
       await onSync();

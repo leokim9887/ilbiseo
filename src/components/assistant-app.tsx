@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { ExcelWorkbook } from "@/components/excel-workbook";
+import { SideListSection } from "@/components/side-list-section";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { DailyBriefingPanel } from "@/components/daily-briefing";
 import { ExcelLinker } from "@/components/excel-linker";
@@ -116,9 +117,8 @@ export function AssistantApp() {
                 일비서
               </h1>
               <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
-                틀에서 업무·개인·과제·팀원·지침·습관·구글 캘린더를 고릅니다.
-                캘린더 틀은 읽기 전용 6열 표와 기간(시작~종료)으로 날짜를
-                고릅니다.
+                틀에서 업무·개인·과제·팀원·구글 캘린더를 고릅니다. 장부 아래에
+                지침·습관 영역을 따로 둡니다.
               </p>
             </div>
             <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">
@@ -165,26 +165,48 @@ export function AssistantApp() {
 
         <div className="animate-sheet-in" key={workbookOpen ? "wb" : view}>
           {workbookOpen ? (
-            <ExcelWorkbook
-              sheet={view === "done" ? "done" : "todo"}
-              onSheetChange={(s) => setView(s === "done" ? "done" : "todo")}
-              frame={frame}
-              onFrameChange={handleFrameChange}
-              activeTasks={active}
-              doneTasks={done}
-              calendarEvents={app.calendarEvents}
-              onUpdate={app.updateTask}
-              onComplete={app.completeTask}
-              onRestore={app.restoreTask}
-              onDelete={app.deleteTask}
-              onAdd={() =>
-                app.addTask({
-                  category: isTaskCategory(frame) ? frame : "work",
-                  kind: "spot",
-                })
-              }
-              onImport={app.addMany}
-            />
+            <div className="space-y-4">
+              <ExcelWorkbook
+                sheet={view === "done" ? "done" : "todo"}
+                onSheetChange={(s) => setView(s === "done" ? "done" : "todo")}
+                frame={frame}
+                onFrameChange={handleFrameChange}
+                activeTasks={active}
+                doneTasks={done}
+                calendarEvents={app.calendarEvents}
+                onUpdate={app.updateTask}
+                onComplete={app.completeTask}
+                onRestore={app.restoreTask}
+                onDelete={app.deleteTask}
+                onAdd={() =>
+                  app.addTask({
+                    category: isTaskCategory(frame) ? frame : "work",
+                    kind: "spot",
+                  })
+                }
+                onImport={app.addMany}
+              />
+              <SideListSection
+                kind="guideline"
+                items={app.guidelines}
+                onAdd={() => app.addSideItem("guideline")}
+                onUpdate={(id, patch) =>
+                  app.updateSideItem("guideline", id, patch)
+                }
+                onToggle={(id) => app.toggleSideItem("guideline", id)}
+                onDelete={(id) => app.deleteSideItem("guideline", id)}
+              />
+              <SideListSection
+                kind="habit"
+                items={app.habits}
+                onAdd={() => app.addSideItem("habit")}
+                onUpdate={(id, patch) =>
+                  app.updateSideItem("habit", id, patch)
+                }
+                onToggle={(id) => app.toggleSideItem("habit", id)}
+                onDelete={(id) => app.deleteSideItem("habit", id)}
+              />
+            </div>
           ) : null}
 
           {view === "calendar" ? (
@@ -200,6 +222,8 @@ export function AssistantApp() {
             <DailyBriefingPanel
               tasks={app.state.tasks}
               calendarEvents={app.calendarEvents}
+              guidelines={app.guidelines}
+              habits={app.habits}
               onAfterExport={() => void app.forceExcelSync()}
             />
           ) : null}

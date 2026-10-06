@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildDailyBriefing } from "@/lib/briefing";
 import { buildWorkbook, briefingFilename } from "@/lib/excel";
-import type { CalendarEvent, Task } from "@/lib/types";
+import type { CalendarEvent, SideListItem, Task } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -71,6 +71,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       tasks?: Task[];
       calendarEvents?: CalendarEvent[];
+      guidelines?: SideListItem[];
+      habits?: SideListItem[];
       send?: boolean;
       preferredHour?: string;
       workEmail?: string;
@@ -80,12 +82,22 @@ export async function POST(request: Request) {
     const calendarEvents = Array.isArray(body.calendarEvents)
       ? body.calendarEvents
       : [];
+    const guidelines = Array.isArray(body.guidelines) ? body.guidelines : [];
+    const habits = Array.isArray(body.habits) ? body.habits : [];
 
-    const briefing = buildDailyBriefing(tasks, calendarEvents);
+    const briefing = buildDailyBriefing(
+      tasks,
+      calendarEvents,
+      undefined,
+      guidelines,
+      habits,
+    );
     const buffer = await buildWorkbook({
       tasks,
       calendarEvents,
       briefing,
+      guidelines,
+      habits,
     });
     const base64 = Buffer.from(buffer).toString("base64");
     const filename = briefingFilename(briefing.date);

@@ -1,7 +1,9 @@
 import {
   CATEGORY_LABEL,
   KIND_LABEL,
+  SIDE_LIST_LABEL,
   type CalendarEvent,
+  type SideListItem,
   type Task,
   type TaskCategory,
   type TaskKind,
@@ -49,6 +51,8 @@ export type DailyBriefing = {
     notes: string;
     calendarName?: string;
   }[];
+  guidelineLines: { title: string; memo: string; done: boolean }[];
+  habitLines: { title: string; memo: string; done: boolean }[];
   plaintext: string;
   activeCount: number;
   completedCount: number;
@@ -82,10 +86,20 @@ function nearWindow(dateStr: string, today: string, days = 7): boolean {
   return t <= end.toISOString().slice(0, 10);
 }
 
+function sideLines(items: SideListItem[]) {
+  return items.map((i) => ({
+    title: i.title,
+    memo: i.memo,
+    done: i.done,
+  }));
+}
+
 export function buildDailyBriefing(
   tasks: Task[],
   calendarEvents: CalendarEvent[] = [],
   now = new Date(),
+  guidelines: SideListItem[] = [],
+  habits: SideListItem[] = [],
 ): DailyBriefing {
   const sorted = sortTasks(tasks);
   const completed = sortCompleted(tasks);
@@ -144,13 +158,18 @@ export function buildDailyBriefing(
       calendarName: e.calendarName,
     }));
 
+  const guidelineLines = sideLines(guidelines);
+  const habitLines = sideLines(habits);
+  const openGuidelines = guidelineLines.filter((g) => !g.done).length;
+  const openHabits = habitLines.filter((h) => !h.done).length;
+
   const headline = `일비서 브리핑 · ${formatKoDate(date)}`;
-  const summaryLine = `할 일 ${list.length}건 · 캘린더(근접) ${calendarLines.length}건 · 한 일 ${completed.length}건`;
+  const summaryLine = `할 일 ${list.length}건 · 지침 ${openGuidelines}건 · 습관 ${openHabits}건 · 캘린더(근접) ${calendarLines.length}건 · 한 일 ${completed.length}건`;
 
   const parts: string[] = [
     headline,
     summaryLine,
-    "※ 같은 기간으로 합쳐 보되, 【할 일】과 【구글 캘린더】는 출처를 구분합니다.",
+    "※ 【할 일】·【지침】·【습관】·【구글 캘린더】는 출처를 구분합니다.",
     "",
     "【할 일】",
   ];
@@ -184,6 +203,26 @@ export function buildDailyBriefing(
     parts.push("");
   }
 
+  const pushSideBlock = (
+    kind: "guideline" | "habit",
+    lines: { title: string; memo: string; done: boolean }[],
+  ) => {
+    parts.push(`【${SIDE_LIST_LABEL[kind]}】`);
+    if (lines.length === 0) {
+      parts.push("  (없음)");
+      parts.push("");
+      return;
+    }
+    for (const line of lines) {
+      parts.push(`  ${line.done ? "☑" : "☐"} ${line.title}`);
+      if (line.memo) parts.push(`    메모: ${line.memo}`);
+    }
+    parts.push("");
+  };
+
+  pushSideBlock("guideline", guidelineLines);
+  pushSideBlock("habit", habitLines);
+
   parts.push("【구글 캘린더】");
   if (calendarLines.length === 0) {
     parts.push("  (근접 일정 없음)");
@@ -202,6 +241,8 @@ export function buildDailyBriefing(
     summaryLine,
     sections,
     calendarLines,
+    guidelineLines,
+    habitLines,
     plaintext: parts.join("\n").trim() + "\n",
     activeCount: sorted.length,
     completedCount: completed.length,

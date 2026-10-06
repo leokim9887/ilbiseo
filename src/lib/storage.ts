@@ -3,10 +3,12 @@ import {
   CATEGORY_LABEL,
   LEGACY_STORAGE_KEY,
   STORAGE_KEY,
+  isLegacySideCategory,
   parseTaskCategory,
   type AppState,
   type CalendarEvent,
   type ChecklistItem,
+  type SideListItem,
   type Task,
 } from "./types";
 import { createId } from "./id";
@@ -19,20 +21,46 @@ export function createEmptyState(): AppState {
     tasks: [],
     checklists: [],
     calendarEvents: [],
+    guidelines: [],
+    habits: [],
+  };
+}
+
+function migrateSideItem(raw: Record<string, unknown>): SideListItem {
+  return {
+    id: String(raw.id ?? createId()),
+    title: String(raw.title ?? "").trim() || "새 항목",
+    memo: String(raw.memo ?? raw.notes ?? ""),
+    done: Boolean(
+      raw.done ?? (raw.status === "completed" || raw.checked),
+    ),
+    createdAt: String(raw.createdAt ?? new Date().toISOString()),
+    completedAt: (raw.completedAt as string | null) ?? null,
+  };
+}
+
+function taskToSideItem(raw: Record<string, unknown>): SideListItem {
+  return {
+    id: String(raw.id ?? createId()),
+    title: String(raw.title ?? "새 항목").trim() || "새 항목",
+    memo: String(raw.memo ?? raw.notes ?? ""),
+    done:
+      raw.status === "completed" ||
+      Boolean(raw.done) ||
+      Boolean(raw.checked),
+    createdAt: String(raw.createdAt ?? new Date().toISOString()),
+    completedAt: (raw.completedAt as string | null) ?? null,
   };
 }
 
 function migrateTask(raw: Record<string, unknown>): Task {
   const title = String(raw.title ?? "할 일");
   const notes = String(raw.notes ?? raw.memo ?? "");
-  // Old single 마감목표 → end date; startDate empty unless already present
   const end =
     (raw.targetDate as string | null) ??
     (raw.endDate as string | null) ??
     null;
-  const start =
-    (raw.startDate as string | null) ??
-    null;
+  const start = (raw.startDate as string | null) ?? null;
   return {
     id: String(raw.id ?? createId()),
     title,
@@ -91,21 +119,62 @@ function foldChecklistsIntoTasks(
   return extras.length ? [...tasks, ...extras] : tasks;
 }
 
+function mergeSideLists(
+  existing: SideListItem[],
+  incoming: SideListItem[],
+): SideListItem[] {
+  if (!incoming.length) return existing;
+  const seen = new Set(existing.map((i) => i.id));
+  const out = [...existing];
+  for (const item of incoming) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
 export function normalizeState(raw: unknown): AppState | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
   if (!Array.isArray(obj.tasks)) return null;
-  const tasks = obj.tasks.map((t) => migrateTask(t as Record<string, unknown>));
+
+  const rawTasks = obj.tasks as Record<string, unknown>[];
+  const migratedGuidelines: SideListItem[] = [];
+  const migratedHabits: SideListItem[] = [];
+  const keptTasks: Task[] = [];
+
+  for (const t of rawTasks) {
+    if (!t || typeof t !== "object") continue;
+    if (isLegacySideCategory(t.category)) {
+      const item = taskToSideItem(t);
+      if (t.category === "guideline") migratedGuidelines.push(item);
+      else migratedHabits.push(item);
+      continue;
+    }
+    keptTasks.push(migrateTask(t));
+  }
+
   const legacyChecks = Array.isArray(obj.checklists)
     ? (obj.checklists as ChecklistItem[])
     : [];
+
+  const fromFieldGuidelines = Array.isArray(obj.guidelines)
+    ? (obj.guidelines as Record<string, unknown>[]).map(migrateSideItem)
+    : [];
+  const fromFieldHabits = Array.isArray(obj.habits)
+    ? (obj.habits as Record<string, unknown>[]).map(migrateSideItem)
+    : [];
+
   return {
-    version: Number(obj.version ?? APP_VERSION),
-    tasks: foldChecklistsIntoTasks(tasks, legacyChecks),
+    version: APP_VERSION,
+    tasks: foldChecklistsIntoTasks(keptTasks, legacyChecks),
     checklists: [],
     calendarEvents: Array.isArray(obj.calendarEvents)
       ? (obj.calendarEvents as CalendarEvent[])
       : [],
+    guidelines: mergeSideLists(fromFieldGuidelines, migratedGuidelines),
+    habits: mergeSideLists(fromFieldHabits, migratedHabits),
   };
 }
 
@@ -114,25 +183,31 @@ export function loadState(): AppState | null {
   try {
     const v2 = localStorage.getItem(STORAGE_KEY);
     if (v2) {
-      const parsed = JSON.parse(v2) as { checklists?: unknown[] };
+      const parsed = JSON.parse(v2) as {
+        checklists?: unknown[];
+        tasks?: unknown[];
+        guidelines?: unknown[];
+        habits?: unknown[];
+        version?: number;
+      };
       const hadChecks =
         Array.isArray(parsed.checklists) && parsed.checklists.length > 0;
-      const rawTasks = Array.isArray(
-        (parsed as { tasks?: unknown[] }).tasks,
-      )
-        ? ((parsed as { tasks: Record<string, unknown>[] }).tasks)
+      const rawTasks = Array.isArray(parsed.tasks)
+        ? (parsed.tasks as Record<string, unknown>[])
         : [];
       const needsStartMigrate = rawTasks.some(
         (t) => t && typeof t === "object" && !("startDate" in t),
       );
-      const needsCategoryMigrate = rawTasks.some((t) => {
-        if (!t || typeof t !== "object") return false;
-        const c = (t as { category?: unknown }).category;
-        return typeof c === "string" && parseTaskCategory(c) !== c;
-      });
+      const needsSideMigrate =
+        rawTasks.some(
+          (t) => t && typeof t === "object" && isLegacySideCategory(t.category),
+        ) ||
+        !Array.isArray(parsed.guidelines) ||
+        !Array.isArray(parsed.habits) ||
+        Number(parsed.version ?? 0) < APP_VERSION;
       const n = normalizeState(parsed);
       if (n) {
-        if (hadChecks || needsStartMigrate || needsCategoryMigrate) saveState(n);
+        if (hadChecks || needsStartMigrate || needsSideMigrate) saveState(n);
         return n;
       }
     }
@@ -144,6 +219,8 @@ export function loadState(): AppState | null {
         tasks: legacy.tasks ?? [],
         checklists: [],
         calendarEvents: [],
+        guidelines: [],
+        habits: [],
       });
       if (n) {
         saveState(n);
@@ -161,6 +238,8 @@ export function saveState(state: AppState): void {
   const clean: AppState = {
     ...state,
     checklists: [],
+    guidelines: state.guidelines ?? [],
+    habits: state.habits ?? [],
     version: APP_VERSION,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));

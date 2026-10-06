@@ -1,5 +1,10 @@
 import ExcelJS from "exceljs";
-import { CATEGORY_LABEL, type CalendarEvent, type Task } from "./types";
+import {
+  CATEGORY_LABEL,
+  type CalendarEvent,
+  type SideListItem,
+  type Task,
+} from "./types";
 import { sortCompleted, sortTasks } from "./sort";
 import type { DailyBriefing } from "./briefing";
 import { formatCalendarWhen } from "./calendar-data";
@@ -36,12 +41,45 @@ export type WorkbookPayload = {
   tasks: Task[];
   calendarEvents: CalendarEvent[];
   briefing?: DailyBriefing | null;
+  guidelines?: SideListItem[];
+  habits?: SideListItem[];
 };
+
+function addSideSheet(
+  wb: ExcelJS.Workbook,
+  name: string,
+  items: SideListItem[],
+) {
+  const sheet = wb.addWorksheet(name, {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+  sheet.columns = [
+    { header: "순서", key: "order", width: 8 },
+    { header: "내용", key: "title", width: 40 },
+    { header: "메모", key: "memo", width: 28 },
+    { header: "완료", key: "done", width: 10 },
+  ];
+  styleHeader(sheet.getRow(1));
+  items.forEach((item, i) => {
+    sheet.addRow({
+      order: i + 1,
+      title: item.title,
+      memo: item.memo,
+      done: item.done ? "완료" : "",
+    });
+  });
+}
 
 export async function buildWorkbook(
   payload: WorkbookPayload,
 ): Promise<ExcelJS.Buffer> {
-  const { tasks, calendarEvents, briefing } = payload;
+  const {
+    tasks,
+    calendarEvents,
+    briefing,
+    guidelines = [],
+    habits = [],
+  } = payload;
   const wb = new ExcelJS.Workbook();
   wb.creator = "일비서";
   wb.created = new Date();
@@ -141,6 +179,9 @@ export async function buildWorkbook(
       source: e.source,
     });
   }
+
+  addSideSheet(wb, "지침", guidelines);
+  addSideSheet(wb, "습관", habits);
 
   if (briefing) {
     const summary = wb.addWorksheet("브리핑요약");

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AppState,
   CalendarEvent,
+  SideListItem,
+  SideListKind,
   Task,
   TaskCategory,
 } from "@/lib/types";
@@ -60,11 +62,19 @@ export function useAppState() {
     }
     setExcelLinked(true);
     try {
-      const briefing = buildDailyBriefing(next.tasks, next.calendarEvents);
+      const briefing = buildDailyBriefing(
+        next.tasks,
+        next.calendarEvents,
+        undefined,
+        next.guidelines,
+        next.habits,
+      );
       const buf = await buildWorkbook({
         tasks: next.tasks,
         calendarEvents: next.calendarEvents,
         briefing,
+        guidelines: next.guidelines,
+        habits: next.habits,
       });
       await writeBufferToHandle(handle, buf);
       setExcelStatus(
@@ -239,6 +249,69 @@ export function useAppState() {
     persist(createEmptyState());
   }, [persist]);
 
+  const sideKey = (kind: SideListKind): "guidelines" | "habits" =>
+    kind === "guideline" ? "guidelines" : "habits";
+
+  const addSideItem = useCallback(
+    (kind: SideListKind) => {
+      const key = sideKey(kind);
+      const item: SideListItem = {
+        id: createId(),
+        title: kind === "guideline" ? "새 지침" : "새 습관",
+        memo: "",
+        done: false,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+      };
+      persist({ ...state, [key]: [...state[key], item] });
+      return item;
+    },
+    [persist, state],
+  );
+
+  const updateSideItem = useCallback(
+    (kind: SideListKind, id: string, patch: Partial<SideListItem>) => {
+      const key = sideKey(kind);
+      persist({
+        ...state,
+        [key]: state[key].map((item) =>
+          item.id === id ? { ...item, ...patch } : item,
+        ),
+      });
+    },
+    [persist, state],
+  );
+
+  const toggleSideItem = useCallback(
+    (kind: SideListKind, id: string) => {
+      const key = sideKey(kind);
+      persist({
+        ...state,
+        [key]: state[key].map((item) => {
+          if (item.id !== id) return item;
+          const done = !item.done;
+          return {
+            ...item,
+            done,
+            completedAt: done ? new Date().toISOString() : null,
+          };
+        }),
+      });
+    },
+    [persist, state],
+  );
+
+  const deleteSideItem = useCallback(
+    (kind: SideListKind, id: string) => {
+      const key = sideKey(kind);
+      persist({
+        ...state,
+        [key]: state[key].filter((item) => item.id !== id),
+      });
+    },
+    [persist, state],
+  );
+
   const forceExcelSync = useCallback(async () => {
     await syncExcel(state);
   }, [state, syncExcel]);
@@ -258,12 +331,18 @@ export function useAppState() {
     activeTasks,
     completedTasks,
     calendarEvents: state.calendarEvents,
+    guidelines: state.guidelines,
+    habits: state.habits,
     addTask,
     addMany,
     updateTask,
     completeTask,
     restoreTask,
     deleteTask,
+    addSideItem,
+    updateSideItem,
+    toggleSideItem,
+    deleteSideItem,
     setCalendarEvents,
     replaceCalendar,
     clearAllData,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CalendarEvent, Task } from "@/lib/types";
+import type { CalendarEvent, SideListItem, Task } from "@/lib/types";
 import {
   buildDailyBriefing,
   loadSettings,
@@ -29,12 +29,16 @@ import {
 interface DailyBriefingPanelProps {
   tasks: Task[];
   calendarEvents: CalendarEvent[];
+  guidelines?: SideListItem[];
+  habits?: SideListItem[];
   onAfterExport?: () => void;
 }
 
 export function DailyBriefingPanel({
   tasks,
   calendarEvents,
+  guidelines = [],
+  habits = [],
   onAfterExport,
 }: DailyBriefingPanelProps) {
   const [settings, setSettings] = useState<AppSettings>({
@@ -51,8 +55,10 @@ export function DailyBriefingPanel({
   }, []);
 
   const preview = useMemo(
-    () => briefing ?? buildDailyBriefing(tasks, calendarEvents),
-    [briefing, tasks, calendarEvents],
+    () =>
+      briefing ??
+      buildDailyBriefing(tasks, calendarEvents, undefined, guidelines, habits),
+    [briefing, tasks, calendarEvents, guidelines, habits],
   );
 
   const persistSettings = (next: AppSettings) => {
@@ -64,7 +70,9 @@ export function DailyBriefingPanel({
     setBusy("gen");
     setError(null);
     try {
-      setBriefing(buildDailyBriefing(tasks, calendarEvents));
+      setBriefing(
+        buildDailyBriefing(tasks, calendarEvents, undefined, guidelines, habits),
+      );
       setApiNote(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "브리핑 생성 실패");
@@ -77,12 +85,20 @@ export function DailyBriefingPanel({
     setBusy("xlsx");
     setError(null);
     try {
-      const b = buildDailyBriefing(tasks, calendarEvents);
+      const b = buildDailyBriefing(
+        tasks,
+        calendarEvents,
+        undefined,
+        guidelines,
+        habits,
+      );
       setBriefing(b);
       const buf = await buildWorkbook({
         tasks,
         calendarEvents,
         briefing: b,
+        guidelines,
+        habits,
       });
       downloadXlsx(buf, briefingFilename(b.date));
       onAfterExport?.();
@@ -104,6 +120,8 @@ export function DailyBriefingPanel({
         body: JSON.stringify({
           tasks,
           calendarEvents,
+          guidelines,
+          habits,
           send,
           preferredHour: settings.briefingHour,
           workEmail: settings.workEmail,
@@ -118,7 +136,9 @@ export function DailyBriefingPanel({
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "API 호출 실패");
       }
-      setBriefing(buildDailyBriefing(tasks, calendarEvents));
+      setBriefing(
+        buildDailyBriefing(tasks, calendarEvents, undefined, guidelines, habits),
+      );
       setApiNote(
         `${send ? "발송 시도" : "dry-run"} · ${data.delivery?.status} · ${data.delivery?.message}`,
       );

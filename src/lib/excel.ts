@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { type CalendarEvent, type Task } from "./types";
+import { CATEGORY_LABEL, type CalendarEvent, type Task } from "./types";
 import { sortCompleted, sortTasks } from "./sort";
 import type { DailyBriefing } from "./briefing";
 import { formatCalendarWhen } from "./calendar-data";
@@ -52,6 +52,7 @@ export async function buildWorkbook(
   });
   todo.columns = [
     { header: "순서", key: "order", width: 8 },
+    { header: "틀", key: "frame", width: 10 },
     { header: "할일 LIST UP", key: "listup", width: 48 },
     { header: "마감목표", key: "deadline", width: 22 },
     { header: "중요도", key: "importance", width: 10 },
@@ -63,6 +64,7 @@ export async function buildWorkbook(
     const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
     todo.addRow({
       order: i + 1,
+      frame: CATEGORY_LABEL[t.category],
       listup,
       deadline: formatDeadlineRange(t),
       importance: t.importance,
@@ -76,12 +78,17 @@ export async function buildWorkbook(
     vertical: "middle",
     horizontal: "center",
   };
+  todo.getColumn("frame").alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
 
   const done = wb.addWorksheet("한 일", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
   done.columns = [
     { header: "순서", key: "order", width: 8 },
+    { header: "틀", key: "frame", width: 10 },
     { header: "할일 LIST UP", key: "listup", width: 48 },
     { header: "마감목표", key: "deadline", width: 22 },
     { header: "중요도", key: "importance", width: 10 },
@@ -93,6 +100,7 @@ export async function buildWorkbook(
     const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
     done.addRow({
       order: i + 1,
+      frame: CATEGORY_LABEL[t.category],
       listup,
       deadline: formatDeadlineRange(t),
       importance: t.importance,
@@ -103,6 +111,10 @@ export async function buildWorkbook(
   done.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
   done.getColumn("deadline").alignment = {
     wrapText: true,
+    vertical: "middle",
+    horizontal: "center",
+  };
+  done.getColumn("frame").alignment = {
     vertical: "middle",
     horizontal: "center",
   };

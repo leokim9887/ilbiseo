@@ -3,11 +3,11 @@ import {
   CATEGORY_LABEL,
   LEGACY_STORAGE_KEY,
   STORAGE_KEY,
+  parseTaskCategory,
   type AppState,
   type CalendarEvent,
   type ChecklistItem,
   type Task,
-  type TaskCategory,
 } from "./types";
 import { createId } from "./id";
 import { inferGroupKey } from "./sort";
@@ -36,7 +36,7 @@ function migrateTask(raw: Record<string, unknown>): Task {
   return {
     id: String(raw.id ?? createId()),
     title,
-    category: (raw.category as TaskCategory) || "work",
+    category: parseTaskCategory(raw.category),
     kind: (raw.kind as Task["kind"]) || "someday",
     startDate: start,
     targetDate: end,
@@ -74,7 +74,7 @@ function foldChecklistsIntoTasks(
     extras.push({
       id: createId(),
       title,
-      category: c.category,
+      category: parseTaskCategory(c.category),
       kind: "someday",
       startDate: null,
       targetDate: null,
@@ -125,9 +125,14 @@ export function loadState(): AppState | null {
       const needsStartMigrate = rawTasks.some(
         (t) => t && typeof t === "object" && !("startDate" in t),
       );
+      const needsCategoryMigrate = rawTasks.some((t) => {
+        if (!t || typeof t !== "object") return false;
+        const c = (t as { category?: unknown }).category;
+        return typeof c === "string" && parseTaskCategory(c) !== c;
+      });
       const n = normalizeState(parsed);
       if (n) {
-        if (hadChecks || needsStartMigrate) saveState(n);
+        if (hadChecks || needsStartMigrate || needsCategoryMigrate) saveState(n);
         return n;
       }
     }

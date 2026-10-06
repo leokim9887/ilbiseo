@@ -1,10 +1,25 @@
 export type TaskKind = "spot" | "ongoing" | "someday";
 export type TaskSource = "manual" | "memo" | "ocr" | "import";
 export type TaskStatus = "active" | "completed";
-export type TaskCategory = "work" | "personal" | "project" | "team";
-/** 틀 dropdown: 4 program frames + Google Calendar frame */
+export type TaskCategory =
+  | "work"
+  | "personal"
+  | "project"
+  | "team"
+  | "guideline"
+  | "habit";
+/** 틀 dropdown: program frames + Google Calendar frame */
 export type FrameId = TaskCategory | "gcal";
 export type CalendarSource = "mock" | "ics" | "google";
+
+export const TASK_CATEGORIES: readonly TaskCategory[] = [
+  "work",
+  "personal",
+  "project",
+  "team",
+  "guideline",
+  "habit",
+] as const;
 
 export interface Task {
   id: string;
@@ -61,26 +76,17 @@ export const STORAGE_KEY = "ilbiseo-state-v2";
 export const LEGACY_STORAGE_KEY = "ilbiseo-tasks-v1";
 export const APP_VERSION = 2;
 
-export const CATEGORY_ORDER: TaskCategory[] = [
-  "work",
-  "personal",
-  "project",
-  "team",
-];
+export const CATEGORY_ORDER: TaskCategory[] = [...TASK_CATEGORIES];
 
-export const FRAME_ORDER: FrameId[] = [
-  "work",
-  "personal",
-  "project",
-  "team",
-  "gcal",
-];
+export const FRAME_ORDER: FrameId[] = [...TASK_CATEGORIES, "gcal"];
 
 export const CATEGORY_LABEL: Record<TaskCategory, string> = {
   work: "업무용",
   personal: "개인용",
   project: "과제용",
   team: "팀원용",
+  guideline: "지침",
+  habit: "습관",
 };
 
 export const FRAME_LABEL: Record<FrameId, string> = {
@@ -88,8 +94,17 @@ export const FRAME_LABEL: Record<FrameId, string> = {
   gcal: "구글 캘린더",
 };
 
-export function isTaskCategory(f: FrameId): f is TaskCategory {
-  return f !== "gcal";
+export function isTaskCategory(f: FrameId | string): f is TaskCategory {
+  return (TASK_CATEGORIES as readonly string[]).includes(f);
+}
+
+/** Parse stored/imported category; unknown → work (safe migrate). */
+export function parseTaskCategory(raw: unknown): TaskCategory {
+  if (typeof raw !== "string") return "work";
+  if (isTaskCategory(raw)) return raw;
+  const byLabel = (Object.entries(CATEGORY_LABEL) as [TaskCategory, string][])
+    .find(([, label]) => label === raw || label.replace(/용$/, "") === raw);
+  return byLabel?.[0] ?? "work";
 }
 
 export const KIND_LABEL: Record<TaskKind, string> = {

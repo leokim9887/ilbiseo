@@ -259,7 +259,7 @@ export type AppSettings = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   briefingHour: "08:00",
-  workEmail: "",
+  workEmail: "goldage77@naver.com",
   dailyEmailEnabled: false,
   attachXlsx: true,
 };
@@ -268,17 +268,26 @@ export function loadSettings(): AppSettings {
   if (typeof window === "undefined") return { ...DEFAULT_SETTINGS };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { ...DEFAULT_SETTINGS };
+    if (!raw) {
+      const fresh = { ...DEFAULT_SETTINGS };
+      saveSettings(fresh);
+      return fresh;
+    }
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return {
+    const next: AppSettings = {
       briefingHour: parsed.briefingHour || DEFAULT_SETTINGS.briefingHour,
-      workEmail: parsed.workEmail ?? "",
+      workEmail: (parsed.workEmail || "").trim() || DEFAULT_SETTINGS.workEmail,
       dailyEmailEnabled: Boolean(parsed.dailyEmailEnabled),
       attachXlsx:
         parsed.attachXlsx === undefined
           ? DEFAULT_SETTINGS.attachXlsx
           : Boolean(parsed.attachXlsx),
     };
+    // Persist default email if older empty settings
+    if (!(parsed.workEmail || "").trim() && next.workEmail) {
+      saveSettings(next);
+    }
+    return next;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

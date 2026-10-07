@@ -306,7 +306,7 @@ export function DailyBriefingPanel({
             <Input
               id="work-email"
               type="email"
-              placeholder="예: father@company.com (아직 모르면 비워 두세요)"
+              placeholder="goldage77@naver.com"
               value={settings.workEmail}
               onChange={(e) =>
                 persistSettings({ ...settings, workEmail: e.target.value })

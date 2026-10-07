@@ -22,6 +22,7 @@ import {
   buildTaskOnlyRows,
   calendarListUpTitle,
   formatEventDeadline,
+  type SheetRow,
 } from "@/lib/sheet-rows";
 import {
   formatDeadlineRange,
@@ -30,10 +31,18 @@ import {
   weekRangeContaining,
   type PeriodSort,
 } from "@/lib/date-range";
+import {
+  applyColumnSort,
+  columnSortLabel,
+  cycleColumnSort,
+  isSortableCol,
+  type ColumnSort,
+  type ColumnSortKey,
+} from "@/lib/column-sort";
 import { Button } from "@/components/ui/button";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
-import { Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 export type WorkbookSheet = "todo" | "done";
 
@@ -90,6 +99,8 @@ export function ExcelWorkbook({
   const [filterStart, setFilterStart] = useState<string>("");
   const [filterEnd, setFilterEnd] = useState<string>("");
   const [periodSort, setPeriodSort] = useState<PeriodSort>("default");
+  /** Excel header column sort — overrides period dropdown when set */
+  const [columnSort, setColumnSort] = useState<ColumnSort | null>(null);
   const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
   const [gcalRangeStart, setGcalRangeStart] = useState("");
   const [gcalRangeEnd, setGcalRangeEnd] = useState("");
@@ -109,20 +120,23 @@ export function ExcelWorkbook({
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
 
   const rows = useMemo(() => {
+    let built: SheetRow[];
     if (isGcal && sheet === "todo") {
-      return buildGcalFrameRows(calendarEvents, {
+      built = buildGcalFrameRows(calendarEvents, {
         rangeStart: gcalRangeStart || null,
         rangeEnd: gcalRangeEnd || null,
       });
+    } else if (isGcal && sheet === "done") {
+      built = [];
+    } else {
+      built = buildTaskOnlyRows(baseTasks, {
+        filterStart: filterStart || null,
+        filterEnd: filterEnd || null,
+        // Column sort takes over ordering; keep period filter only
+        periodSort: columnSort ? "default" : periodSort,
+      });
     }
-    if (isGcal && sheet === "done") {
-      return [];
-    }
-    return buildTaskOnlyRows(baseTasks, {
-      filterStart: filterStart || null,
-      filterEnd: filterEnd || null,
-      periodSort,
-    });
+    return applyColumnSort(built, columnSort);
   }, [
     isGcal,
     sheet,
@@ -133,7 +147,18 @@ export function ExcelWorkbook({
     filterStart,
     filterEnd,
     periodSort,
+    columnSort,
   ]);
+
+  const onHeaderSort = (key: ColKey) => {
+    if (!isSortableCol(key)) return;
+    setColumnSort((prev) => cycleColumnSort(prev, key as ColumnSortKey));
+  };
+
+  const clearColumnSort = () => {
+    setColumnSort(null);
+    setPeriodSort("default");
+  };
 
   const taskIds = useMemo(
     () => rows.filter((r) => r.kind === "task").map((r) => r.task.id),
@@ -350,6 +375,7 @@ export function ExcelWorkbook({
           {isGcal && !gcalFilterActive && sheet === "todo"
             ? ` · 오늘부터`
             : ""}
+          {columnSort ? ` · ${columnSortLabel(columnSort)}` : ""}
         </span>
       </div>
 
@@ -416,10 +442,23 @@ export function ExcelWorkbook({
                 필터 지우기
               </button>
             ) : null}
+            {columnSort ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 min-h-8 gap-1 px-2 text-[12px]"
+                onClick={clearColumnSort}
+              >
+                <RotateCcw className="size-3.5" />
+                기본 정렬
+              </Button>
+            ) : null}
           </div>
           <p className="text-[11px] text-[#5c655f]">
-            시작·종료일을 비우면 오늘 포함 이후 일정만 보입니다. 연도는 날짜
-            입력(브라우저 달력)에서 고릅니다.
+            시작·종료일을 비우면 오늘 포함 이후 일정만 보입니다. 표 머리글
+            「마감목표」를 눌러 오름/내림 · 빈 값은 맨 아래.
+            {columnSort ? ` · 지금: ${columnSortLabel(columnSort)}` : ""}
           </p>
         </div>
       ) : !isGcal ? (
@@ -479,17 +518,37 @@ export function ExcelWorkbook({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-[#1a2420]">정렬</span>
           <select
-            value={periodSort}
-            onChange={(e) => setPeriodSort(e.target.value as PeriodSort)}
+            value={columnSort ? "column" : periodSort}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "column") return;
+              setColumnSort(null);
+              setPeriodSort(v as PeriodSort);
+            }}
             className="h-8 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px]"
             aria-label="기간 정렬"
           >
             <option value="default">기본(스팟·지속·언젠가)</option>
             <option value="start">시작일 순</option>
             <option value="end">마감(종료)일 순</option>
+            {columnSort ? (
+              <option value="column">{columnSortLabel(columnSort)}</option>
+            ) : null}
           </select>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 min-h-8 gap-1 px-2 text-[12px]"
+            disabled={!columnSort && periodSort === "default"}
+            onClick={clearColumnSort}
+            title="스팟·지속·언젠가 기본 순서로 되돌림"
+          >
+            <RotateCcw className="size-3.5" />
+            기본 정렬
+          </Button>
           <p className="text-[11px] text-[#5c655f]">
-            이 틀의 할 일만 표시 · 날짜 없는 행은 「전체」에서만
+            표 머리글(마감목표·중요도·시급성)을 눌러 오름/내림 · 빈 값은 맨 아래
           </p>
         </div>
       </div>
@@ -499,19 +558,60 @@ export function ExcelWorkbook({
         <table className="w-full min-w-[820px] border-collapse text-[15px] text-black">
           <thead className="sticky top-0 z-20">
             <tr>
-              {COLS.map((c) => (
-                <th
-                  key={`H-${c.key}`}
-                  style={
-                    c.key === "listup"
-                      ? { width: c.width, minWidth: "260px" }
-                      : { width: c.width, minWidth: c.width }
-                  }
-                  className="border border-black bg-[#f3f3f3] px-2 py-3 text-center text-[15px] font-bold leading-tight text-black"
-                >
-                  {c.label}
-                </th>
-              ))}
+              {COLS.map((c) => {
+                const sortable = isSortableCol(c.key);
+                const active =
+                  sortable && columnSort?.key === c.key ? columnSort : null;
+                return (
+                  <th
+                    key={`H-${c.key}`}
+                    style={
+                      c.key === "listup"
+                        ? { width: c.width, minWidth: "260px" }
+                        : { width: c.width, minWidth: c.width }
+                    }
+                    className={`border border-black bg-[#f3f3f3] px-1 py-2 text-center text-[15px] font-bold leading-tight text-black ${
+                      sortable ? "p-0" : "px-2 py-3"
+                    }`}
+                  >
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => onHeaderSort(c.key)}
+                        className={`flex min-h-11 w-full items-center justify-center gap-0.5 px-1 py-2 text-[14px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] sm:text-[15px] ${
+                          active ? "bg-[#e4efe6]" : ""
+                        }`}
+                        aria-label={`${c.label} 정렬 (${
+                          !active
+                            ? "기본"
+                            : active.dir === "asc"
+                              ? "오름차순"
+                              : "내림차순"
+                        }) · 누르면 바뀜`}
+                        title="클릭: 없음 → 오름차순 → 내림차순 → 기본"
+                      >
+                        <span>{c.label}</span>
+                        <span
+                          className="inline-flex flex-col leading-none text-[#217346]"
+                          aria-hidden
+                        >
+                          {active?.dir === "asc" ? (
+                            <ArrowUp className="size-3.5 stroke-[2.5]" />
+                          ) : active?.dir === "desc" ? (
+                            <ArrowDown className="size-3.5 stroke-[2.5]" />
+                          ) : (
+                            <span className="text-[10px] font-semibold text-[#8a939a]">
+                              ↕
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    ) : (
+                      c.label
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

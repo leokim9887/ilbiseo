@@ -37,29 +37,43 @@ async function main() {
   });
 
   await page.getByRole("button", { name: "테스트 메일 보내기" }).click();
-  await page.waitForTimeout(2500);
+  // Real Naver SMTP can take several seconds
+  await page.waitForFunction(
+    () => {
+      const t = document.body?.innerText || "";
+      return (
+        t.includes("테스트 메일 · sent") ||
+        t.includes("테스트 메일 · send_failed") ||
+        t.includes("테스트 메일 · skipped_no_credentials") ||
+        t.includes("네이버 SMTP로 메일을 보냈습니다")
+      );
+    },
+    { timeout: 60000 },
+  );
+  await page.waitForTimeout(400);
 
   const body = await page.locator("body").innerText();
   const sent =
-    body.includes("네이버 SMTP로 메일을 보냈습니다") ||
-    body.includes('status": "sent"');
+    body.includes("테스트 메일 · sent") ||
+    body.includes("네이버 SMTP로 메일을 보냈습니다");
   const failed =
     body.includes("535") ||
     body.includes("send_failed") ||
     body.includes("Username and Password not accepted");
 
-  await page.screenshot({
-    path: sent
-      ? `${OUT}/ilbiseo-naver-test-ok-sent.png`
-      : `${OUT}/ilbiseo-naver-test-ok-smtp535.png`,
-    fullPage: true,
-  });
+  const shot = sent
+    ? `${OUT}/ilbiseo-naver-test-ok-sent.png`
+    : failed
+      ? `${OUT}/ilbiseo-naver-test-ok-smtp535.png`
+      : `${OUT}/ilbiseo-naver-test-ok-result.png`;
+  await page.screenshot({ path: shot, fullPage: true });
 
   console.log(
     JSON.stringify({
       sent: Boolean(sent),
       failed: Boolean(failed),
       has535: body.includes("535"),
+      shot,
     }),
   );
 

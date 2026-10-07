@@ -8,8 +8,8 @@
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-snappy-cello-g9cb0ou.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=e79a1448-c9c5-4b88-8f8e-d65cb7611cf3  
+   https://temporary-swift-sulfur-ytzhvs5.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=1712f2fc-a727-47c3-a5cb-9b8a0afbe82b  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  

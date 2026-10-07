@@ -79,20 +79,27 @@ export function CalendarPanel({
     void loadStatus();
   }, [loadStatus]);
 
+  const [lastFetchCount, setLastFetchCount] = useState<number | null>(null);
+
   const refreshGoogle = useCallback(async () => {
     setBusy("refresh");
     setGoogleError(null);
     try {
-      const res = await fetch("/api/google/events?days=14");
+      // Full calendar sync (paginated; ~10y past → ~10y ahead). UI period filter still applies for display.
+      const res = await fetch("/api/google/events?full=1");
       const json = (await res.json()) as {
         error?: string;
         events?: CalendarEvent[];
         email?: string | null;
+        count?: number;
+        mode?: string;
       };
       if (!res.ok) {
         throw new Error(json.error || "일정을 가져오지 못했습니다.");
       }
-      onReplace(json.events ?? []);
+      const list = json.events ?? [];
+      onReplace(list);
+      setLastFetchCount(json.count ?? list.length);
       setStatus((s) =>
         s
           ? {
@@ -221,7 +228,7 @@ export function CalendarPanel({
                 ) : (
                   <RefreshCw className="size-4" />
                 )}
-                새로고침
+                {busy === "refresh" ? "전체 일정 불러오는 중…" : "전체 새로고침"}
               </Button>
               <Button
                 type="button"
@@ -299,8 +306,15 @@ export function CalendarPanel({
           ) : configured && connected ? (
             <p className="text-[var(--ink)]">
               <span className="font-semibold text-[#217346]">연결됨</span>
-              {status?.email ? ` · ${status.email}` : ""} · 앞으로 14일 일정을
-              불러옵니다.
+              {status?.email ? ` · ${status.email}` : ""} · Google 일정{" "}
+              <strong>전체</strong>(약 10년 전~후, 페이지 단위)를 불러옵니다.
+              틀「구글 캘린더」기간 필터는 화면 표시만 줄입니다.
+              {lastFetchCount != null ? (
+                <>
+                  {" "}
+                  · 최근 동기화 <strong>{lastFetchCount}</strong>건
+                </>
+              ) : null}
             </p>
           ) : configured ? (
             <p className="text-[var(--ink)]">
@@ -335,6 +349,13 @@ export function CalendarPanel({
               </p>
             </div>
           )}
+          {busy === "refresh" ? (
+            <p className="mt-2 flex items-center gap-2 text-sm text-[var(--ink-muted)]">
+              <Loader2 className="size-4 animate-spin" />
+              Google 전체 일정을 가져오는 중입니다. 일정이 많으면 잠시 걸릴 수
+              있습니다…
+            </p>
+          ) : null}
           {googleError ? (
             <p className="mt-2 text-sm text-destructive" role="alert">
               {googleError}

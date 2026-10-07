@@ -3,12 +3,20 @@ import { fetchUpcomingGoogleEvents } from "@/lib/google-oauth";
 import { ensureAccessToken, writeTokenCookie } from "@/lib/google-session";
 
 export const runtime = "nodejs";
+/** Wide calendar sync can take longer than the default serverless budget. */
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  const days = Math.min(
-    60,
-    Math.max(1, Number(req.nextUrl.searchParams.get("days") || 14) || 14),
-  );
+  const sp = req.nextUrl.searchParams;
+  // Default: full calendar (~10y past → ~10y ahead). Optional ?days=N for narrow sync.
+  const daysParam = sp.get("days");
+  const fullParam = sp.get("full");
+  const wantFull =
+    fullParam === "1" ||
+    fullParam === "true" ||
+    daysParam == null ||
+    daysParam === "" ||
+    daysParam === "all";
 
   const ensured = await ensureAccessToken();
   if ("error" in ensured) {
@@ -19,10 +27,23 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const events = await fetchUpcomingGoogleEvents(ensured.token, days);
+    const events = await fetchUpcomingGoogleEvents(
+      ensured.token,
+      wantFull
+        ? { full: true }
+        : {
+            full: false,
+            daysAhead: Math.min(
+              3650,
+              Math.max(1, Number(daysParam) || 14),
+            ),
+          },
+    );
     const json = NextResponse.json({
       ok: true,
       email: ensured.bundle.email ?? null,
+      mode: wantFull ? "full" : "days",
+      count: events.length,
       events: events.map((e) => ({
         id: e.id,
         title: e.title,

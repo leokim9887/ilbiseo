@@ -256,52 +256,128 @@ async function listUserCalendars(
   return calendars;
 }
 
-export async function fetchUpcomingGoogleEvents(
+/** Wide horizon for “전체” calendar sync (API requires bounds with orderBy=startTime). */
+const FULL_YEARS_PAST = 10;
+const FULL_YEARS_AHEAD = 10;
+const EVENTS_PAGE_SIZE = 250; // Calendar API max per page
+const MAX_PAGES_PER_CALENDAR = 40; // safety: ≤ 10_000 events / calendar
+const MAX_CALENDARS = 12;
+const MAX_TOTAL_EVENTS = 20_000;
+
+export type FetchGoogleEventsOptions = {
+  /** @deprecated Prefer full sync. If set, only loads from now → +daysAhead (legacy). */
+  daysAhead?: number;
+  /** When true (default), load ~10y past → ~10y ahead with pagination. */
+  full?: boolean;
+};
+
+function mapGEvent(
+  item: GEvent,
+  cal: GCalListItem,
+): GoogleApiEvent | null {
+  const start = item.start?.dateTime || item.start?.date;
+  if (!start) return null;
+  const end = item.end?.dateTime || item.end?.date || null;
+  const allDay = Boolean(item.start?.date && !item.start?.dateTime);
+  return {
+    id: `gcal:${cal.id}:${item.id ?? start}`,
+    title: item.summary?.trim() || "(제목 없음)",
+    start,
+    end,
+    allDay,
+    notes: item.description?.trim() || "",
+    calendarName: cal.summary || (cal.primary ? "기본 캘린더" : "캘린더"),
+    source: "google",
+  };
+}
+
+async function fetchEventsForCalendar(
   accessToken: string,
-  daysAhead = 14,
-): Promise<GoogleApiEvent[]> {
-  const timeMin = new Date();
-  const timeMax = new Date();
-  timeMax.setDate(timeMax.getDate() + daysAhead);
+  cal: GCalListItem,
+  timeMin: Date,
+  timeMax: Date,
+): Promise<{ events: GoogleApiEvent[]; error: string | null }> {
+  const calId = encodeURIComponent(cal.id!);
+  const events: GoogleApiEvent[] = [];
+  let pageToken: string | undefined;
+  let pages = 0;
+  let lastError: string | null = null;
 
-  const calendars = await listUserCalendars(accessToken);
-
-  const out: GoogleApiEvent[] = [];
-  let lastEventError: string | null = null;
-  for (const cal of calendars.slice(0, 10)) {
-    const calId = encodeURIComponent(cal.id!);
+  while (pages < MAX_PAGES_PER_CALENDAR) {
+    pages += 1;
     const params = new URLSearchParams({
       timeMin: timeMin.toISOString(),
       timeMax: timeMax.toISOString(),
       singleEvents: "true",
       orderBy: "startTime",
-      maxResults: "40",
+      maxResults: String(EVENTS_PAGE_SIZE),
     });
+    if (pageToken) params.set("pageToken", pageToken);
+
     const evRes = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/${calId}/events?${params}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     if (!evRes.ok) {
       const t = await evRes.text();
-      lastEventError = formatGoogleApiError(evRes.status, t, "일정");
-      continue;
+      lastError = formatGoogleApiError(evRes.status, t, "일정");
+      break;
     }
-    const evJson = (await evRes.json()) as { items?: GEvent[] };
+    const evJson = (await evRes.json()) as {
+      items?: GEvent[];
+      nextPageToken?: string;
+    };
     for (const item of evJson.items ?? []) {
-      const start = item.start?.dateTime || item.start?.date;
-      if (!start) continue;
-      const end = item.end?.dateTime || item.end?.date || null;
-      const allDay = Boolean(item.start?.date && !item.start?.dateTime);
-      out.push({
-        id: `gcal:${cal.id}:${item.id ?? start}`,
-        title: item.summary?.trim() || "(제목 없음)",
-        start,
-        end,
-        allDay,
-        notes: item.description?.trim() || "",
-        calendarName: cal.summary || (cal.primary ? "기본 캘린더" : "캘린더"),
-        source: "google",
-      });
+      const mapped = mapGEvent(item, cal);
+      if (mapped) events.push(mapped);
+    }
+    pageToken = evJson.nextPageToken;
+    if (!pageToken) break;
+  }
+
+  return { events, error: lastError };
+}
+
+/**
+ * Load Google Calendar events across calendars.
+ * Default: full-ish sync (~10 years past → ~10 years ahead) with nextPageToken pagination.
+ */
+export async function fetchUpcomingGoogleEvents(
+  accessToken: string,
+  daysAheadOrOpts: number | FetchGoogleEventsOptions = {},
+): Promise<GoogleApiEvent[]> {
+  const opts: FetchGoogleEventsOptions =
+    typeof daysAheadOrOpts === "number"
+      ? { daysAhead: daysAheadOrOpts, full: false }
+      : daysAheadOrOpts;
+
+  const full = opts.full !== false && opts.daysAhead == null;
+  const timeMin = new Date();
+  const timeMax = new Date();
+  if (full) {
+    timeMin.setFullYear(timeMin.getFullYear() - FULL_YEARS_PAST);
+    timeMax.setFullYear(timeMax.getFullYear() + FULL_YEARS_AHEAD);
+  } else {
+    const days = Math.min(3650, Math.max(1, opts.daysAhead ?? 14));
+    timeMax.setDate(timeMax.getDate() + days);
+  }
+
+  const calendars = await listUserCalendars(accessToken);
+  const out: GoogleApiEvent[] = [];
+  let lastEventError: string | null = null;
+
+  for (const cal of calendars.slice(0, MAX_CALENDARS)) {
+    if (out.length >= MAX_TOTAL_EVENTS) break;
+    const { events, error } = await fetchEventsForCalendar(
+      accessToken,
+      cal,
+      timeMin,
+      timeMax,
+    );
+    if (error) lastEventError = error;
+    for (const ev of events) {
+      out.push(ev);
+      if (out.length >= MAX_TOTAL_EVENTS) break;
     }
   }
 
@@ -310,7 +386,7 @@ export async function fetchUpcomingGoogleEvents(
   }
 
   out.sort((a, b) => a.start.localeCompare(b.start));
-  return out.slice(0, 100);
+  return out;
 }
 
 export const cookieOptions = {

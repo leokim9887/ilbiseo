@@ -38,10 +38,15 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#163f39",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#163f39" },
+    { media: "(prefers-color-scheme: dark)", color: "#163f39" },
+  ],
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
   viewportFit: "cover",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -50,7 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="ko"
       className={`${sans.variable} ${display.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col font-sans">
+      <body className="flex min-h-dvh flex-col font-sans">
         <PwaRegister />
         {children}
       </body>

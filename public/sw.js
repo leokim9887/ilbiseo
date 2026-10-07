@@ -1,10 +1,11 @@
-/* 일비서 service worker — app shell cache for offline localStorage use */
-const CACHE = "ilbiseo-shell-v1";
+/* 일비서 service worker — offline shell + static assets (localStorage tasks work offline) */
+const CACHE = "ilbiseo-shell-v2";
 const PRECACHE = [
   "/",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
+  "/icons/maskable-512.png",
   "/icons/apple-touch-icon.png",
   "/offline.html",
 ];
@@ -38,13 +39,20 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navigations: network first, fallback to cache / offline page
+  // Never cache API / OAuth / cron — always network
+  if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  // Navigations: network first, fallback to cached shell / offline page
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put("/", copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put("/", copy));
+          }
           return response;
         })
         .catch(async () => {
@@ -55,19 +63,22 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets: cache first, then network
+  // App shell assets: cache first
   if (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
-    url.pathname.endsWith(".webmanifest")
+    url.pathname.endsWith(".webmanifest") ||
+    url.pathname === "/offline.html"
   ) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
           cached ||
           fetch(request).then((response) => {
-            const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
+            if (response.ok) {
+              const copy = response.clone();
+              caches.open(CACHE).then((cache) => cache.put(request, copy));
+            }
             return response;
           }),
       ),
@@ -75,7 +86,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Default: network, fall back to cache
+  // Other same-origin GET: network, cache successful _next responses
   event.respondWith(
     fetch(request)
       .then((response) => {

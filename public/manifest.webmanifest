@@ -1,16 +1,19 @@
 {
+  "id": "/",
   "name": "일비서",
   "short_name": "일비서",
-  "description": "아버지용 헤드헌팅 할 일·일정 개인 비서",
-  "lang": "ko",
+  "description": "아버지용 할 일·일정 비서. 이 기기에 저장되며 홈 화면에 두면 앱처럼 씁니다.",
+  "lang": "ko-KR",
   "dir": "ltr",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui", "browser"],
   "orientation": "any",
-  "background_color": "#e8eef2",
-  "theme_color": "#0b4f57",
-  "categories": ["productivity", "business"],
+  "background_color": "#ebe6df",
+  "theme_color": "#163f39",
+  "categories": ["productivity", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -29,6 +32,26 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "할 일",
+      "short_name": "할 일",
+      "url": "/?view=todo",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "오늘 브리핑",
+      "short_name": "브리핑",
+      "url": "/?view=briefing",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

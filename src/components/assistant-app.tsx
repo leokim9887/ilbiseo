@@ -231,9 +231,38 @@ export function AssistantApp() {
           {view === "settings" ? (
             <PanelShell
               title="설정 · 엑셀"
-              description="PC 엑셀 연결, 샘플 데이터, 이 기기 저장 안내입니다. 브리핑 메일은 「오늘 브리핑」에서 설정합니다(아버지 네이버 메일 고정)."
+              description="앱 설치, PC 엑셀 연결, 이 기기 저장 안내입니다. 브리핑 메일은 「오늘 브리핑」에서 설정합니다(아버지 네이버 메일 고정)."
             >
               <div className="space-y-5">
+                <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
+                  <p className="text-sm font-semibold text-[var(--ink)]">
+                    앱처럼 설치하기
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                    홈 화면·시작 메뉴에 두면 브라우저 창 없이 일비서를 엽니다.
+                    할 일 데이터는 이 기기에 그대로 저장됩니다.
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--ink-muted)]">
+                    <li>
+                      <strong>Windows/Mac</strong>: Chrome·Edge → 주소창 설치
+                      아이콘 또는 메뉴 → 앱 설치
+                    </li>
+                    <li>
+                      <strong>안드로이드</strong>: Chrome 메뉴(⋮) → 앱 설치 /
+                      홈 화면에 추가
+                    </li>
+                    <li>
+                      <strong>아이폰</strong>: <strong>Safari</strong> → 공유 →
+                      홈 화면에 추가 (iOS는 Safari만 지원)
+                    </li>
+                  </ul>
+                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
+                    자세한 순서: 프로젝트 문서{" "}
+                    <code className="rounded bg-black/5 px-1">
+                      docs/install-as-app.md
+                    </code>
+                  </p>
+                </div>
                 <ExcelLinker
                   state={app.state}
                   linked={app.excelLinked}
@@ -247,7 +276,8 @@ export function AssistantApp() {
                   </p>
                   <p className="mt-1 text-sm text-[var(--ink-muted)]">
                     할 일·한 일은 이 브라우저(localStorage)에 저장됩니다. 장부
-                    UI와 PC xlsx 시트가 같은 구조입니다.
+                    UI와 PC xlsx 시트가 같은 구조입니다. 오프라인에서도 이미
+                    열어 둔 앱 화면과 저장된 할 일은 쓸 수 있습니다.
                   </p>
                   <Button
                     type="button"

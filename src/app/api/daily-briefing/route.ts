@@ -1,73 +1,21 @@
 import { NextResponse } from "next/server";
 import { buildDailyBriefing } from "@/lib/briefing";
 import { buildWorkbook, briefingFilename } from "@/lib/excel";
+import {
+  hasMailTransport,
+  mailTransportLabel,
+  sendBriefingEmail,
+} from "@/lib/mail";
 import type { CalendarEvent, SideListItem, Task } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-async function trySendEmail(opts: {
-  to: string;
-  subject: string;
-  text: string;
-  filename: string;
-  xlsxBase64: string;
-}): Promise<{ sent: boolean; detail: string }> {
-  const resendKey = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM || "일비서 <onboarding@resend.dev>";
-
-  if (resendKey) {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [opts.to],
-        subject: opts.subject,
-        text: opts.text,
-        attachments: [
-          {
-            filename: opts.filename,
-            content: opts.xlsxBase64,
-          },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      return { sent: false, detail: `Resend 오류: ${body.slice(0, 200)}` };
-    }
-    return { sent: true, detail: "Resend로 발송했습니다." };
-  }
-
-  if (process.env.SMTP_URL) {
-    return {
-      sent: false,
-      detail:
-        "SMTP_URL은 설정됐으나 이 슬라이스에서는 Resend만 구현되어 있습니다.",
-    };
-  }
-
-  return { sent: false, detail: "RESEND_API_KEY / SMTP_URL 없음" };
-}
-
 /**
  * POST /api/daily-briefing
- * Cron 예 (매일 08:00 KST ≈ 23:00 UTC 전날):
- *   0 23 * * * curl -X POST .../api/daily-briefing -H "Authorization: Bearer $CRON_SECRET" ...
+ * UI 테스트 발송·미리보기. 매일 크론은 /api/cron/daily-briefing 사용.
  */
 export async function POST(request: Request) {
   try {
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const auth = request.headers.get("authorization");
-      if (auth !== `Bearer ${cronSecret}`) {
-        // allow local UI without secret when body has client payload
-      }
-    }
-
     const body = (await request.json()) as {
       tasks?: Task[];
       calendarEvents?: CalendarEvent[];
@@ -76,6 +24,7 @@ export async function POST(request: Request) {
       send?: boolean;
       preferredHour?: string;
       workEmail?: string;
+      attachXlsx?: boolean;
     };
 
     const tasks = Array.isArray(body.tasks) ? body.tasks : [];
@@ -84,6 +33,7 @@ export async function POST(request: Request) {
       : [];
     const guidelines = Array.isArray(body.guidelines) ? body.guidelines : [];
     const habits = Array.isArray(body.habits) ? body.habits : [];
+    const attachXlsx = body.attachXlsx !== false;
 
     const briefing = buildDailyBriefing(
       tasks,
@@ -104,47 +54,52 @@ export async function POST(request: Request) {
 
     const wantsSend = Boolean(body.send);
     const email = (body.workEmail || "").trim();
-    const hasTransport = Boolean(
-      process.env.RESEND_API_KEY || process.env.SMTP_URL,
-    );
 
     let delivery: {
       status: string;
       message: string;
       preferredHour?: string;
+      transport?: string;
     };
 
     if (!wantsSend) {
       delivery = {
         status: "dry_run",
-        message: "발송하지 않음. JSON + xlsx(base64)만 반환.",
+        message:
+          "미리보기만 했습니다. 메일을 보내지 않았습니다. 「테스트 메일 보내기」를 누르면 실발송을 시도합니다.",
         preferredHour: body.preferredHour || "08:00",
+        transport: mailTransportLabel(),
       };
     } else if (!email) {
       delivery = {
         status: "skipped_no_address",
-        message: "업무용 이메일이 비어 있어 발송하지 않았습니다.",
+        message:
+          "업무용 이메일이 비어 있어 발송하지 않았습니다. 주소를 입력해 주세요.",
         preferredHour: body.preferredHour || "08:00",
+        transport: mailTransportLabel(),
       };
-    } else if (!hasTransport) {
+    } else if (!hasMailTransport()) {
       delivery = {
         status: "skipped_no_credentials",
         message:
-          "메일 전송 키가 없어 발송하지 않았습니다. RESEND_API_KEY를 설정하세요.",
+          "메일 키가 없어 발송하지 않았습니다. RESEND_API_KEY와 EMAIL_FROM을 서버 환경 변수에 넣으세요. (가짜 발송 없음)",
         preferredHour: body.preferredHour || "08:00",
+        transport: mailTransportLabel(),
       };
     } else {
-      const result = await trySendEmail({
+      const result = await sendBriefingEmail({
         to: email,
         subject: briefing.headline,
         text: briefing.plaintext,
         filename,
         xlsxBase64: base64,
+        attachXlsx,
       });
       delivery = {
         status: result.sent ? "sent" : "send_failed",
         message: result.detail,
         preferredHour: body.preferredHour || "08:00",
+        transport: mailTransportLabel(),
       };
     }
 
@@ -161,6 +116,8 @@ export async function POST(request: Request) {
         completedCount: briefing.completedCount,
         sections: briefing.sections,
         calendarLines: briefing.calendarLines,
+        guidelineLines: briefing.guidelineLines,
+        habitLines: briefing.habitLines,
       },
       excel: {
         filename,
@@ -170,7 +127,7 @@ export async function POST(request: Request) {
       },
       delivery,
       schedulerNote:
-        "매일 08:00 Asia/Seoul cron → 이 엔드포인트. 주소·Resend 확정 후 실발송.",
+        "매일 08:00 Asia/Seoul → GET/POST /api/cron/daily-briefing (vercel.json cron: 0 23 * * * UTC).",
     });
   } catch (e) {
     return NextResponse.json(
@@ -188,13 +145,8 @@ export async function GET() {
     ok: true,
     endpoint: "/api/daily-briefing",
     defaultHourKST: "08:00",
+    cronEndpoint: "/api/cron/daily-briefing",
     method: "POST",
-    body: {
-      tasks: [],
-      calendarEvents: [],
-      send: false,
-      workEmail: "",
-      preferredHour: "08:00",
-    },
+    env: ["RESEND_API_KEY", "EMAIL_FROM|MAIL_FROM", "CRON_SECRET"],
   });
 }

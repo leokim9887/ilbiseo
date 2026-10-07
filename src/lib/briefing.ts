@@ -1,5 +1,6 @@
 import {
   CATEGORY_LABEL,
+  CATEGORY_ORDER,
   KIND_LABEL,
   SIDE_LIST_LABEL,
   type CalendarEvent,
@@ -169,64 +170,59 @@ export function buildDailyBriefing(
   const parts: string[] = [
     headline,
     summaryLine,
-    "※ 【할 일】·【지침】·【습관】·【구글 캘린더】는 출처를 구분합니다.",
+    "※ 【할 일】(틀별) · 【지침】 · 【습관】 · 【구글 캘린더】를 구분합니다.",
     "",
     "【할 일】",
   ];
 
-  for (const section of sections) {
-    parts.push(section.title);
-    let lastGroup = "";
-    for (const line of section.lines) {
-      if (line.groupKey && line.groupKey !== lastGroup) {
-        parts.push(`  〔${line.categoryLabel} · ${line.groupKey}〕`);
-        lastGroup = line.groupKey;
-      }
-      const meta = [
-        line.priorityTag,
-        line.categoryLabel,
-        `중요 ${line.importance}(${line.importanceLabel})`,
-        `시급 ${line.urgency}(${line.urgencyLabel})`,
-        line.targetDate ? `기한 ${line.targetDate}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      parts.push(`  ☐ ${line.title}`);
-      parts.push(`    ${meta}`);
-      if (line.memo) parts.push(`    메모: ${line.memo}`);
-    }
-    parts.push("");
-  }
-
-  if (sections.length === 0) {
+  // Group by 틀 (category), then by kind section order for readability
+  const allLines = sections.flatMap((s) => s.lines);
+  if (allLines.length === 0) {
     parts.push("  (활성 할 일 없음)");
     parts.push("");
+  } else {
+    for (const cat of CATEGORY_ORDER) {
+      const catLines = allLines.filter((l) => l.category === cat);
+      if (catLines.length === 0) continue;
+      parts.push(`〔${CATEGORY_LABEL[cat]}〕`);
+      for (const line of catLines) {
+        const meta = [
+          line.priorityTag,
+          line.kindLabel,
+          `중요 ${line.importance}(${line.importanceLabel})`,
+          `시급 ${line.urgency}(${line.urgencyLabel})`,
+          line.targetDate ? `기한 ${line.targetDate}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        parts.push(`  ☐ ${line.title}`);
+        parts.push(`    ${meta}`);
+        if (line.memo) parts.push(`    메모: ${line.memo}`);
+      }
+      parts.push("");
+    }
   }
 
-  const pushSideBlock = (
-    kind: "guideline" | "habit",
-    lines: { title: string; memo: string; done: boolean }[],
-  ) => {
-    parts.push(`【${SIDE_LIST_LABEL[kind]}】`);
-    if (lines.length === 0) {
-      parts.push("  (없음)");
-      parts.push("");
-      return;
-    }
-    for (const line of lines) {
+  if (guidelineLines.length > 0) {
+    parts.push(`【${SIDE_LIST_LABEL.guideline}】`);
+    for (const line of guidelineLines) {
       parts.push(`  ${line.done ? "☑" : "☐"} ${line.title}`);
       if (line.memo) parts.push(`    메모: ${line.memo}`);
     }
     parts.push("");
-  };
+  }
 
-  pushSideBlock("guideline", guidelineLines);
-  pushSideBlock("habit", habitLines);
+  if (habitLines.length > 0) {
+    parts.push(`【${SIDE_LIST_LABEL.habit}】`);
+    for (const line of habitLines) {
+      parts.push(`  ${line.done ? "☑" : "☐"} ${line.title}`);
+      if (line.memo) parts.push(`    메모: ${line.memo}`);
+    }
+    parts.push("");
+  }
 
-  parts.push("【구글 캘린더】");
-  if (calendarLines.length === 0) {
-    parts.push("  (근접 일정 없음)");
-  } else {
+  if (calendarLines.length > 0) {
+    parts.push("【구글 캘린더】");
     for (const c of calendarLines) {
       const cal = c.calendarName ? ` · ${c.calendarName}` : "";
       parts.push(`  • ${c.when}  ${c.title}${cal}`);
@@ -252,13 +248,20 @@ export function buildDailyBriefing(
 export const SETTINGS_KEY = "ilbiseo-settings-v1";
 
 export type AppSettings = {
+  /** Display / documentation — cron is fixed 08:00 KST */
   briefingHour: string;
   workEmail: string;
+  /** When true, client syncs snapshot for Vercel/local cron */
+  dailyEmailEnabled: boolean;
+  /** Attach xlsx snapshot to outbound mail */
+  attachXlsx: boolean;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
   briefingHour: "08:00",
   workEmail: "",
+  dailyEmailEnabled: false,
+  attachXlsx: true,
 };
 
 export function loadSettings(): AppSettings {
@@ -270,6 +273,11 @@ export function loadSettings(): AppSettings {
     return {
       briefingHour: parsed.briefingHour || DEFAULT_SETTINGS.briefingHour,
       workEmail: parsed.workEmail ?? "",
+      dailyEmailEnabled: Boolean(parsed.dailyEmailEnabled),
+      attachXlsx:
+        parsed.attachXlsx === undefined
+          ? DEFAULT_SETTINGS.attachXlsx
+          : Boolean(parsed.attachXlsx),
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

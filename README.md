@@ -8,8 +8,8 @@
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-express-nitrogen-qc9zc7i.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=90fac156-63f2-4239-aa59-e54f1b734dc5  
+   https://temporary-agile-flint-y3rzy9j.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=e4c6e164-2c43-414e-9a34-e621a6cdb2f4  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  
@@ -27,7 +27,7 @@ npm run start -- -p 4317
 
 3. **엑셀**: 노트북 Chrome → **설정·엑셀** → 「엑셀 파일 연결」  
 4. **구글 캘린더**: **캘린더** 메뉴 (할 일 표와 별도). 키 없으면 mock·ICS. 키 있으면 「Google 캘린더 연결」. 안내: store `docs/google-calendar-setup.md`  
-5. **08:00 메일**: 업무 이메일 + `RESEND_API_KEY` 필요 (없으면 dry-run만)
+5. **08:00 메일**: **오늘 브리핑**에서 이메일·매일 발송·테스트 메일. 안내: store `docs/daily-email-briefing.md`
 
 ## 아버지용 빠른 안내
 
@@ -51,8 +51,9 @@ npm run start -- -p 4317
 
 ### 4) 매일 08:00 이메일 브리핑
 1. **오늘 브리핑**에서 업무용 이메일을 넣는다.  
-2. 기본 **08:00** · `RESEND_API_KEY` 있으면 실발송, 없으면 dry-run.  
-3. 캘린더 일정이 있으면 **【구글 캘린더】** 블록이 할 일과 따로 포함됩니다.
+2. **테스트 메일 보내기**로 확인 · **매일 08:00 자동 발송**을 켠다.  
+3. 서버 환경 변수: `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, (Vercel) Upstash.  
+4. 단계별: `/cursor/stores/self/docs/daily-email-briefing.md`
 
 ## 로컬 실행
 
@@ -72,11 +73,17 @@ GOOGLE_REDIRECT_URI=http://127.0.0.1:4317/api/google/callback
 TOKEN_ENCRYPTION_SECRET=   # 선택
 NEXT_PUBLIC_APP_URL=http://127.0.0.1:4317
 
-# 브리핑 메일 (선택)
+# 브리핑 메일
 RESEND_API_KEY=re_xxx
-MAIL_FROM="일비서 <you@domain.com>"
-CRON_SECRET=optional
+EMAIL_FROM="일비서 <you@domain.com>"
+CRON_SECRET=long-random
+# Vercel 크론 스냅샷 저장
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 ```
+
+크론: `vercel.json` → `0 23 * * *` UTC = 08:00 KST → `/api/cron/daily-briefing`  
+(익명 임시 배포에는 cron이 비활성. Claim/프로덕션 배포 후 동작.)
 
 ## 지금 되는 것 / 대기
 
@@ -84,7 +91,7 @@ CRON_SECRET=optional
 |--------|---------------------|
 | 4틀 + 구글 캘린더 틀 + 장부 아래 지침·습관 + 기간필터 + 중요 1–3 | 업무 이메일 주소 |
 | 캘린더 별도 패널 + OAuth 코드 경로 + mock/ICS | Google Cloud에 키 넣고 실연결 |
-| 브리핑 【구글 캘린더】 분리 블록 · xlsx · API dry-run | Resend로 08:00 실발송 |
+| 브리핑 UI · 테스트 메일 · 스냅샷 동기화 · cron 엔드포인트 | Resend + EMAIL_FROM + (Vercel) Upstash + Claim |
 | PC 엑셀 연결(브라우저 FS Access) | 아버지 PC에서 연결 |
 
 ## 스택

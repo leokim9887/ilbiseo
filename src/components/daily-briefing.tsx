@@ -14,6 +14,10 @@ import {
   briefingFilename,
   downloadXlsx,
 } from "@/lib/excel";
+import {
+  formatNextBriefingKo,
+  nextBriefingUtc,
+} from "@/lib/schedule-kst";
 import { PanelShell } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +38,33 @@ interface DailyBriefingPanelProps {
   onAfterExport?: () => void;
 }
 
+async function syncSnapshot(
+  settings: AppSettings,
+  payload: {
+    tasks: Task[];
+    calendarEvents: CalendarEvent[];
+    guidelines: SideListItem[];
+    habits: SideListItem[];
+  },
+) {
+  const res = await fetch("/api/briefing-snapshot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...payload,
+      workEmail: settings.workEmail,
+      dailyEmailEnabled: settings.dailyEmailEnabled,
+      attachXlsx: settings.attachXlsx,
+    }),
+  });
+  return (await res.json()) as {
+    ok: boolean;
+    message?: string;
+    store?: string;
+    error?: string;
+  };
+}
+
 export function DailyBriefingPanel({
   tasks,
   calendarEvents,
@@ -44,15 +75,25 @@ export function DailyBriefingPanel({
   const [settings, setSettings] = useState<AppSettings>({
     briefingHour: "08:00",
     workEmail: "",
+    dailyEmailEnabled: false,
+    attachXlsx: true,
   });
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
-  const [busy, setBusy] = useState<"none" | "gen" | "xlsx" | "api">("none");
+  const [busy, setBusy] = useState<
+    "none" | "gen" | "xlsx" | "api" | "sync"
+  >("none");
   const [apiNote, setApiNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   useEffect(() => {
     setSettings(loadSettings());
   }, []);
+
+  const nextLabel = useMemo(
+    () => formatNextBriefingKo(nextBriefingUtc(8, 0)),
+    [],
+  );
 
   const preview = useMemo(
     () =>
@@ -66,12 +107,44 @@ export function DailyBriefingPanel({
     saveSettings(next);
   };
 
+  // Keep server snapshot fresh when daily send is on
+  useEffect(() => {
+    if (!settings.dailyEmailEnabled) return;
+    const t = setTimeout(() => {
+      void syncSnapshot(settings, {
+        tasks,
+        calendarEvents,
+        guidelines,
+        habits,
+      }).then((r) => {
+        setSyncNote(
+          r.ok
+            ? `서버 동기화됨 · ${r.store ?? ""} · ${r.message ?? ""}`
+            : `동기화 실패 · ${r.error || r.message || ""}`,
+        );
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [
+    settings,
+    tasks,
+    calendarEvents,
+    guidelines,
+    habits,
+  ]);
+
   const generate = () => {
     setBusy("gen");
     setError(null);
     try {
       setBriefing(
-        buildDailyBriefing(tasks, calendarEvents, undefined, guidelines, habits),
+        buildDailyBriefing(
+          tasks,
+          calendarEvents,
+          undefined,
+          guidelines,
+          habits,
+        ),
       );
       setApiNote(null);
     } catch (e) {
@@ -109,11 +182,18 @@ export function DailyBriefingPanel({
     }
   };
 
-  const dryRunApi = async (send: boolean) => {
+  const callApi = async (send: boolean) => {
     setBusy("api");
     setError(null);
     setApiNote(null);
     try {
+      // Sync first so cron has latest data
+      await syncSnapshot(settings, {
+        tasks,
+        calendarEvents,
+        guidelines,
+        habits,
+      });
       const res = await fetch("/api/daily-briefing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -123,24 +203,36 @@ export function DailyBriefingPanel({
           guidelines,
           habits,
           send,
-          preferredHour: settings.briefingHour,
+          preferredHour: "08:00",
           workEmail: settings.workEmail,
+          attachXlsx: settings.attachXlsx,
         }),
       });
       const data = (await res.json()) as {
         ok: boolean;
         error?: string;
-        delivery?: { status: string; message: string };
+        delivery?: { status: string; message: string; transport?: string };
         excel?: { filename: string };
+        briefing?: { plaintext?: string };
       };
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "API 호출 실패");
       }
       setBriefing(
-        buildDailyBriefing(tasks, calendarEvents, undefined, guidelines, habits),
+        buildDailyBriefing(
+          tasks,
+          calendarEvents,
+          undefined,
+          guidelines,
+          habits,
+        ),
       );
       setApiNote(
-        `${send ? "발송 시도" : "dry-run"} · ${data.delivery?.status} · ${data.delivery?.message}`,
+        `${send ? "테스트 메일" : "미리보기"} · ${data.delivery?.status} · ${data.delivery?.message}${
+          data.delivery?.transport
+            ? ` · 전송=${data.delivery.transport}`
+            : ""
+        }`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "API 호출 실패");
@@ -149,10 +241,31 @@ export function DailyBriefingPanel({
     }
   };
 
+  const forceSync = async () => {
+    setBusy("sync");
+    setError(null);
+    try {
+      const r = await syncSnapshot(settings, {
+        tasks,
+        calendarEvents,
+        guidelines,
+        habits,
+      });
+      setSyncNote(
+        r.ok
+          ? `서버 동기화됨 · ${r.store ?? ""} · ${r.message ?? ""}`
+          : `동기화 실패 · ${r.error || r.message || ""}`,
+      );
+      if (!r.ok) setError(r.error || r.message || "동기화 실패");
+    } finally {
+      setBusy("none");
+    }
+  };
+
   return (
     <PanelShell
-      title="오늘 브리핑"
-      description="매일 08:00(KST) 목표. 할 일과 구글 캘린더를 구분해서 읽기 쉽게 정리합니다."
+      title="오늘 브리핑 · 매일 메일"
+      description="매일 아침 08:00(한국 시간)에 업무 메일로 할 일·캘린더·지침·습관을 보냅니다. 키가 없으면 발송하지 않고 안내만 합니다."
       icon={<Newspaper className="size-5" />}
       actions={
         <>
@@ -185,67 +298,123 @@ export function DailyBriefingPanel({
       }
     >
       <div className="space-y-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="brief-hour" className="text-xs">
-              발송 시각 (표시·cron용)
-            </Label>
-            <Input
-              id="brief-hour"
-              type="time"
-              value={settings.briefingHour}
-              onChange={(e) =>
-                persistSettings({ ...settings, briefingHour: e.target.value })
-              }
-              className="h-11"
-            />
-          </div>
+        <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-4 space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="work-email" className="text-xs">
-              업무용 이메일 (비우면 dry-run만)
+              아버지 업무용 이메일
             </Label>
             <Input
               id="work-email"
               type="email"
-              placeholder="work@example.com"
+              placeholder="예: father@company.com (아직 모르면 비워 두세요)"
               value={settings.workEmail}
               onChange={(e) =>
                 persistSettings({ ...settings, workEmail: e.target.value })
               }
               className="h-11"
+              autoComplete="email"
             />
           </div>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="lg"
-            className="min-h-11"
-            variant="outline"
-            onClick={() => dryRunApi(false)}
-            disabled={busy !== "none"}
-          >
-            API dry-run
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            className="min-h-11"
-            variant="outline"
-            onClick={() => dryRunApi(true)}
-            disabled={busy !== "none"}
-          >
-            <Mail className="size-4" />
-            메일 시도
-          </Button>
-        </div>
+          <label className="flex items-start gap-3 text-sm text-[var(--ink)]">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 accent-[var(--brand)]"
+              checked={settings.dailyEmailEnabled}
+              onChange={(e) =>
+                persistSettings({
+                  ...settings,
+                  dailyEmailEnabled: e.target.checked,
+                })
+              }
+            />
+            <span>
+              <span className="font-semibold">매일 08:00(KST) 자동 발송</span>
+              <span className="mt-0.5 block text-[12px] text-[var(--ink-muted)]">
+                켜면 이 기기의 할 일·캘린더를 서버에 동기화해 크론이 보낼 수
+                있습니다. Vercel에서는 Upstash Redis도 필요합니다.
+              </span>
+            </span>
+          </label>
 
-        <p className="text-[12px] text-[var(--ink-muted)]">
-          기본 {settings.briefingHour} · 주소{" "}
-          {settings.workEmail || "(미입력 → 발송 안 함)"} · Resend/SMTP 없으면
-          dry-run
-        </p>
+          <label className="flex items-start gap-3 text-sm text-[var(--ink)]">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 accent-[var(--brand)]"
+              checked={settings.attachXlsx}
+              onChange={(e) =>
+                persistSettings({
+                  ...settings,
+                  attachXlsx: e.target.checked,
+                })
+              }
+            />
+            <span>
+              <span className="font-semibold">엑셀(xlsx) 첨부</span>
+              <span className="mt-0.5 block text-[12px] text-[var(--ink-muted)]">
+                당일 스냅샷 파일을 메일 첨부합니다.
+              </span>
+            </span>
+          </label>
+
+          <p className="text-[13px] text-[var(--ink)]">
+            다음 예정:{" "}
+            <strong className="tabular-nums">{nextLabel}</strong>
+            <span className="text-[var(--ink-muted)]">
+              {" "}
+              (Asia/Seoul 08:00 · UTC cron 23:00)
+            </span>
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="lg"
+              className="min-h-11"
+              onClick={() => callApi(true)}
+              disabled={busy !== "none"}
+            >
+              {busy === "api" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Mail className="size-4" />
+              )}
+              테스트 메일 보내기
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              className="min-h-11"
+              variant="outline"
+              onClick={() => callApi(false)}
+              disabled={busy !== "none"}
+            >
+              미리보기(발송 안 함)
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              className="min-h-11"
+              variant="outline"
+              onClick={forceSync}
+              disabled={busy !== "none"}
+            >
+              {busy === "sync" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              서버에 지금 동기화
+            </Button>
+          </div>
+
+          <p className="text-[12px] text-[var(--ink-muted)]">
+            주소 {settings.workEmail || "(미입력)"} · 매일 발송{" "}
+            {settings.dailyEmailEnabled ? "켜짐" : "꺼짐"} · 키가 없으면 메일을
+            보내지 않습니다.
+          </p>
+          {syncNote ? (
+            <p className="text-[12px] text-[var(--ink-muted)]">{syncNote}</p>
+          ) : null}
+        </div>
 
         {error ? (
           <p
@@ -320,13 +489,41 @@ export function DailyBriefingPanel({
               )}
             </section>
 
-            <section className="px-4 py-3">
-              <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
-                【구글 캘린더】
-              </h4>
-              {preview.calendarLines.length === 0 ? (
-                <p className="text-sm text-[var(--ink-muted)]">근접 일정 없음</p>
-              ) : (
+            {preview.guidelineLines.length > 0 ? (
+              <section className="px-4 py-3">
+                <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
+                  【지침】
+                </h4>
+                <ul className="space-y-1 text-sm">
+                  {preview.guidelineLines.map((g, i) => (
+                    <li key={`g-${i}`}>
+                      {g.done ? "☑" : "☐"} {g.title}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {preview.habitLines.length > 0 ? (
+              <section className="px-4 py-3">
+                <h4 className="mb-2 text-sm font-semibold text-[#2d7a4f]">
+                  【습관】
+                </h4>
+                <ul className="space-y-1 text-sm">
+                  {preview.habitLines.map((h, i) => (
+                    <li key={`h-${i}`}>
+                      {h.done ? "☑" : "☐"} {h.title}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {preview.calendarLines.length > 0 ? (
+              <section className="px-4 py-3">
+                <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
+                  【구글 캘린더】
+                </h4>
                 <ul className="space-y-1.5">
                   {preview.calendarLines.map((c, i) => (
                     <li key={`${c.title}-${i}`} className="text-sm">
@@ -341,8 +538,8 @@ export function DailyBriefingPanel({
                     </li>
                   ))}
                 </ul>
-              )}
-            </section>
+              </section>
+            ) : null}
           </div>
         </article>
       </div>

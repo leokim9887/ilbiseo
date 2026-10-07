@@ -3,6 +3,7 @@ import { buildDailyBriefing } from "@/lib/briefing";
 import { loadBriefingSnapshot, snapshotStoreMode } from "@/lib/briefing-store";
 import { buildWorkbook, briefingFilename } from "@/lib/excel";
 import {
+  FATHER_EMAIL,
   authorizeCron,
   hasMailTransport,
   mailTransportLabel,
@@ -43,15 +44,7 @@ async function runCron(request: Request) {
     });
   }
 
-  const email = snapshot.workEmail.trim();
-  if (!email) {
-    return NextResponse.json({
-      ok: true,
-      skipped: true,
-      reason: "업무용 이메일이 비어 있습니다.",
-      updatedAt: snapshot.updatedAt,
-    });
-  }
+  const email = FATHER_EMAIL;
 
   if (!hasMailTransport()) {
     return NextResponse.json({
@@ -60,8 +53,9 @@ async function runCron(request: Request) {
       delivery: {
         status: "skipped_no_credentials",
         message:
-          "RESEND_API_KEY가 없어 발송하지 않았습니다. (가짜 발송 없음)",
+          "네이버 앱 비밀번호(NAVER_SMTP_PASSWORD)가 없어 발송하지 않았습니다. (가짜 발송 없음)",
         transport: mailTransportLabel(),
+        to: email,
       },
       updatedAt: snapshot.updatedAt,
     });

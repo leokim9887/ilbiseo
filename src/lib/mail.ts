@@ -1,87 +1,176 @@
-/** Shared Resend / SMTP mail helpers for daily briefing. */
+import nodemailer from "nodemailer";
+import { FATHER_EMAIL, FATHER_FROM } from "@/lib/father-mail";
+
+export { FATHER_EMAIL, FATHER_FROM };
+
+function naverSmtpPassword(): string {
+  return (
+    process.env.NAVER_SMTP_PASSWORD ||
+    process.env.SMTP_PASS ||
+    process.env.SMTP_PASSWORD ||
+    ""
+  ).trim();
+}
 
 export function mailFromAddress(): string {
+  return process.env.EMAIL_FROM || process.env.MAIL_FROM || FATHER_FROM;
+}
+
+function resendFallbackAllowed(): boolean {
   return (
-    process.env.EMAIL_FROM ||
-    process.env.MAIL_FROM ||
-    "일비서 <onboarding@resend.dev>"
+    process.env.ALLOW_RESEND_FALLBACK === "1" &&
+    Boolean(process.env.RESEND_API_KEY)
   );
 }
 
 export function hasMailTransport(): boolean {
-  return Boolean(process.env.RESEND_API_KEY || process.env.SMTP_URL);
+  return Boolean(naverSmtpPassword() || resendFallbackAllowed());
 }
 
 export function mailTransportLabel(): string {
-  if (process.env.RESEND_API_KEY) return "Resend";
-  if (process.env.SMTP_URL) return "SMTP";
+  if (naverSmtpPassword()) return "네이버 SMTP";
+  if (resendFallbackAllowed()) return "Resend(보조)";
   return "없음";
 }
 
-export async function sendBriefingEmail(opts: {
+async function sendViaNaverSmtp(opts: {
   to: string;
+  subject: string;
+  text: string;
+  filename: string;
+  xlsxBase64: string;
+  attachXlsx: boolean;
+}): Promise<{ sent: boolean; detail: string }> {
+  const pass = naverSmtpPassword();
+  if (!pass) {
+    return {
+      sent: false,
+      detail:
+        "네이버 앱 비밀번호가 없습니다. 서버 환경 변수 NAVER_SMTP_PASSWORD(또는 SMTP_PASS)에 네이버 메일 애플리케이션 비밀번호를 넣으세요. (가짜 발송 없음)",
+    };
+  }
+
+  const port = Number(process.env.NAVER_SMTP_PORT || "465");
+  const secure = port === 465;
+  const transporter = nodemailer.createTransport({
+    host: process.env.NAVER_SMTP_HOST || "smtp.naver.com",
+    port,
+    secure,
+    auth: {
+      user: process.env.NAVER_SMTP_USER || FATHER_EMAIL,
+      pass,
+    },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: mailFromAddress(),
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      attachments: opts.attachXlsx
+        ? [
+            {
+              filename: opts.filename,
+              content: Buffer.from(opts.xlsxBase64, "base64"),
+              contentType:
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            },
+          ]
+        : [],
+    });
+    return {
+      sent: true,
+      detail: "네이버 SMTP로 메일을 보냈습니다.",
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      sent: false,
+      detail: `네이버 SMTP 오류: ${msg.slice(0, 280)}`,
+    };
+  }
+}
+
+async function sendViaResendFallback(opts: {
+  to: string;
+  subject: string;
+  text: string;
+  filename: string;
+  xlsxBase64: string;
+  attachXlsx: boolean;
+}): Promise<{ sent: boolean; detail: string }> {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    return { sent: false, detail: "Resend 키가 없습니다." };
+  }
+  const payload: Record<string, unknown> = {
+    from: mailFromAddress(),
+    to: [opts.to],
+    subject: opts.subject,
+    text: opts.text,
+  };
+  if (opts.attachXlsx) {
+    payload.attachments = [
+      { filename: opts.filename, content: opts.xlsxBase64 },
+    ];
+  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    return {
+      sent: false,
+      detail: `Resend 오류(${res.status}): ${body.slice(0, 240)}`,
+    };
+  }
+  return { sent: true, detail: "Resend(보조)로 메일을 보냈습니다." };
+}
+
+export async function sendBriefingEmail(opts: {
+  to?: string;
   subject: string;
   text: string;
   filename: string;
   xlsxBase64: string;
   attachXlsx?: boolean;
 }): Promise<{ sent: boolean; detail: string }> {
-  const resendKey = process.env.RESEND_API_KEY;
-  const from = mailFromAddress();
-  const attach = opts.attachXlsx !== false;
+  const to = (opts.to || FATHER_EMAIL).trim() || FATHER_EMAIL;
+  const attachXlsx = opts.attachXlsx !== false;
+  const payload = {
+    to,
+    subject: opts.subject,
+    text: opts.text,
+    filename: opts.filename,
+    xlsxBase64: opts.xlsxBase64,
+    attachXlsx,
+  };
 
-  if (resendKey) {
-    const payload: Record<string, unknown> = {
-      from,
-      to: [opts.to],
-      subject: opts.subject,
-      text: opts.text,
-    };
-    if (attach) {
-      payload.attachments = [
-        {
-          filename: opts.filename,
-          content: opts.xlsxBase64,
-        },
-      ];
-    }
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      return {
-        sent: false,
-        detail: `Resend 오류(${res.status}): ${body.slice(0, 240)}`,
-      };
-    }
-    return { sent: true, detail: "Resend로 메일을 보냈습니다." };
+  // Naver SMTP first (father-only). No silent Resend fallback.
+  if (naverSmtpPassword()) {
+    return sendViaNaverSmtp(payload);
   }
 
-  if (process.env.SMTP_URL) {
-    return {
-      sent: false,
-      detail:
-        "SMTP_URL은 설정되어 있으나 현재는 Resend(RESEND_API_KEY)만 지원합니다. Resend 키를 넣어 주세요.",
-    };
+  if (resendFallbackAllowed()) {
+    return sendViaResendFallback(payload);
   }
 
   return {
     sent: false,
     detail:
-      "메일 키가 없습니다. RESEND_API_KEY와 EMAIL_FROM(또는 MAIL_FROM)을 설정하세요.",
+      "네이버 앱 비밀번호가 없습니다. NAVER_SMTP_PASSWORD(또는 SMTP_PASS)를 설정하세요. 네이버 메일 → 환경설정 → POP3/IMAP → SMTP·애플리케이션 비밀번호. (가짜 발송 없음)",
   };
 }
 
 export function authorizeCron(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
-    // Local / unconfigured: allow only when not on Vercel production
     if (process.env.VERCEL === "1") return false;
     return true;
   }

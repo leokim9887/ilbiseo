@@ -8,8 +8,8 @@
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-speedy-gorge-li49z5c.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=a7de081d-6838-4e05-91be-120fd1c6daed  
+   https://temporary-snappy-cello-g9cb0ou.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=e79a1448-c9c5-4b88-8f8e-d65cb7611cf3  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  
@@ -49,10 +49,10 @@ npm run start -- -p 4317
 - 없으면 **mock 샘플** 또는 **ICS**로 확인.  
 - 자세한 단계: `/cursor/stores/self/docs/google-calendar-setup.md`
 
-### 4) 매일 08:00 이메일 브리핑
-1. **오늘 브리핑**에서 업무용 이메일을 넣는다.  
-2. **테스트 메일 보내기**로 확인 · **매일 08:00 자동 발송**을 켠다.  
-3. 서버 환경 변수: `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, (Vercel) Upstash.  
+### 4) 매일 08:00 이메일 브리핑 (네이버 SMTP)
+1. 수신·발신 고정: `goldage77@naver.com`  
+2. 네이버 **애플리케이션 비밀번호** → `NAVER_SMTP_PASSWORD`  
+3. **오늘 브리핑** → **테스트 메일 보내기** · 매일 발송 켜기  
 4. 단계별: `/cursor/stores/self/docs/daily-email-briefing.md`
 
 ## 로컬 실행
@@ -73,11 +73,10 @@ GOOGLE_REDIRECT_URI=http://127.0.0.1:4317/api/google/callback
 TOKEN_ENCRYPTION_SECRET=   # 선택
 NEXT_PUBLIC_APP_URL=http://127.0.0.1:4317
 
-# 브리핑 메일
-RESEND_API_KEY=re_xxx
-EMAIL_FROM="일비서 <you@domain.com>"
+# 브리핑 메일 (네이버 SMTP)
+NAVER_SMTP_PASSWORD=   # 네이버 앱 비밀번호 — git에 넣지 마세요
+EMAIL_FROM="일비서 <goldage77@naver.com>"
 CRON_SECRET=long-random
-# Vercel 크론 스냅샷 저장
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 ```
@@ -87,11 +86,11 @@ UPSTASH_REDIS_REST_TOKEN=
 
 ## 지금 되는 것 / 대기
 
-| 되는 것 | 대기(아버지 확정·키) |
-|--------|---------------------|
-| 4틀 + 구글 캘린더 틀 + 장부 아래 지침·습관 + 기간필터 + 중요 1–3 | 업무 이메일 주소 |
-| 캘린더 별도 패널 + OAuth 코드 경로 + mock/ICS | Google Cloud에 키 넣고 실연결 |
-| 브리핑 UI · 테스트 메일 · 스냅샷 동기화 · cron 엔드포인트 | Resend + EMAIL_FROM + (Vercel) Upstash + Claim |
+| 되는 것 | 대기 |
+|--------|------|
+| 4틀 + 구글 캘린더 틀 + 장부 아래 지침·습관 + 기간필터 + 중요 1–3 | — |
+| 캘린더 별도 패널 + OAuth 코드 경로 + mock/ICS | Google Cloud 키 |
+| 브리핑 UI · 네이버 SMTP 경로 · 스냅샷·cron | `NAVER_SMTP_PASSWORD` + Claim + Upstash |
 | PC 엑셀 연결(브라우저 FS Access) | 아버지 PC에서 연결 |
 
 ## 스택

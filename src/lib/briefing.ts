@@ -259,7 +259,7 @@ export type AppSettings = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   briefingHour: "08:00",
-  workEmail: "goldage77@naver.com",
+  workEmail: "goldage77@naver.com", // keep in sync with FATHER_EMAIL
   dailyEmailEnabled: false,
   attachXlsx: true,
 };

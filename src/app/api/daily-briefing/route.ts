@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildDailyBriefing } from "@/lib/briefing";
 import { buildWorkbook, briefingFilename } from "@/lib/excel";
 import {
+  FATHER_EMAIL,
   hasMailTransport,
   mailTransportLabel,
   sendBriefingEmail,
@@ -53,38 +54,33 @@ export async function POST(request: Request) {
     const filename = briefingFilename(briefing.date);
 
     const wantsSend = Boolean(body.send);
-    const email = (body.workEmail || "").trim();
+    const email = FATHER_EMAIL;
 
     let delivery: {
       status: string;
       message: string;
       preferredHour?: string;
       transport?: string;
+      to?: string;
     };
 
     if (!wantsSend) {
       delivery = {
         status: "dry_run",
         message:
-          "미리보기만 했습니다. 메일을 보내지 않았습니다. 「테스트 메일 보내기」를 누르면 실발송을 시도합니다.",
+          "미리보기만 했습니다. 메일을 보내지 않았습니다. 「테스트 메일 보내기」를 누르면 네이버 SMTP로 실발송을 시도합니다.",
         preferredHour: body.preferredHour || "08:00",
         transport: mailTransportLabel(),
-      };
-    } else if (!email) {
-      delivery = {
-        status: "skipped_no_address",
-        message:
-          "업무용 이메일이 비어 있어 발송하지 않았습니다. 주소를 입력해 주세요.",
-        preferredHour: body.preferredHour || "08:00",
-        transport: mailTransportLabel(),
+        to: email,
       };
     } else if (!hasMailTransport()) {
       delivery = {
         status: "skipped_no_credentials",
         message:
-          "메일 키가 없어 발송하지 않았습니다. RESEND_API_KEY와 EMAIL_FROM을 서버 환경 변수에 넣으세요. (가짜 발송 없음)",
+          "네이버 앱 비밀번호가 없어 발송하지 않았습니다. NAVER_SMTP_PASSWORD(또는 SMTP_PASS)를 설정하세요. (가짜 발송 없음)",
         preferredHour: body.preferredHour || "08:00",
         transport: mailTransportLabel(),
+        to: email,
       };
     } else {
       const result = await sendBriefingEmail({
@@ -100,6 +96,7 @@ export async function POST(request: Request) {
         message: result.detail,
         preferredHour: body.preferredHour || "08:00",
         transport: mailTransportLabel(),
+        to: email,
       };
     }
 
@@ -147,6 +144,12 @@ export async function GET() {
     defaultHourKST: "08:00",
     cronEndpoint: "/api/cron/daily-briefing",
     method: "POST",
-    env: ["RESEND_API_KEY", "EMAIL_FROM|MAIL_FROM", "CRON_SECRET"],
+    env: [
+      "NAVER_SMTP_PASSWORD|SMTP_PASS",
+      "CRON_SECRET",
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+    ],
+    fatherEmail: FATHER_EMAIL,
   });
 }

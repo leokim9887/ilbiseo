@@ -231,7 +231,7 @@ export function AssistantApp() {
           {view === "settings" ? (
             <PanelShell
               title="설정 · 엑셀"
-              description="PC 엑셀 연결, 샘플 데이터, 이 기기 저장 안내입니다. 브리핑 메일 주소는 「오늘 브리핑」에서도 바꿀 수 있습니다."
+              description="PC 엑셀 연결, 샘플 데이터, 이 기기 저장 안내입니다. 브리핑 메일은 「오늘 브리핑」에서 설정합니다(아버지 네이버 메일 고정)."
             >
               <div className="space-y-5">
                 <ExcelLinker

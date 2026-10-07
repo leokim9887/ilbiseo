@@ -18,6 +18,7 @@ import {
   formatNextBriefingKo,
   nextBriefingUtc,
 } from "@/lib/schedule-kst";
+import { FATHER_EMAIL } from "@/lib/father-mail";
 import { PanelShell } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,7 +75,7 @@ export function DailyBriefingPanel({
 }: DailyBriefingPanelProps) {
   const [settings, setSettings] = useState<AppSettings>({
     briefingHour: "08:00",
-    workEmail: "",
+    workEmail: FATHER_EMAIL,
     dailyEmailEnabled: false,
     attachXlsx: true,
   });
@@ -87,7 +88,10 @@ export function DailyBriefingPanel({
   const [syncNote, setSyncNote] = useState<string | null>(null);
 
   useEffect(() => {
-    setSettings(loadSettings());
+    const loaded = loadSettings();
+    const locked = { ...loaded, workEmail: FATHER_EMAIL };
+    setSettings(locked);
+    saveSettings(locked);
   }, []);
 
   const nextLabel = useMemo(
@@ -103,8 +107,9 @@ export function DailyBriefingPanel({
   );
 
   const persistSettings = (next: AppSettings) => {
-    setSettings(next);
-    saveSettings(next);
+    const locked = { ...next, workEmail: FATHER_EMAIL };
+    setSettings(locked);
+    saveSettings(locked);
   };
 
   // Keep server snapshot fresh when daily send is on
@@ -265,7 +270,7 @@ export function DailyBriefingPanel({
   return (
     <PanelShell
       title="오늘 브리핑 · 매일 메일"
-      description="매일 아침 08:00(한국 시간)에 업무 메일로 할 일·캘린더·지침·습관을 보냅니다. 키가 없으면 발송하지 않고 안내만 합니다."
+      description="매일 아침 08:00(한국 시간)에 네이버 메일로 할 일·캘린더·지침·습관을 보냅니다. 네이버 앱 비밀번호가 없으면 발송하지 않습니다."
       icon={<Newspaper className="size-5" />}
       actions={
         <>
@@ -301,19 +306,19 @@ export function DailyBriefingPanel({
         <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-4 space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="work-email" className="text-xs">
-              아버지 업무용 이메일
+              아버지 메일 (고정)
             </Label>
             <Input
               id="work-email"
               type="email"
-              placeholder="goldage77@naver.com"
-              value={settings.workEmail}
-              onChange={(e) =>
-                persistSettings({ ...settings, workEmail: e.target.value })
-              }
-              className="h-11"
-              autoComplete="email"
+              value={FATHER_EMAIL}
+              readOnly
+              aria-readonly="true"
+              className="h-11 bg-[var(--sheet-header)] text-[var(--ink)]"
             />
+            <p className="text-[11px] text-[var(--ink-muted)]">
+              발신·수신 모두 {FATHER_EMAIL} · 네이버 SMTP (도메인 인증 불필요)
+            </p>
           </div>
 
           <label className="flex items-start gap-3 text-sm text-[var(--ink)]">
@@ -407,9 +412,9 @@ export function DailyBriefingPanel({
           </div>
 
           <p className="text-[12px] text-[var(--ink-muted)]">
-            주소 {settings.workEmail || "(미입력)"} · 매일 발송{" "}
-            {settings.dailyEmailEnabled ? "켜짐" : "꺼짐"} · 키가 없으면 메일을
-            보내지 않습니다.
+            {FATHER_EMAIL} · 매일 발송{" "}
+            {settings.dailyEmailEnabled ? "켜짐" : "꺼짐"} ·{" "}
+            NAVER_SMTP_PASSWORD 없으면 발송 안 함
           </p>
           {syncNote ? (
             <p className="text-[12px] text-[var(--ink-muted)]">{syncNote}</p>

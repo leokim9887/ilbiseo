@@ -40,7 +40,10 @@ export function CalendarPanel({
   banner,
 }: CalendarPanelProps) {
   const [icsText, setIcsText] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  /** Google OAuth /events errors — shown near connection status, not ICS */
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  /** ICS import errors only */
+  const [icsError, setIcsError] = useState<string | null>(null);
   const [status, setStatus] = useState<GoogleStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [busy, setBusy] = useState<"refresh" | "disconnect" | "ics" | null>(
@@ -78,7 +81,7 @@ export function CalendarPanel({
 
   const refreshGoogle = useCallback(async () => {
     setBusy("refresh");
-    setError(null);
+    setGoogleError(null);
     try {
       const res = await fetch("/api/google/events?days=14");
       const json = (await res.json()) as {
@@ -100,7 +103,13 @@ export function CalendarPanel({
           : s,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "가져오기 실패");
+      const msg = e instanceof Error ? e.message : "가져오기 실패";
+      // Never dump raw HTML next to ICS controls
+      setGoogleError(
+        /<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(msg)
+          ? "Google 일정을 불러오지 못했습니다. 「새로고침」하거나 연결을 다시 해보세요. ICS는 선택 사항입니다."
+          : msg,
+      );
     } finally {
       setBusy(null);
     }
@@ -114,13 +123,13 @@ export function CalendarPanel({
 
   const disconnect = async () => {
     setBusy("disconnect");
-    setError(null);
+    setGoogleError(null);
     try {
       await fetch("/api/google/disconnect", { method: "POST" });
       autoFetched.current = false;
       await loadStatus();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "연결 해제 실패");
+      setGoogleError(e instanceof Error ? e.message : "연결 해제 실패");
     } finally {
       setBusy(null);
     }
@@ -129,15 +138,16 @@ export function CalendarPanel({
   const loadMock = () => {
     // Optional demo only — not auto-loaded
     onReplace(createMockCalendarEvents());
-    setError(null);
+    setGoogleError(null);
+    setIcsError(null);
   };
 
   const importIcsViaServer = async (input: string, mode: "append" | "replace") => {
     setBusy("ics");
-    setError(null);
+    setIcsError(null);
     const trimmed = input.trim();
     if (!trimmed) {
-      setError("붙여 넣을 ICS 내용 또는 iCal URL을 입력하세요.");
+      setIcsError("붙여 넣을 ICS 내용 또는 iCal URL을 입력하세요.");
       setBusy(null);
       return;
     }
@@ -163,7 +173,12 @@ export function CalendarPanel({
       else onAppend(events);
       setIcsText("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "ICS 가져오기 실패");
+      const msg = e instanceof Error ? e.message : "ICS 가져오기 실패";
+      setIcsError(
+        /<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(msg)
+          ? "ICS/URL을 가져오지 못했습니다. 주소를 확인하거나 파일로 넣어 보세요."
+          : msg,
+      );
     } finally {
       setBusy(null);
     }
@@ -177,7 +192,7 @@ export function CalendarPanel({
       const text = await file.text();
       await importIcsViaServer(text, "append");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "파일 읽기 실패");
+      setIcsError(e instanceof Error ? e.message : "파일 읽기 실패");
     }
   };
 
@@ -320,11 +335,17 @@ export function CalendarPanel({
               </p>
             </div>
           )}
+          {googleError ? (
+            <p className="mt-2 text-sm text-destructive" role="alert">
+              {googleError}
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-2 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 p-3">
           <p className="text-xs font-medium text-[var(--ink-muted)]">
-            ICS 가져오기 · Google iCal URL (서버가 대신 받아옵니다 — CORS 없음)
+            ICS 가져오기 · Google iCal URL (선택 · OAuth와 별도 · 서버가 대신
+            받아옵니다)
           </p>
           <Textarea
             rows={3}
@@ -354,9 +375,9 @@ export function CalendarPanel({
               "ICS / URL 가져오기"
             )}
           </Button>
-          {error ? (
+          {icsError ? (
             <p className="text-sm text-destructive" role="alert">
-              {error}
+              {icsError}
             </p>
           ) : null}
         </div>

@@ -187,6 +187,75 @@ type GEvent = {
   end?: { date?: string; dateTime?: string };
 };
 
+/** Strip HTML / noisy Google error bodies into short Korean messages. */
+export function formatGoogleApiError(
+  status: number,
+  body: string,
+  what: string,
+): string {
+  const raw = (body || "").trim();
+  const looksHtml =
+    /<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(raw) ||
+    raw.startsWith("<");
+  if (looksHtml) {
+    if (status === 404) {
+      return `${what}을(를) 찾지 못했습니다(404). Calendar API 주소가 올바른지·API가 켜져 있는지 확인하세요.`;
+    }
+    return `${what} 요청이 실패했습니다(HTTP ${status}). HTML 오류 페이지가 돌아왔습니다.`;
+  }
+  try {
+    const j = JSON.parse(raw) as {
+      error?: { message?: string; status?: string; code?: number };
+    };
+    const msg = j.error?.message?.trim();
+    if (msg) {
+      if (/invalid_grant|invalid credentials|auth/i.test(msg)) {
+        return `${what} 인증이 만료되었거나 잘못되었습니다. 「연결 해제」후 다시 「Google 캘린더 연결」하세요.`;
+      }
+      if (/accessNotConfigured|has not been used|disabled/i.test(msg)) {
+        return `Google Calendar API가 프로젝트에서 꺼져 있습니다. Cloud Console에서 Calendar API를 사용 설정하세요.`;
+      }
+      return `${what} 오류: ${msg.slice(0, 160)}`;
+    }
+  } catch {
+    /* plain text */
+  }
+  const plain = raw.replace(/\s+/g, " ").slice(0, 160);
+  return plain
+    ? `${what} 오류(HTTP ${status}): ${plain}`
+    : `${what} 오류(HTTP ${status})`;
+}
+
+async function listUserCalendars(
+  accessToken: string,
+): Promise<GCalListItem[]> {
+  // Official endpoint: GET /calendar/v3/users/me/calendarList
+  const listRes = await fetch(
+    "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50&minAccessRole=reader",
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!listRes.ok) {
+    const t = await listRes.text();
+    // Fall back to primary so a list glitch still loads the main calendar
+    if (listRes.status === 404 || listRes.status >= 500) {
+      console.warn(
+        "calendarList failed; falling back to primary:",
+        formatGoogleApiError(listRes.status, t, "캘린더 목록"),
+      );
+      return [{ id: "primary", summary: "기본", primary: true }];
+    }
+    throw new Error(formatGoogleApiError(listRes.status, t, "캘린더 목록"));
+  }
+  const listJson = (await listRes.json()) as { items?: GCalListItem[] };
+  const calendars = (listJson.items ?? []).filter((c) => c.id);
+  if (calendars.length === 0) {
+    return [{ id: "primary", summary: "기본", primary: true }];
+  }
+  // Prefer primary first
+  calendars.sort((a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)));
+  return calendars;
+}
+
 export async function fetchUpcomingGoogleEvents(
   accessToken: string,
   daysAhead = 14,
@@ -195,21 +264,10 @@ export async function fetchUpcomingGoogleEvents(
   const timeMax = new Date();
   timeMax.setDate(timeMax.getDate() + daysAhead);
 
-  const listRes = await fetch(
-    "https://www.googleapis.com/calendar/v3/calendarList?maxResults=20&minAccessRole=reader",
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
-  if (!listRes.ok) {
-    const t = await listRes.text();
-    throw new Error(`캘린더 목록 오류: ${t.slice(0, 180)}`);
-  }
-  const listJson = (await listRes.json()) as { items?: GCalListItem[] };
-  const calendars = (listJson.items ?? []).filter((c) => c.id);
-  if (calendars.length === 0) {
-    calendars.push({ id: "primary", summary: "기본" });
-  }
+  const calendars = await listUserCalendars(accessToken);
 
   const out: GoogleApiEvent[] = [];
+  let lastEventError: string | null = null;
   for (const cal of calendars.slice(0, 10)) {
     const calId = encodeURIComponent(cal.id!);
     const params = new URLSearchParams({
@@ -223,7 +281,11 @@ export async function fetchUpcomingGoogleEvents(
       `https://www.googleapis.com/calendar/v3/calendars/${calId}/events?${params}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
-    if (!evRes.ok) continue;
+    if (!evRes.ok) {
+      const t = await evRes.text();
+      lastEventError = formatGoogleApiError(evRes.status, t, "일정");
+      continue;
+    }
     const evJson = (await evRes.json()) as { items?: GEvent[] };
     for (const item of evJson.items ?? []) {
       const start = item.start?.dateTime || item.start?.date;
@@ -241,6 +303,10 @@ export async function fetchUpcomingGoogleEvents(
         source: "google",
       });
     }
+  }
+
+  if (out.length === 0 && lastEventError) {
+    throw new Error(lastEventError);
   }
 
   out.sort((a, b) => a.start.localeCompare(b.start));

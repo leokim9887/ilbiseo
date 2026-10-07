@@ -37,9 +37,10 @@ export async function GET(req: NextRequest) {
     await writeTokenCookie(json, ensured.bundle);
     return json;
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "일정 불러오기 실패" },
-      { status: 502 },
-    );
+    const msg = e instanceof Error ? e.message : "일정 불러오기 실패";
+    const clean = /<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(msg)
+      ? "Google 일정을 불러오지 못했습니다. 연결을 다시 하거나 Calendar API 설정을 확인하세요."
+      : msg;
+    return NextResponse.json({ error: clean }, { status: 502 });
   }
 }

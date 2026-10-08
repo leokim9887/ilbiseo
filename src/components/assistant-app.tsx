@@ -178,6 +178,8 @@ export function AssistantApp() {
                 onComplete={app.completeTask}
                 onRestore={app.restoreTask}
                 onDelete={app.deleteTask}
+                onDeleteMany={app.deleteTasks}
+                onRestoreMany={app.restoreTasks}
                 onAdd={() =>
                   app.addTask({
                     category: isTaskCategory(frame) ? frame : "work",
@@ -195,6 +197,9 @@ export function AssistantApp() {
                 }
                 onToggle={(id) => app.toggleSideItem("guideline", id)}
                 onDelete={(id) => app.deleteSideItem("guideline", id)}
+                onDeleteMany={(ids) =>
+                  app.deleteSideItems("guideline", ids)
+                }
               />
               <SideListSection
                 kind="habit"
@@ -205,6 +210,7 @@ export function AssistantApp() {
                 }
                 onToggle={(id) => app.toggleSideItem("habit", id)}
                 onDelete={(id) => app.deleteSideItem("habit", id)}
+                onDeleteMany={(ids) => app.deleteSideItems("habit", ids)}
               />
             </div>
           ) : null}

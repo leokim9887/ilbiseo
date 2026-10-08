@@ -225,6 +225,34 @@ export function useAppState() {
     [persist, state],
   );
 
+  const deleteTasks = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      const remove = new Set(ids);
+      persist({
+        ...state,
+        tasks: state.tasks.filter((t) => !remove.has(t.id)),
+      });
+    },
+    [persist, state],
+  );
+
+  const restoreTasks = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      const restore = new Set(ids);
+      persist({
+        ...state,
+        tasks: state.tasks.map((t) =>
+          restore.has(t.id)
+            ? { ...t, status: "active", completedAt: null }
+            : t,
+        ),
+      });
+    },
+    [persist, state],
+  );
+
   const setCalendarEvents = useCallback(
     (events: CalendarEvent[]) => {
       persist({ ...state, calendarEvents: events });
@@ -312,6 +340,19 @@ export function useAppState() {
     [persist, state],
   );
 
+  const deleteSideItems = useCallback(
+    (kind: SideListKind, ids: string[]) => {
+      if (ids.length === 0) return;
+      const key = sideKey(kind);
+      const remove = new Set(ids);
+      persist({
+        ...state,
+        [key]: state[key].filter((item) => !remove.has(item.id)),
+      });
+    },
+    [persist, state],
+  );
+
   const forceExcelSync = useCallback(async () => {
     await syncExcel(state);
   }, [state, syncExcel]);
@@ -339,10 +380,13 @@ export function useAppState() {
     completeTask,
     restoreTask,
     deleteTask,
+    deleteTasks,
+    restoreTasks,
     addSideItem,
     updateSideItem,
     toggleSideItem,
     deleteSideItem,
+    deleteSideItems,
     setCalendarEvents,
     replaceCalendar,
     clearAllData,

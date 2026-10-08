@@ -40,6 +40,14 @@ import {
   type ColumnSortKey,
 } from "@/lib/column-sort";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -73,6 +81,8 @@ interface ExcelWorkbookProps {
   onComplete: (id: string) => void;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
+  onDeleteMany: (ids: string[]) => void;
+  onRestoreMany?: (ids: string[]) => void;
   onAdd: () => void;
   onImport: (tasks: Task[]) => void;
   calendarEvents?: CalendarEvent[];
@@ -88,14 +98,21 @@ export function ExcelWorkbook({
   onUpdate,
   onComplete,
   onRestore,
-  onDelete,
+  onDelete: _onDelete,
+  onDeleteMany,
+  onRestoreMany,
   onAdd,
   onImport,
   calendarEvents = [],
 }: ExcelWorkbookProps) {
   const isGcal = frame === "gcal";
   const [focus, setFocus] = useState<FocusCell | null>(null);
-  const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // Keep active row highlight for keyboard/editing (separate from multi-select)
+  const [activeRow, setActiveRow] = useState<string | null>(null);
   const [filterStart, setFilterStart] = useState<string>("");
   const [filterEnd, setFilterEnd] = useState<string>("");
   const [periodSort, setPeriodSort] = useState<PeriodSort>("default");
@@ -169,6 +186,51 @@ export function ExcelWorkbook({
   const filterActive = Boolean(filterStart || filterEnd);
   const gcalFilterActive = Boolean(gcalRangeStart || gcalRangeEnd);
 
+  const selectedCount = selectedIds.size;
+  const allVisibleSelected =
+    taskIds.length > 0 && taskIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = taskIds.some((id) => selectedIds.has(id));
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedIds(new Set(taskIds));
+  }, [taskIds]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleSelectAllVisible = useCallback(() => {
+    if (allVisibleSelected) clearSelection();
+    else selectAllVisible();
+  }, [allVisibleSelected, clearSelection, selectAllVisible]);
+
+  const confirmBulkDelete = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    onDeleteMany(ids);
+    setSelectedIds(new Set());
+    setActiveRow(null);
+    setConfirmDeleteOpen(false);
+  }, [onDeleteMany, selectedIds]);
+
+  const bulkRestore = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (onRestoreMany) onRestoreMany(ids);
+    else ids.forEach((id) => onRestore(id));
+    setSelectedIds(new Set());
+    setActiveRow(null);
+  }, [onRestore, onRestoreMany, selectedIds]);
+
   const applyChip = (c: "all" | "today" | "week" | "month") => {
     setChip(c);
     if (c === "all") {
@@ -232,8 +294,25 @@ export function ExcelWorkbook({
 
   useEffect(() => {
     setFocus(null);
-    setSelectedRow(null);
+    setActiveRow(null);
+    setSelectedIds(new Set());
+    setConfirmDeleteOpen(false);
   }, [sheet, frame]);
+
+  // Drop selection ids that are no longer in the workbook tasks
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const alive = new Set(baseTasks.map((t) => t.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (alive.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [baseTasks]);
 
   useEffect(() => {
     if (!focus) return;
@@ -291,6 +370,7 @@ export function ExcelWorkbook({
     }`;
 
   return (
+    <>
     <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2">
         <p className="truncate text-[15px] font-semibold text-[#1a2420]">
@@ -351,29 +431,61 @@ export function ExcelWorkbook({
             캘린더 일정은 한 일 시트로 옮기지 않습니다.
           </p>
         ) : null}
-        {selectedRow && !isGcal ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9 rounded-sm border-[#b42318]/40 text-[#b42318]"
-            onClick={() => onDelete(selectedRow)}
-          >
-            <Trash2 className="size-3.5" />
-            선택 행 삭제
-          </Button>
-        ) : null}
-        {selectedRow && sheet === "done" && !isGcal ? (
+        {!isGcal && taskIds.length > 0 ? (
           <Button
             type="button"
             size="sm"
             variant="outline"
             className="h-9 rounded-sm"
-            onClick={() => onRestore(selectedRow)}
+            onClick={selectAllVisible}
+            data-excel-select-all
           >
-            <RotateCcw className="size-3.5" />
-            복원
+            보이는 행 모두 선택
           </Button>
+        ) : null}
+        {!isGcal && selectedCount > 0 ? (
+          <>
+            <span
+              className="rounded-sm border border-[#217346]/35 bg-[#e8f5ee] px-2.5 py-1.5 text-[13px] font-semibold text-[#1a5c38]"
+              data-excel-selection-count
+            >
+              {selectedCount}개 선택
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 rounded-sm"
+              onClick={clearSelection}
+              data-excel-clear-selection
+            >
+              선택 해제
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 rounded-sm border-[#b42318]/40 text-[#b42318]"
+              onClick={() => setConfirmDeleteOpen(true)}
+              data-excel-bulk-delete
+            >
+              <Trash2 className="size-3.5" />
+              선택 삭제
+            </Button>
+            {sheet === "done" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm"
+                onClick={bulkRestore}
+                data-excel-bulk-restore
+              >
+                <RotateCcw className="size-3.5" />
+                선택 복원
+              </Button>
+            ) : null}
+          </>
         ) : null}
         <span className="ml-auto text-[12px] text-[#5c655f]">
           {FRAME_LABEL[frame]} · {rows.length}행
@@ -563,9 +675,31 @@ export function ExcelWorkbook({
       ) : null}
 
       <div className="relative max-h-[min(66vh,720px)] min-h-[300px] overflow-auto bg-white">
-        <table className="w-full min-w-[820px] border-collapse text-[15px] text-black">
+        <table className="w-full min-w-[860px] border-collapse text-[15px] text-black">
           <thead className="sticky top-0 z-20">
             <tr>
+              {!isGcal ? (
+                <th
+                  className="border border-black bg-[#f3f3f3] px-1 py-2 text-center"
+                  style={{ width: "40px", minWidth: "40px" }}
+                  title="여러 행 선택"
+                >
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate =
+                          someVisibleSelected && !allVisibleSelected;
+                    }}
+                    onChange={toggleSelectAllVisible}
+                    disabled={taskIds.length === 0}
+                    className="size-4 accent-[#217346]"
+                    aria-label="보이는 할 일 모두 선택"
+                    data-excel-header-select
+                  />
+                </th>
+              ) : null}
               {COLS.map((c) => {
                 const sortable = isSortableCol(c.key);
                 const active =
@@ -626,7 +760,7 @@ export function ExcelWorkbook({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={isGcal ? 6 : 7}
                   className="border border-black px-4 py-16 text-center text-[15px] text-[#555]"
                 >
                   {filterActive && !isGcal ? (
@@ -698,22 +832,38 @@ export function ExcelWorkbook({
 
                 const task = row.task;
                 const order = idx + 1;
-                const selected = selectedRow === task.id;
+                const checked = selectedIds.has(task.id);
+                const active = activeRow === task.id || checked;
                 const zebra = order % 2 === 0;
                 const deadlineFocused =
                   focus?.rowId === task.id && focus.col === "deadline";
                 return (
                   <tr
                     key={task.id}
-                    onClick={() => setSelectedRow(task.id)}
+                    onClick={() => setActiveRow(task.id)}
+                    data-excel-row={task.id}
+                    data-excel-row-selected={checked ? "1" : "0"}
                     className={
-                      selected
-                        ? "bg-[#e8f5ee]"
-                        : zebra
-                          ? "bg-[#fafafa]"
-                          : "bg-white"
+                      checked
+                        ? "bg-[#dcefe3]"
+                        : active
+                          ? "bg-[#e8f5ee]"
+                          : zebra
+                            ? "bg-[#fafafa]"
+                            : "bg-white"
                     }
                   >
+                    <td className="border border-black px-1 py-1 text-center align-middle">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSelect(task.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="size-4 accent-[#217346]"
+                        aria-label={`${order}번 행 선택`}
+                        data-excel-row-check={task.id}
+                      />
+                    </td>
                     <td className="border border-black px-1 py-1 text-center align-middle text-[14px] font-medium tabular-nums">
                       {order}
                     </td>
@@ -721,7 +871,7 @@ export function ExcelWorkbook({
                     <EditCell
                       active={focus?.rowId === task.id && focus.col === "listup"}
                       onFocusCell={() => {
-                        setSelectedRow(task.id);
+                        setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "listup" });
                       }}
                       onKeyNav={(e) =>
@@ -740,7 +890,7 @@ export function ExcelWorkbook({
                             onUpdate(task.id, { title: e.target.value })
                           }
                           onFocus={() => {
-                            setSelectedRow(task.id);
+                            setActiveRow(task.id);
                             setFocus({ rowId: task.id, col: "listup" });
                           }}
                           className="excel-textarea font-medium"
@@ -760,7 +910,7 @@ export function ExcelWorkbook({
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
                             onFocus={() => {
-                              setSelectedRow(task.id);
+                              setActiveRow(task.id);
                               // Keep LIST UP cell highlighted without stealing caret from memo
                               setFocus({ rowId: task.id, col: "listup" });
                             }}
@@ -779,7 +929,7 @@ export function ExcelWorkbook({
                       active={deadlineFocused}
                       center
                       onFocusCell={() => {
-                        setSelectedRow(task.id);
+                        setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "deadline" });
                       }}
                       onKeyNav={(e) =>
@@ -823,7 +973,7 @@ export function ExcelWorkbook({
                           type="button"
                           className="min-h-11 w-full px-1 text-center text-[13px] leading-snug"
                           onClick={() => {
-                            setSelectedRow(task.id);
+                            setActiveRow(task.id);
                             setFocus({ rowId: task.id, col: "deadline" });
                           }}
                           aria-label="마감목표"
@@ -841,7 +991,7 @@ export function ExcelWorkbook({
                       }
                       center
                       onFocusCell={() => {
-                        setSelectedRow(task.id);
+                        setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "importance" });
                       }}
                       onKeyNav={(e) =>
@@ -864,7 +1014,7 @@ export function ExcelWorkbook({
                       }
                       center
                       onFocusCell={() => {
-                        setSelectedRow(task.id);
+                        setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "urgency" });
                       }}
                       onKeyNav={(e) =>
@@ -938,6 +1088,38 @@ export function ExcelWorkbook({
         </div>
       </div>
     </div>
+
+    <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+      <DialogContent className="sm:max-w-md" showCloseButton>
+        <DialogHeader>
+          <DialogTitle>선택 항목 삭제</DialogTitle>
+          <DialogDescription>
+            선택한 {selectedCount}개의 할 일을 삭제할까요? 삭제하면 이 기기에서
+            바로 지워지며, 되돌리려면 다시 입력해야 합니다.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-sm"
+            onClick={() => setConfirmDeleteOpen(false)}
+          >
+            취소
+          </Button>
+          <Button
+            type="button"
+            className="rounded-sm bg-[#b42318] text-white hover:bg-[#912018]"
+            onClick={confirmBulkDelete}
+            data-excel-confirm-delete
+          >
+            <Trash2 className="size-3.5" />
+            삭제
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

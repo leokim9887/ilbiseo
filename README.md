@@ -8,9 +8,9 @@
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
 1. **공개 URL (바로 열기)**  
-   https://temporary-instant-emerald-67p4uu7.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=126120c2-dbd5-45e4-863a-4d1503b66d05  
-   - GCal redirect: `https://temporary-instant-emerald-67p4uu7.vercel.app/api/google/callback`  
+   https://temporary-fleet-nitrogen-6wxfp18.vercel.app  
+   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=29f90112-4306-496b-b9ba-d83918a32e2d  
+   - GCal redirect: `https://temporary-fleet-nitrogen-6wxfp18.vercel.app/api/google/callback`  
    - 영구: `npx vercel login` 후 `npx vercel --prod`
 
 2. **zip으로 로컬 실행**  

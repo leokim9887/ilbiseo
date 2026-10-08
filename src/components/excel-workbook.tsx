@@ -237,6 +237,14 @@ export function ExcelWorkbook({
 
   useEffect(() => {
     if (!focus) return;
+    // Don't steal focus from the memo sub-input inside LIST UP
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active.dataset.excelMemo === focus.rowId
+    ) {
+      return;
+    }
     const el = document.querySelector<HTMLElement>(
       `[data-excel-cell="${focus.rowId}:${focus.col}"]`,
     );
@@ -720,31 +728,49 @@ export function ExcelWorkbook({
                         handleNav(e, task.id, "listup", moveFocus)
                       }
                     >
-                      <div className="flex w-full flex-col gap-0.5 px-1.5 py-1.5">
+                      <div className="flex w-full flex-col gap-1 px-1.5 py-1.5">
                         <textarea
                           data-excel-cell={`${task.id}:listup`}
                           value={task.title}
                           rows={Math.min(
                             5,
-                            Math.max(1, Math.ceil(task.title.length / 36)),
+                            Math.max(1, Math.ceil(task.title.length / 36) || 1),
                           )}
                           onChange={(e) =>
                             onUpdate(task.id, { title: e.target.value })
                           }
+                          onFocus={() => {
+                            setSelectedRow(task.id);
+                            setFocus({ rowId: task.id, col: "listup" });
+                          }}
                           className="excel-textarea font-medium"
                           aria-label="할일 LIST UP"
+                          placeholder="할 일 제목"
                         />
-                        {task.memo || focus?.rowId === task.id ? (
+                        {/* Always visible for program tasks — memo is under LIST UP (6-col layout) */}
+                        <label className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-medium text-[#5c655f]">
+                            메모
+                          </span>
                           <input
+                            type="text"
+                            data-excel-memo={task.id}
                             value={task.memo}
-                            placeholder="메모"
+                            placeholder="일정·메모 입력"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onFocus={() => {
+                              setSelectedRow(task.id);
+                              // Keep LIST UP cell highlighted without stealing caret from memo
+                              setFocus({ rowId: task.id, col: "listup" });
+                            }}
                             onChange={(e) =>
                               onUpdate(task.id, { memo: e.target.value })
                             }
-                            className="excel-input min-h-0 py-0.5 text-[12px] text-[#555]"
+                            className="excel-input min-h-9 py-1 text-[13px] text-[#333]"
                             aria-label="메모"
                           />
-                        ) : null}
+                        </label>
                       </div>
                     </EditCell>
 

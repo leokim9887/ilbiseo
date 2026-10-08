@@ -7,11 +7,11 @@
 
 본인 노트북 브라우저로 확인하는 방법입니다. (Cursor Try Live 불필요)
 
-1. **공개 URL (바로 열기)**  
-   https://temporary-fleet-nitrogen-6wxfp18.vercel.app  
-   - 임시 배포(약 1시간). 유지: https://vercel.com/claim-deployment?code=29f90112-4306-496b-b9ba-d83918a32e2d  
-   - GCal redirect: `https://temporary-fleet-nitrogen-6wxfp18.vercel.app/api/google/callback`  
-   - 영구: `npx vercel login` 후 `npx vercel --prod`
+1. **공개 URL (프로덕션 · 고정)**  
+   https://fleet-nitrogen-6wxfp18.vercel.app  
+   - GCal redirect: `https://fleet-nitrogen-6wxfp18.vercel.app/api/google/callback`  
+   - 배포는 **이 Vercel 프로젝트에만** (`npx vercel link` → `npx vercel --prod`). 새 `temporary-*` URL 금지.  
+   - 안내: [DEPLOY_TARGET.md](./DEPLOY_TARGET.md) · store `docs/production-url.md`
 
 2. **zip으로 로컬 실행**  
    - 파일: Project store `docs/ilbiseo-laptop.zip`  

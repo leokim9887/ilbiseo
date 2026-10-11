@@ -186,7 +186,9 @@
 .excel-textarea {
   width: 100%;
   min-height: 2.25rem;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
   border: none;
   background: transparent;
   padding: 0.15rem 0.1rem;
@@ -195,6 +197,11 @@
   color: #000;
   outline: none;
   font-family: inherit;
+}
+.excel-textarea-memo {
+  min-height: 2rem;
+  font-size: 13px;
+  color: #333;
 }
 .excel-textarea:focus {
   background: #fff;

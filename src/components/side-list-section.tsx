@@ -3,14 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type { SideListItem, SideListKind } from "@/lib/types";
 import { SIDE_LIST_LABEL } from "@/lib/types";
 
@@ -52,7 +44,6 @@ export function SideListSection({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const ordered = useMemo(() => {
     const open = items.filter((i) => !i.done);
@@ -97,12 +88,11 @@ export function SideListSection({
     setSelectedIds(new Set());
   }, []);
 
-  const confirmDelete = useCallback(() => {
+  const bulkDelete = useCallback(() => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     onDeleteMany(ids);
     setSelectedIds(new Set());
-    setConfirmOpen(false);
   }, [onDeleteMany, selectedIds]);
 
   return (
@@ -142,12 +132,6 @@ export function SideListSection({
           ) : null}
           {selectedCount > 0 ? (
             <>
-              <span
-                className="rounded-sm border border-[#8a939a]/50 bg-white px-2 py-0.5 text-[12px] font-semibold text-[#1a2420]"
-                data-side-selection-count={kind}
-              >
-                {selectedCount}개 선택
-              </span>
               <Button
                 type="button"
                 size="sm"
@@ -162,7 +146,7 @@ export function SideListSection({
                 size="sm"
                 variant="outline"
                 className="h-8 rounded-sm border-[#b42318]/40 px-2 text-[12px] text-[#b42318]"
-                onClick={() => setConfirmOpen(true)}
+                onClick={bulkDelete}
                 data-side-bulk-delete={kind}
               >
                 <Trash2 className="size-3.5" />
@@ -271,36 +255,6 @@ export function SideListSection({
         )}
       </div>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{label} 선택 삭제</DialogTitle>
-            <DialogDescription>
-              선택한 {selectedCount}개의 {label}을 삭제할까요? 삭제하면 이
-              기기에서 바로 지워집니다.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-sm"
-              onClick={() => setConfirmOpen(false)}
-            >
-              취소
-            </Button>
-            <Button
-              type="button"
-              className="rounded-sm bg-[#b42318] text-white hover:bg-[#912018]"
-              onClick={confirmDelete}
-              data-side-confirm-delete={kind}
-            >
-              <Trash2 className="size-3.5" />
-              삭제
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }

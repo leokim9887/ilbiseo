@@ -40,14 +40,7 @@ import {
   type ColumnSortKey,
 } from "@/lib/column-sort";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
 import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -110,7 +103,6 @@ export function ExcelWorkbook({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   // Keep active row highlight for keyboard/editing (separate from multi-select)
   const [activeRow, setActiveRow] = useState<string | null>(null);
   const [filterStart, setFilterStart] = useState<string>("");
@@ -213,13 +205,12 @@ export function ExcelWorkbook({
     else selectAllVisible();
   }, [allVisibleSelected, clearSelection, selectAllVisible]);
 
-  const confirmBulkDelete = useCallback(() => {
+  const bulkDelete = useCallback(() => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     onDeleteMany(ids);
     setSelectedIds(new Set());
     setActiveRow(null);
-    setConfirmDeleteOpen(false);
   }, [onDeleteMany, selectedIds]);
 
   const bulkRestore = useCallback(() => {
@@ -296,7 +287,6 @@ export function ExcelWorkbook({
     setFocus(null);
     setActiveRow(null);
     setSelectedIds(new Set());
-    setConfirmDeleteOpen(false);
   }, [sheet, frame]);
 
   // Drop selection ids that are no longer in the workbook tasks
@@ -370,7 +360,6 @@ export function ExcelWorkbook({
     }`;
 
   return (
-    <>
     <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2">
         <p className="truncate text-[15px] font-semibold text-[#1a2420]">
@@ -431,26 +420,8 @@ export function ExcelWorkbook({
             캘린더 일정은 한 일 시트로 옮기지 않습니다.
           </p>
         ) : null}
-        {!isGcal && taskIds.length > 0 ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9 rounded-sm"
-            onClick={selectAllVisible}
-            data-excel-select-all
-          >
-            보이는 행 모두 선택
-          </Button>
-        ) : null}
         {!isGcal && selectedCount > 0 ? (
           <>
-            <span
-              className="rounded-sm border border-[#217346]/35 bg-[#e8f5ee] px-2.5 py-1.5 text-[13px] font-semibold text-[#1a5c38]"
-              data-excel-selection-count
-            >
-              {selectedCount}개 선택
-            </span>
             <Button
               type="button"
               size="sm"
@@ -466,7 +437,7 @@ export function ExcelWorkbook({
               size="sm"
               variant="outline"
               className="h-9 rounded-sm border-[#b42318]/40 text-[#b42318]"
-              onClick={() => setConfirmDeleteOpen(true)}
+              onClick={bulkDelete}
               data-excel-bulk-delete
             >
               <Trash2 className="size-3.5" />
@@ -879,13 +850,9 @@ export function ExcelWorkbook({
                       }
                     >
                       <div className="flex w-full flex-col gap-1 px-1.5 py-1.5">
-                        <textarea
+                        <AutoGrowTextarea
                           data-excel-cell={`${task.id}:listup`}
                           value={task.title}
-                          rows={Math.min(
-                            5,
-                            Math.max(1, Math.ceil(task.title.length / 36) || 1),
-                          )}
                           onChange={(e) =>
                             onUpdate(task.id, { title: e.target.value })
                           }
@@ -902,8 +869,7 @@ export function ExcelWorkbook({
                           <span className="text-[10px] font-medium text-[#5c655f]">
                             메모
                           </span>
-                          <input
-                            type="text"
+                          <AutoGrowTextarea
                             data-excel-memo={task.id}
                             value={task.memo}
                             placeholder="일정·메모 입력"
@@ -917,7 +883,7 @@ export function ExcelWorkbook({
                             onChange={(e) =>
                               onUpdate(task.id, { memo: e.target.value })
                             }
-                            className="excel-input min-h-9 py-1 text-[13px] text-[#333]"
+                            className="excel-textarea excel-textarea-memo"
                             aria-label="메모"
                           />
                         </label>
@@ -1088,38 +1054,6 @@ export function ExcelWorkbook({
         </div>
       </div>
     </div>
-
-    <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-      <DialogContent className="sm:max-w-md" showCloseButton>
-        <DialogHeader>
-          <DialogTitle>선택 항목 삭제</DialogTitle>
-          <DialogDescription>
-            선택한 {selectedCount}개의 할 일을 삭제할까요? 삭제하면 이 기기에서
-            바로 지워지며, 되돌리려면 다시 입력해야 합니다.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-sm"
-            onClick={() => setConfirmDeleteOpen(false)}
-          >
-            취소
-          </Button>
-          <Button
-            type="button"
-            className="rounded-sm bg-[#b42318] text-white hover:bg-[#912018]"
-            onClick={confirmBulkDelete}
-            data-excel-confirm-delete
-          >
-            <Trash2 className="size-3.5" />
-            삭제
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    </>
   );
 }
 

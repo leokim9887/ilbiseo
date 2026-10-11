@@ -130,8 +130,11 @@ if (overdueCount !== 0) {
   throw new Error(`someday must not be overdue, got ${overdueCount}`);
 }
 
+const deadlineSortBtn = () =>
+  page.getByRole("button", { name: /마감목표 정렬/ });
+
 // Sort ASC by 마감목표 → start dates: early, mid, late, someday last
-await page.getByRole("button", { name: /마감목표/ }).click();
+await deadlineSortBtn().click();
 await page.waitForTimeout(250);
 let titles = await page.locator("[data-excel-row]").evaluateAll((rows) =>
   rows.map((r) => {
@@ -145,7 +148,7 @@ if (JSON.stringify(titles) !== JSON.stringify(expectedAsc)) {
 }
 
 // Sort DESC → late, mid, early, someday still last
-await page.getByRole("button", { name: /마감목표/ }).click();
+await deadlineSortBtn().click();
 await page.waitForTimeout(250);
 titles = await page.locator("[data-excel-row]").evaluateAll((rows) =>
   rows.map((r) => {

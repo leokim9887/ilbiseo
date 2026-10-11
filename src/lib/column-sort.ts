@@ -1,5 +1,5 @@
 import type { SheetRow } from "./sheet-rows";
-import { taskDateRange } from "./date-range";
+import { isSomedayDeadline, taskDateRange } from "./date-range";
 
 /** Sortable Excel columns (마감목표 · 중요도 · 시급성). */
 export type ColumnSortKey = "deadline" | "importance" | "urgency";
@@ -31,8 +31,8 @@ export function cycleColumnSort(
 }
 
 /**
- * Empty / missing values always sort **last** (both asc and desc),
- * so blank 마감·중요·시급 rows sink to the bottom consistently.
+ * Empty / missing / 「언젠가」 values always sort **last** (both asc and desc),
+ * so blank·언젠가 마감·중요·시급 rows sink to the bottom consistently.
  */
 function cmpEmptyLast(
   aEmpty: boolean,
@@ -51,9 +51,13 @@ function deadlineKey(row: SheetRow): { empty: boolean; value: string } {
     const v = row.event.start.slice(0, 10);
     return { empty: !v, value: v || "" };
   }
+  // 「언젠가」·날짜 없음 → always last (ASC/DESC)
+  if (isSomedayDeadline(row.task)) {
+    return { empty: true, value: "" };
+  }
   const r = taskDateRange(row.task);
-  // 마감목표 = 종료(마감)일 기준
-  const v = r?.end ?? "";
+  // 마감목표 정렬 = 시작일 기준
+  const v = r?.start ?? "";
   return { empty: !v, value: v };
 }
 

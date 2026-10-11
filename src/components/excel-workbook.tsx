@@ -27,6 +27,7 @@ import {
 import {
   formatDeadlineRange,
   isPastUnfinishedTask,
+  isSomedayDeadline,
   monthRangeContaining,
   todayIso,
   todayIsoKst,
@@ -794,6 +795,7 @@ export function ExcelWorkbook({
                 const zebra = order % 2 === 0;
                 const overdue =
                   sheet === "todo" && isPastUnfinishedTask(task, todayKst);
+                const someday = isSomedayDeadline(task);
                 const deadlineFocused =
                   !overdue &&
                   focus?.rowId === task.id &&
@@ -803,6 +805,21 @@ export function ExcelWorkbook({
                   task.startDate && task.startDate >= todayKst
                     ? task.startDate
                     : todayKst;
+                const setSomeday = (on: boolean) => {
+                  if (on) {
+                    onUpdate(task.id, {
+                      kind: "someday",
+                      startDate: null,
+                      targetDate: null,
+                    });
+                  } else {
+                    onUpdate(task.id, {
+                      kind: "spot",
+                      startDate: todayKst,
+                      targetDate: todayKst,
+                    });
+                  }
+                };
                 return (
                   <tr
                     key={task.id}
@@ -857,7 +874,7 @@ export function ExcelWorkbook({
                           : handleNav(e, task.id, "listup", moveFocus)
                       }
                     >
-                      <div className="flex w-full flex-col gap-0.5 px-1.5 py-1">
+                      <div className="flex w-full flex-col gap-0 px-1.5 py-0.5">
                         {overdue ? (
                           <span
                             className="w-fit rounded-sm bg-[#c45c26] px-1.5 py-0.5 text-[10px] font-semibold text-white"
@@ -884,8 +901,8 @@ export function ExcelWorkbook({
                           readOnly={overdue}
                           disabled={overdue}
                         />
-                        <label className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium text-[#5c655f]">
+                        <label className="flex flex-col gap-0">
+                          <span className="text-[10px] font-medium leading-tight text-[#5c655f]">
                             메모
                           </span>
                           <AutoGrowTextarea
@@ -912,7 +929,7 @@ export function ExcelWorkbook({
                       </div>
                     </EditCell>
 
-                    {/* 마감목표: 시작일 ~ 종료일 */}
+                    {/* 마감목표: 언젠가 | 시작일 ~ 종료일 */}
                     <EditCell
                       active={deadlineFocused}
                       center
@@ -930,7 +947,7 @@ export function ExcelWorkbook({
                     >
                       {overdue ? (
                         <div
-                          className="flex min-h-9 w-full flex-col items-center justify-center px-1 py-1 text-center text-[13px] leading-snug text-[#5c3a1a]"
+                          className="flex min-h-8 w-full flex-col items-center justify-center px-1 py-0.5 text-center text-[13px] leading-snug text-[#5c3a1a]"
                           aria-label="마감목표"
                         >
                           {formatDeadlineRange(task) || (
@@ -938,62 +955,123 @@ export function ExcelWorkbook({
                           )}
                         </div>
                       ) : deadlineFocused ? (
-                        <div className="flex w-full flex-col gap-0.5 px-1.5 py-1">
-                          <label className="flex flex-col items-stretch gap-0.5 text-[10px] text-[#5c655f]">
-                            시작일
-                            <input
+                        <div className="flex w-full flex-col gap-0.5 px-1 py-0.5">
+                          <button
+                            type="button"
+                            data-excel-someday={task.id}
+                            aria-pressed={someday}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSomeday(!someday);
+                            }}
+                            className={`mx-auto w-fit rounded-sm border px-2 py-0.5 text-[11px] font-semibold tracking-tight ${
+                              someday
+                                ? "border-[#217346] bg-[#217346] text-white"
+                                : "border-[#8a939a] bg-white text-[#3a4540] hover:border-[#217346] hover:text-[#217346]"
+                            }`}
+                          >
+                            언젠가
+                          </button>
+                          {someday ? (
+                            <p
                               data-excel-cell={`${task.id}:deadline`}
-                              type="date"
-                              value={task.startDate ?? ""}
-                              min={startMin}
-                              onChange={(e) => {
-                                const v = e.target.value || null;
-                                if (v && v < todayKst) return;
-                                const patch: Partial<Task> = {
-                                  startDate: v,
-                                };
-                                if (
-                                  v &&
-                                  task.targetDate &&
-                                  task.targetDate < v
-                                ) {
-                                  patch.targetDate = v;
-                                }
-                                onUpdate(task.id, patch);
-                              }}
-                              className="excel-input min-h-7 text-center text-[13px]"
-                              aria-label="시작일"
-                            />
-                          </label>
-                          <label className="flex flex-col items-stretch gap-0.5 text-[10px] text-[#5c655f]">
-                            종료일
-                            <input
-                              type="date"
-                              value={task.targetDate ?? ""}
-                              min={endMin}
-                              onChange={(e) => {
-                                const v = e.target.value || null;
-                                const floor =
-                                  task.startDate && task.startDate >= todayKst
-                                    ? task.startDate
-                                    : todayKst;
-                                if (v && v < floor) return;
-                                onUpdate(task.id, { targetDate: v });
-                              }}
-                              className="excel-input min-h-7 text-center text-[13px]"
-                              aria-label="종료일"
-                            />
-                          </label>
+                              tabIndex={0}
+                              className="px-0.5 text-center text-[11px] leading-snug text-[#5c655f] outline-none"
+                            >
+                              기한 없음 · 칩을 다시 누르면 날짜 선택
+                            </p>
+                          ) : (
+                            <>
+                              <label className="flex flex-col items-stretch gap-0 text-[10px] text-[#5c655f]">
+                                시작일
+                                <input
+                                  data-excel-cell={`${task.id}:deadline`}
+                                  type="date"
+                                  value={task.startDate ?? ""}
+                                  min={startMin}
+                                  onChange={(e) => {
+                                    const v = e.target.value || null;
+                                    if (v && v < todayKst) return;
+                                    if (!v && !task.targetDate) {
+                                      onUpdate(task.id, {
+                                        kind: "someday",
+                                        startDate: null,
+                                        targetDate: null,
+                                      });
+                                      return;
+                                    }
+                                    const patch: Partial<Task> = {
+                                      kind:
+                                        v &&
+                                        task.targetDate &&
+                                        task.targetDate !== v
+                                          ? "ongoing"
+                                          : "spot",
+                                      startDate: v,
+                                    };
+                                    if (
+                                      v &&
+                                      task.targetDate &&
+                                      task.targetDate < v
+                                    ) {
+                                      patch.targetDate = v;
+                                    }
+                                    onUpdate(task.id, patch);
+                                  }}
+                                  className="excel-input min-h-7 text-center text-[13px]"
+                                  aria-label="시작일"
+                                />
+                              </label>
+                              <label className="flex flex-col items-stretch gap-0 text-[10px] text-[#5c655f]">
+                                종료일
+                                <input
+                                  type="date"
+                                  value={task.targetDate ?? ""}
+                                  min={endMin}
+                                  onChange={(e) => {
+                                    const v = e.target.value || null;
+                                    const floor =
+                                      task.startDate &&
+                                      task.startDate >= todayKst
+                                        ? task.startDate
+                                        : todayKst;
+                                    if (v && v < floor) return;
+                                    if (!v && !task.startDate) {
+                                      onUpdate(task.id, {
+                                        kind: "someday",
+                                        startDate: null,
+                                        targetDate: null,
+                                      });
+                                      return;
+                                    }
+                                    const start = task.startDate;
+                                    onUpdate(task.id, {
+                                      kind:
+                                        start && v && start !== v
+                                          ? "ongoing"
+                                          : "spot",
+                                      targetDate: v,
+                                    });
+                                  }}
+                                  className="excel-input min-h-7 text-center text-[13px]"
+                                  aria-label="종료일"
+                                />
+                              </label>
+                            </>
+                          )}
                         </div>
                       ) : (
                         <button
                           type="button"
-                          className="min-h-9 w-full px-1 text-center text-[13px] leading-snug"
+                          className={`min-h-8 w-full px-1 text-center text-[13px] leading-snug ${
+                            someday ? "font-semibold text-[#217346]" : ""
+                          }`}
                           onClick={() => {
                             setActiveRow(task.id);
                             setFocus({ rowId: task.id, col: "deadline" });
                           }}
                           aria-label="마감목표"
+                          data-excel-deadline-display={task.id}
                         >
                           {formatDeadlineRange(task) || (
                             <span className="text-[#999]">시작 ~ 종료</span>
@@ -1165,7 +1243,7 @@ function EditCell({
       onKeyDown={onKeyNav}
     >
       <div
-        className={`flex min-h-9 items-stretch ${center ? "justify-center" : ""}`}
+        className={`flex min-h-8 items-stretch ${center ? "justify-center" : ""}`}
       >
         {children}
       </div>

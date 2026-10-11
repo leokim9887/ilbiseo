@@ -46,8 +46,10 @@ export function monthRangeContaining(iso: string): { start: string; end: string 
 
 /** Effective [start, end] for a task. Single-date → both ends that day. */
 export function taskDateRange(
-  task: Pick<Task, "startDate" | "targetDate">,
+  task: Pick<Task, "startDate" | "targetDate" | "kind">,
 ): { start: string; end: string } | null {
+  // 「언젠가」= no specific deadline (null dates + kind someday)
+  if (task.kind === "someday") return null;
   const start = task.startDate?.trim() || null;
   const end = task.targetDate?.trim() || null;
   if (!start && !end) return null;
@@ -59,15 +61,29 @@ export function taskDateRange(
 }
 
 /**
+ * Explicit 「언젠가」마감 — no scheduled window.
+ * Prefer kind=someday; also treat fully undated rows as someday.
+ */
+export function isSomedayDeadline(
+  task: Pick<Task, "kind" | "startDate" | "targetDate">,
+): boolean {
+  if (task.kind === "someday") return true;
+  const start = task.startDate?.trim() || null;
+  const end = task.targetDate?.trim() || null;
+  return !start && !end;
+}
+
+/**
  * Active task whose deadline window is already past.
  * Uses taskDateRange: end day (or sole date) before today → overdue.
- * Undated tasks are never overdue.
+ * 「언젠가」/ undated tasks are never overdue.
  */
 export function isPastUnfinishedTask(
-  task: Pick<Task, "status" | "startDate" | "targetDate">,
+  task: Pick<Task, "status" | "startDate" | "targetDate" | "kind">,
   today: string = todayIsoKst(),
 ): boolean {
   if (task.status !== "active") return false;
+  if (isSomedayDeadline(task)) return false;
   const r = taskDateRange(task);
   if (!r) return false;
   return r.end < today;
@@ -79,7 +95,7 @@ export function isPastUnfinishedTask(
  * Undated rows are hidden when a period filter is active.
  */
 export function overlapsPeriod(
-  task: Pick<Task, "startDate" | "targetDate">,
+  task: Pick<Task, "startDate" | "targetDate" | "kind">,
   filterStart: string,
   filterEnd: string,
 ): boolean {
@@ -90,10 +106,11 @@ export function overlapsPeriod(
   return r.start <= fe && r.end >= fs;
 }
 
-/** Display in 마감목표 cell / xlsx — e.g. `2026-09-01 ~ 2026-09-30` */
+/** Display in 마감목표 cell / xlsx — e.g. `2026-09-01 ~ 2026-09-30` or `언젠가` */
 export function formatDeadlineRange(
-  task: Pick<Task, "startDate" | "targetDate">,
+  task: Pick<Task, "startDate" | "targetDate" | "kind">,
 ): string {
+  if (isSomedayDeadline(task)) return "언젠가";
   const r = taskDateRange(task);
   if (!r) return "";
   if (r.start === r.end) return r.start;
@@ -106,6 +123,7 @@ export function sortByPeriod(tasks: Task[], mode: PeriodSort): Task[] {
   if (mode === "default") return tasks;
   const keyed = tasks.map((t, i) => {
     const r = taskDateRange(t);
+    // 「언젠가」/ undated → after all dated tasks
     const key =
       mode === "start"
         ? (r?.start ?? "9999-12-31")

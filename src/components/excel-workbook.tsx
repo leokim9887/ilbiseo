@@ -42,7 +42,15 @@ import { Button } from "@/components/ui/button";
 import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
-import { ArrowDown, ArrowUp, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Plus,
+  RotateCcw,
+  Trash2,
+  X,
+} from "lucide-react";
 
 export type WorkbookSheet = "todo" | "done";
 
@@ -71,6 +79,7 @@ interface ExcelWorkbookProps {
   doneTasks: Task[];
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onComplete: (id: string) => void;
+  onCompleteMany?: (ids: string[]) => void;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
   onDeleteMany: (ids: string[]) => void;
@@ -89,6 +98,7 @@ export function ExcelWorkbook({
   doneTasks,
   onUpdate,
   onComplete,
+  onCompleteMany,
   onRestore,
   onDelete: _onDelete,
   onDeleteMany,
@@ -205,6 +215,15 @@ export function ExcelWorkbook({
     setSelectedIds(new Set());
     setActiveRow(null);
   }, [onDeleteMany, selectedIds]);
+
+  const bulkComplete = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (onCompleteMany) onCompleteMany(ids);
+    else ids.forEach((id) => onComplete(id));
+    setSelectedIds(new Set());
+    setActiveRow(null);
+  }, [onComplete, onCompleteMany, selectedIds]);
 
   const bulkRestore = useCallback(() => {
     const ids = Array.from(selectedIds);
@@ -409,6 +428,19 @@ export function ExcelWorkbook({
         ) : null}
         {!isGcal && selectedCount > 0 ? (
           <>
+            {sheet === "todo" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm border-[#217346]/50 text-[#217346]"
+                onClick={bulkComplete}
+                data-excel-bulk-complete
+              >
+                <Check className="size-3.5" />
+                완료
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"

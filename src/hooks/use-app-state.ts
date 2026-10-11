@@ -201,6 +201,27 @@ export function useAppState() {
     [persist, state],
   );
 
+  const completeTasks = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      const complete = new Set(ids);
+      const completedAt = new Date().toISOString();
+      persist({
+        ...state,
+        tasks: state.tasks.map((t) =>
+          complete.has(t.id) && t.status !== "completed"
+            ? {
+                ...t,
+                status: "completed",
+                completedAt,
+              }
+            : t,
+        ),
+      });
+    },
+    [persist, state],
+  );
+
   const restoreTask = useCallback(
     (id: string) => {
       persist({
@@ -378,6 +399,7 @@ export function useAppState() {
     addMany,
     updateTask,
     completeTask,
+    completeTasks,
     restoreTask,
     deleteTask,
     deleteTasks,

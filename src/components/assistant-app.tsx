@@ -177,6 +177,7 @@ export function AssistantApp() {
                 calendarEvents={app.calendarEvents}
                 onUpdate={app.updateTask}
                 onComplete={app.completeTask}
+                onCompleteMany={app.completeTasks}
                 onRestore={app.restoreTask}
                 onDelete={app.deleteTask}
                 onDeleteMany={app.deleteTasks}

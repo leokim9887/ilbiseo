@@ -381,11 +381,13 @@ export function ExcelWorkbook({
             className="h-9 min-w-[8.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] font-medium outline-none focus:border-[#217346]"
             aria-label="틀"
           >
-            {FRAME_ORDER.map((c) => (
-              <option key={c} value={c}>
-                {FRAME_LABEL[c]}
-              </option>
-            ))}
+            {FRAME_ORDER.filter((c) => sheet === "todo" || c !== "gcal").map(
+              (c) => (
+                <option key={c} value={c}>
+                  {FRAME_LABEL[c]}
+                </option>
+              ),
+            )}
           </select>
         </label>
         {!isGcal && sheet === "todo" ? (
@@ -407,31 +409,8 @@ export function ExcelWorkbook({
             ) : null}
           </>
         ) : null}
-        {isGcal && sheet === "todo" ? (
-          <p className="text-[13px] text-[#1a3a6b]">
-            구글 캘린더 틀 · 읽기 전용 · ICS/연결은 「캘린더」메뉴
-          </p>
-        ) : null}
-        {!isGcal && sheet === "done" ? (
-          <p className="text-[13px] text-[#5c655f]">한 일 · 완료여부 복원 가능</p>
-        ) : null}
-        {isGcal && sheet === "done" ? (
-          <p className="text-[13px] text-[#5c655f]">
-            캘린더 일정은 한 일 시트로 옮기지 않습니다.
-          </p>
-        ) : null}
         {!isGcal && selectedCount > 0 ? (
           <>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-9 rounded-sm"
-              onClick={clearSelection}
-              data-excel-clear-selection
-            >
-              선택 해제
-            </Button>
             <Button
               type="button"
               size="sm"
@@ -546,11 +525,6 @@ export function ExcelWorkbook({
               </Button>
             ) : null}
           </div>
-          <p className="text-[11px] text-[#5c655f]">
-            시작·종료일을 비우면 오늘 포함 이후 일정만 보입니다. 표 머리글
-            「마감목표」를 눌러 오름/내림 · 빈 값은 맨 아래.
-            {columnSort ? ` · 지금: ${columnSortLabel(columnSort)}` : ""}
-          </p>
         </div>
       ) : !isGcal ? (
       <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
@@ -638,9 +612,6 @@ export function ExcelWorkbook({
             <RotateCcw className="size-3.5" />
             기본 정렬
           </Button>
-          <p className="text-[11px] text-[#5c655f]">
-            표 머리글(마감목표·중요도·시급성)을 눌러 오름/내림 · 빈 값은 맨 아래
-          </p>
         </div>
       </div>
       ) : null}
@@ -739,14 +710,10 @@ export function ExcelWorkbook({
                       이 기간에 겹치는 할 일이 없습니다. 「전체」를 누르세요.
                     </p>
                   ) : isGcal && sheet === "todo" ? (
-                    <p>
-                      이 기간에 일정이 없습니다. ICS·Google을 「캘린더」
-                      메뉴에서 불러오거나 기간·오늘/이번 주/이번 달을
-                      바꿔 보세요.
-                    </p>
+                    <p>이 기간에 일정이 없습니다.</p>
                   ) : sheet === "todo" ? (
                     <>
-                      <p>할 일이 없습니다. 「행 추가」로 첫 줄을 넣으세요.</p>
+                      <p>할 일이 없습니다.</p>
                       <button
                         type="button"
                         className="mt-2 text-[14px] font-semibold text-[#217346] underline"
@@ -778,9 +745,11 @@ export function ExcelWorkbook({
                         <p className="text-[14px] font-semibold leading-snug text-[#1a2420]">
                           {calendarListUpTitle(ev)}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-[#3b6ea5]">
-                          {ev.calendarName || "Google/ICS"} · 읽기 전용
-                        </p>
+                        {ev.calendarName ? (
+                          <p className="mt-0.5 text-[11px] text-[#3b6ea5]">
+                            {ev.calendarName}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="border border-black px-1 py-2 text-center align-middle text-[13px] text-[#1a2420]">
                         {formatEventDeadline(ev)}
@@ -1030,11 +999,6 @@ export function ExcelWorkbook({
       </div>
 
       <div className="flex flex-col border-t border-[#7a8288] bg-[#f0f2f4]">
-        <div className="border-b border-[#c5ccd2] px-3 py-1 text-[11px] text-[#5c655f]">
-          {isGcal
-            ? "구글 캘린더 틀 · [캘린더] 행만 · 읽기 전용 · 기간으로 필터"
-            : "프로그램 할 일만 (틀별) · 캘린더는 「구글 캘린더」 틀에서"}
-        </div>
         <div className="flex items-end gap-0 overflow-x-auto px-1 pt-1">
           <SheetTab
             active={sheet === "todo"}
@@ -1044,13 +1008,13 @@ export function ExcelWorkbook({
           </SheetTab>
           <SheetTab
             active={sheet === "done"}
-            onClick={() => onSheetChange("done")}
+            onClick={() => {
+              if (isGcal) onFrameChange("work");
+              onSheetChange("done");
+            }}
           >
             한 일
           </SheetTab>
-          <span className="mb-1.5 ml-2 hidden text-[11px] text-[#8a939a] sm:inline">
-            틀에 「구글 캘린더」 · ICS는 캘린더 메뉴
-          </span>
         </div>
       </div>
     </div>

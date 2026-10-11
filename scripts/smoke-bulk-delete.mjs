@@ -60,8 +60,9 @@ for (const frame of frames) {
   await page.waitForTimeout(150);
 
   const toolbarVisible =
-    (await page.locator("[data-excel-bulk-delete]").count()) === 1 &&
-    (await page.locator("[data-excel-clear-selection]").count()) === 1;
+    (await page.locator("[data-excel-bulk-delete]").count()) === 1;
+  const noClearBtn =
+    (await page.locator("[data-excel-clear-selection]").count()) === 0;
   const noCountBadge =
     (await page.locator("[data-excel-selection-count]").count()) === 0;
   const noSelectAllBtn =
@@ -95,6 +96,7 @@ for (const frame of frames) {
   frameResults.push({
     frame,
     toolbarVisible,
+    noClearBtn,
     noCountBadge,
     noSelectAllBtn,
     confirmGone,
@@ -104,7 +106,7 @@ for (const frame of frames) {
   });
 }
 
-// Header select-all + clear on personal
+// Header select-all + toggle-off clear on personal
 await page.locator('select[aria-label="틀"]').selectOption("personal");
 await page.waitForTimeout(200);
 for (let i = 1; i <= 2; i++) {
@@ -123,7 +125,8 @@ await page.screenshot({
   path: `${OUT}/ilbiseo-bulk-delete-selected.png`,
   fullPage: true,
 });
-await page.locator("[data-excel-clear-selection]").click();
+// Header checkbox again clears selection (no 「선택 해제」 button)
+await page.locator("[data-excel-header-select]").click();
 await page.waitForTimeout(100);
 const cleared =
   (await page.locator("[data-excel-bulk-delete]").count()) === 0;
@@ -266,6 +269,7 @@ const allOk =
   frameResults.every(
     (r) =>
       r.toolbarVisible &&
+      r.noClearBtn &&
       r.noCountBadge &&
       r.noSelectAllBtn &&
       r.confirmGone &&

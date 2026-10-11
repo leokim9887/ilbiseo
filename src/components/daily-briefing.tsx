@@ -270,7 +270,7 @@ export function DailyBriefingPanel({
   return (
     <PanelShell
       title="오늘 브리핑 · 매일 메일"
-      description="매일 아침 08:00(한국 시간)에 네이버 메일로 할 일·캘린더·지침·습관을 보냅니다. 네이버 앱 비밀번호가 없으면 발송하지 않습니다."
+      description="매일 아침 08:00(한국 시간) 네이버 메일."
       icon={<Newspaper className="size-5" />}
       actions={
         <>

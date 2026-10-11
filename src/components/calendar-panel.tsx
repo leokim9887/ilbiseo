@@ -210,7 +210,6 @@ export function CalendarPanel({
   return (
     <PanelShell
       title="구글 캘린더"
-      description="엑셀 할 일 표와 섞지 않습니다. 구글 연결 · ICS · mock으로 일정을 따로 봅니다."
       icon={<CalendarDays className="size-5" />}
       actions={
         <>
@@ -228,7 +227,7 @@ export function CalendarPanel({
                 ) : (
                   <RefreshCw className="size-4" />
                 )}
-                {busy === "refresh" ? "전체 일정 불러오는 중…" : "전체 새로고침"}
+                {busy === "refresh" ? "불러오는 중…" : "새로고침"}
               </Button>
               <Button
                 type="button"
@@ -262,7 +261,7 @@ export function CalendarPanel({
             className="min-h-11"
             onClick={loadMock}
           >
-            mock 샘플
+            샘플
           </Button>
           <input
             ref={fileRef}
@@ -301,59 +300,29 @@ export function CalendarPanel({
           {statusLoading ? (
             <p className="flex items-center gap-2 text-[var(--ink-muted)]">
               <Loader2 className="size-4 animate-spin" />
-              Google 연결 상태 확인 중…
+              연결 확인 중…
             </p>
           ) : configured && connected ? (
             <p className="text-[var(--ink)]">
               <span className="font-semibold text-[#217346]">연결됨</span>
-              {status?.email ? ` · ${status.email}` : ""} · Google 일정{" "}
-              <strong>전체</strong>(약 10년 전~후, 페이지 단위)를 불러옵니다.
-              틀「구글 캘린더」기간 필터는 화면 표시만 줄입니다.
-              {lastFetchCount != null ? (
-                <>
-                  {" "}
-                  · 최근 동기화 <strong>{lastFetchCount}</strong>건
-                </>
-              ) : null}
+              {status?.email ? ` · ${status.email}` : ""}
+              {lastFetchCount != null ? ` · ${lastFetchCount}건` : null}
             </p>
           ) : configured ? (
-            <p className="text-[var(--ink)]">
-              Google 설정은 되어 있습니다. 「Google 캘린더 연결」을 누르면
-              로그인합니다.
-            </p>
+            <p className="text-[var(--ink)]">연결을 누르면 Google 로그인합니다.</p>
           ) : (
-            <div className="space-y-2 text-[var(--ink)]">
-              <p className="font-semibold">아직 Google 키가 없습니다</p>
-              <p className="text-[var(--ink-muted)]">
-                로컬/배포 환경에{" "}
-                <code className="rounded bg-black/5 px-1">GOOGLE_CLIENT_ID</code>
-                ,{" "}
-                <code className="rounded bg-black/5 px-1">
-                  GOOGLE_CLIENT_SECRET
-                </code>
-                ,{" "}
-                <code className="rounded bg-black/5 px-1">
-                  GOOGLE_REDIRECT_URI
-                </code>
-                를 넣으면 연결 버튼이 살아납니다.
-              </p>
-              {status?.missing?.length ? (
-                <p className="text-xs text-[var(--ink-muted)]">
-                  없는 값: {status.missing.join(", ")}
-                </p>
-              ) : null}
-              <p className="text-xs text-[var(--ink-muted)]">
-                설정 안내: 프로젝트 store{" "}
-                <code>docs/google-calendar-setup.md</code> · 그전까지는 mock·ICS로
-                확인하세요.
-              </p>
-            </div>
+            <p className="text-[var(--ink-muted)]">
+              Google 키가 없습니다
+              {status?.missing?.length
+                ? ` (${status.missing.join(", ")})`
+                : ""}
+              .
+            </p>
           )}
           {busy === "refresh" ? (
             <p className="mt-2 flex items-center gap-2 text-sm text-[var(--ink-muted)]">
               <Loader2 className="size-4 animate-spin" />
-              Google 전체 일정을 가져오는 중입니다. 일정이 많으면 잠시 걸릴 수
-              있습니다…
+              일정을 가져오는 중…
             </p>
           ) : null}
           {googleError ? (
@@ -365,20 +334,15 @@ export function CalendarPanel({
 
         <div className="space-y-2 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 p-3">
           <p className="text-xs font-medium text-[var(--ink-muted)]">
-            ICS 가져오기 · Google iCal URL (선택 · OAuth와 별도 · 서버가 대신
-            받아옵니다)
+            ICS / iCal URL
           </p>
           <Textarea
             rows={3}
             className="font-mono text-xs"
-            placeholder="https://calendar.google.com/calendar/ical/…/public/basic.ics 또는 BEGIN:VCALENDAR …"
+            placeholder="iCal URL 또는 BEGIN:VCALENDAR …"
             value={icsText}
             onChange={(e) => setIcsText(e.target.value)}
           />
-          <p className="text-[11px] text-[var(--ink-muted)]">
-            webcal:// 주소도 됩니다. 공개 URL이 안 되면 Google 설정의{" "}
-            <strong>비밀 iCal 주소</strong>를 쓰세요.
-          </p>
           <Button
             type="button"
             size="lg"
@@ -393,7 +357,7 @@ export function CalendarPanel({
                 가져오는 중…
               </>
             ) : (
-              "ICS / URL 가져오기"
+              "가져오기"
             )}
           </Button>
           {icsError ? (
@@ -406,10 +370,10 @@ export function CalendarPanel({
         {sorted.length === 0 ? (
           <EmptyState
             title="캘린더 일정이 없습니다"
-            description="Google 연결·「mock 샘플」·ICS로 일정을 불러오세요. 할 일 엑셀 표와는 별도입니다."
+            description="연결하거나 ICS·샘플로 일정을 불러오세요."
             action={
               <Button type="button" size="lg" onClick={loadMock}>
-                mock 샘플 넣기
+                샘플 넣기
               </Button>
             }
           />

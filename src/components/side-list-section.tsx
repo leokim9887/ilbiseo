@@ -110,9 +110,7 @@ export function SideListSection({
           >
             {label}
           </span>
-          <p className="text-[12px] text-[#5c655f]">
-            장부 아래 별도 영역 · 틀과 섞이지 않음 · {items.length}건
-          </p>
+          <p className="text-[12px] text-[#5c655f]">{items.length}건</p>
           {items.length > 0 ? (
             <label className="flex items-center gap-1.5 text-[12px] text-[#5c655f]">
               <input
@@ -131,28 +129,17 @@ export function SideListSection({
             </label>
           ) : null}
           {selectedCount > 0 ? (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 rounded-sm px-2 text-[12px]"
-                onClick={clearSelection}
-              >
-                선택 해제
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 rounded-sm border-[#b42318]/40 px-2 text-[12px] text-[#b42318]"
-                onClick={bulkDelete}
-                data-side-bulk-delete={kind}
-              >
-                <Trash2 className="size-3.5" />
-                선택 삭제
-              </Button>
-            </>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-sm border-[#b42318]/40 px-2 text-[12px] text-[#b42318]"
+              onClick={bulkDelete}
+              data-side-bulk-delete={kind}
+            >
+              <Trash2 className="size-3.5" />
+              선택 삭제
+            </Button>
           ) : null}
         </div>
         <Button

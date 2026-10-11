@@ -101,6 +101,11 @@ export function AssistantApp() {
     if (f === "gcal" && view === "done") setView("todo");
   };
 
+  const handleViewChange = (v: MainView) => {
+    if (v === "done" && frame === "gcal") setFrame("work");
+    setView(v);
+  };
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <InstallHint />
@@ -116,10 +121,6 @@ export function AssistantApp() {
               <h1 className="mt-0.5 font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--brand)] sm:text-5xl">
                 일비서
               </h1>
-              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
-                틀에서 업무·개인·과제·팀원·구글 캘린더를 고릅니다. 장부 아래에
-                지침·습관 영역을 따로 둡니다.
-              </p>
             </div>
             <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">
               <div>
@@ -146,7 +147,7 @@ export function AssistantApp() {
 
         <AppNav
           value={view}
-          onChange={setView}
+          onChange={handleViewChange}
           counts={{
             todo: app.allActive.length,
             done: app.allCompleted.length,
@@ -235,18 +236,11 @@ export function AssistantApp() {
           ) : null}
 
           {view === "settings" ? (
-            <PanelShell
-              title="설정 · 엑셀"
-              description="앱 설치, PC 엑셀 연결, 이 기기 저장 안내입니다. 브리핑 메일은 「오늘 브리핑」에서 설정합니다(아버지 네이버 메일 고정)."
-            >
+            <PanelShell title="설정 · 엑셀">
               <div className="space-y-5">
                 <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
                   <p className="text-sm font-semibold text-[var(--ink)]">
                     앱처럼 설치하기
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    홈 화면·시작 메뉴에 두면 브라우저 창 없이 일비서를 엽니다.
-                    할 일 데이터는 이 기기에 그대로 저장됩니다.
                   </p>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--ink-muted)]">
                     <li>
@@ -258,16 +252,9 @@ export function AssistantApp() {
                       홈 화면에 추가
                     </li>
                     <li>
-                      <strong>아이폰</strong>: <strong>Safari</strong> → 공유 →
-                      홈 화면에 추가 (iOS는 Safari만 지원)
+                      <strong>아이폰</strong>: Safari → 공유 → 홈 화면에 추가
                     </li>
                   </ul>
-                  <p className="mt-2 text-xs text-[var(--ink-muted)]">
-                    자세한 순서: 프로젝트 문서{" "}
-                    <code className="rounded bg-black/5 px-1">
-                      docs/install-as-app.md
-                    </code>
-                  </p>
                 </div>
                 <ExcelLinker
                   state={app.state}
@@ -279,11 +266,6 @@ export function AssistantApp() {
                 <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
                   <p className="text-sm font-semibold text-[var(--ink)]">
                     데이터
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ink-muted)]">
-                    할 일·한 일은 이 브라우저(localStorage)에 저장됩니다. 장부
-                    UI와 PC xlsx 시트가 같은 구조입니다. 오프라인에서도 이미
-                    열어 둔 앱 화면과 저장된 할 일은 쓸 수 있습니다.
                   </p>
                   <Button
                     type="button"

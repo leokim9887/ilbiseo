@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import fs from "fs";
 
-const BASE = process.env.BASE_URL || "http://127.0.0.1:4347";
+const BASE = process.env.BASE_URL || "http://localhost:4347";
 const OUT = process.env.OUT_DIR || "/cursor/stores/self/media";
 const frames = ["work", "personal", "project", "team"];
 

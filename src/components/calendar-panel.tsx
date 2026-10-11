@@ -168,6 +168,11 @@ export function CalendarPanel({
     setMonthIndex(t.monthIndex);
   };
 
+  const changeYearMonth = (nextYear: number, nextMonthIndex: number) => {
+    setYear(nextYear);
+    setMonthIndex(nextMonthIndex);
+  };
+
   const monthPrefix = useMemo(() => {
     const m = String(monthIndex + 1).padStart(2, "0");
     return `${year}-${m}`;
@@ -317,6 +322,7 @@ export function CalendarPanel({
             onPrevMonth={goPrevMonth}
             onNextMonth={goNextMonth}
             onGoToday={goToday}
+            onChangeYearMonth={changeYearMonth}
           />
         )}
       </div>

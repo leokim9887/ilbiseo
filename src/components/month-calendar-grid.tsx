@@ -142,6 +142,32 @@ function buildWeekModels(
   return weeks;
 }
 
+const MONTH_OPTIONS = [
+  "1월",
+  "2월",
+  "3월",
+  "4월",
+  "5월",
+  "6월",
+  "7월",
+  "8월",
+  "9월",
+  "10월",
+  "11월",
+  "12월",
+] as const;
+
+function yearOptionsAround(selectedYear: number, todayYear: number): number[] {
+  const start = Math.min(todayYear - 10, selectedYear);
+  const end = Math.max(todayYear + 5, selectedYear);
+  const years: number[] = [];
+  for (let y = start; y <= end; y++) years.push(y);
+  return years;
+}
+
+const pickerSelectClass =
+  "min-h-9 cursor-pointer appearance-auto rounded-lg border border-[var(--grid-line)] bg-[var(--sheet)] px-2.5 py-1.5 text-base font-semibold tabular-nums text-[var(--ink)] shadow-none outline-none transition-colors hover:border-[#217346]/45 focus-visible:border-[#217346] focus-visible:ring-2 focus-visible:ring-[#217346]/25";
+
 interface MonthCalendarGridProps {
   events: CalendarEvent[];
   year: number;
@@ -149,6 +175,7 @@ interface MonthCalendarGridProps {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onGoToday: () => void;
+  onChangeYearMonth: (year: number, monthIndex: number) => void;
 }
 
 export function MonthCalendarGrid({
@@ -158,8 +185,14 @@ export function MonthCalendarGrid({
   onPrevMonth,
   onNextMonth,
   onGoToday,
+  onChangeYearMonth,
 }: MonthCalendarGridProps) {
   const today = todayIsoKst();
+  const todayYear = Number(today.slice(0, 4));
+  const years = useMemo(
+    () => yearOptionsAround(year, todayYear),
+    [year, todayYear],
+  );
   const cells = useMemo(
     () => daysInMonthGrid(year, monthIndex),
     [year, monthIndex],
@@ -169,9 +202,49 @@ export function MonthCalendarGrid({
   return (
     <div className="space-y-3" data-month-calendar>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-lg font-semibold text-[var(--ink)]">
-          {monthLabelKo(year, monthIndex)}
-        </p>
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          data-cal-year-month-picker
+        >
+          <label className="sr-only" htmlFor="cal-year-select">
+            연도
+          </label>
+          <select
+            id="cal-year-select"
+            data-cal-year-select
+            className={pickerSelectClass}
+            value={year}
+            aria-label="연도 선택"
+            onChange={(e) =>
+              onChangeYearMonth(Number(e.target.value), monthIndex)
+            }
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}년
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="cal-month-select">
+            월
+          </label>
+          <select
+            id="cal-month-select"
+            data-cal-month-select
+            className={pickerSelectClass}
+            value={monthIndex}
+            aria-label="월 선택"
+            onChange={(e) =>
+              onChangeYearMonth(year, Number(e.target.value))
+            }
+          >
+            {MONTH_OPTIONS.map((label, i) => (
+              <option key={label} value={i}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <Button
             type="button"

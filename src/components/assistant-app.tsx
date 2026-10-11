@@ -174,6 +174,7 @@ export function AssistantApp() {
                 onFrameChange={handleFrameChange}
                 activeTasks={active}
                 doneTasks={done}
+                allActiveTasks={app.allActive}
                 calendarEvents={app.calendarEvents}
                 onUpdate={app.updateTask}
                 onComplete={app.completeTask}

@@ -1,15 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
-import {
-  createMockCalendarEvents,
-  formatCalendarWhen,
-  looksLikeCalendarUrl,
-} from "@/lib/calendar-data";
+import { createMockCalendarEvents } from "@/lib/calendar-data";
 import { PanelShell, EmptyState } from "@/components/panel-shell";
+import { MonthCalendarGrid } from "@/components/month-calendar-grid";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   CalendarDays,
   Link2,
@@ -17,6 +13,7 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
+import { todayIsoKst } from "@/lib/date-range";
 
 interface CalendarPanelProps {
   events: CalendarEvent[];
@@ -33,24 +30,24 @@ type GoogleStatus = {
   setupHint: string;
 };
 
+function parseYearMonth(isoDay: string): { year: number; monthIndex: number } {
+  const [y, m] = isoDay.split("-").map(Number);
+  return { year: y, monthIndex: m - 1 };
+}
+
 export function CalendarPanel({
   events,
   onReplace,
-  onAppend,
   banner,
 }: CalendarPanelProps) {
-  const [icsText, setIcsText] = useState("");
-  /** Google OAuth /events errors — shown near connection status, not ICS */
   const [googleError, setGoogleError] = useState<string | null>(null);
-  /** ICS import errors only */
-  const [icsError, setIcsError] = useState<string | null>(null);
   const [status, setStatus] = useState<GoogleStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
-  const [busy, setBusy] = useState<"refresh" | "disconnect" | "ics" | null>(
-    null,
-  );
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<"refresh" | "disconnect" | null>(null);
   const autoFetched = useRef(false);
+  const initial = parseYearMonth(todayIsoKst());
+  const [year, setYear] = useState(initial.year);
+  const [monthIndex, setMonthIndex] = useState(initial.monthIndex);
 
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -68,7 +65,7 @@ export function CalendarPanel({
           "GOOGLE_CLIENT_SECRET",
           "GOOGLE_REDIRECT_URI",
         ],
-        setupHint: "상태 확인에 실패했습니다. ICS·mock으로 확인하세요.",
+        setupHint: "상태 확인에 실패했습니다. 샘플로 확인할 수 있습니다.",
       });
     } finally {
       setStatusLoading(false);
@@ -85,7 +82,6 @@ export function CalendarPanel({
     setBusy("refresh");
     setGoogleError(null);
     try {
-      // Full calendar sync (paginated; ~10y past → ~10y ahead). UI period filter still applies for display.
       const res = await fetch("/api/google/events?full=1");
       const json = (await res.json()) as {
         error?: string;
@@ -111,10 +107,9 @@ export function CalendarPanel({
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "가져오기 실패";
-      // Never dump raw HTML next to ICS controls
       setGoogleError(
         /<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(msg)
-          ? "Google 일정을 불러오지 못했습니다. 「새로고침」하거나 연결을 다시 해보세요. ICS는 선택 사항입니다."
+          ? "Google 일정을 불러오지 못했습니다. 「새로고침」하거나 연결을 다시 해보세요."
           : msg,
       );
     } finally {
@@ -143,67 +138,54 @@ export function CalendarPanel({
   };
 
   const loadMock = () => {
-    // Optional demo only — not auto-loaded
     onReplace(createMockCalendarEvents());
     setGoogleError(null);
-    setIcsError(null);
   };
 
-  const importIcsViaServer = async (input: string, mode: "append" | "replace") => {
-    setBusy("ics");
-    setIcsError(null);
-    const trimmed = input.trim();
-    if (!trimmed) {
-      setIcsError("붙여 넣을 ICS 내용 또는 iCal URL을 입력하세요.");
-      setBusy(null);
-      return;
-    }
-    try {
-      const body = looksLikeCalendarUrl(trimmed)
-        ? { url: trimmed }
-        : { text: trimmed };
-      const res = await fetch("/api/calendar/ics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const json = (await res.json()) as {
-        error?: string;
-        events?: CalendarEvent[];
-        count?: number;
-      };
-      if (!res.ok) {
-        throw new Error(json.error || "ICS 가져오기 실패");
+  const goPrevMonth = () => {
+    setMonthIndex((m) => {
+      if (m === 0) {
+        setYear((y) => y - 1);
+        return 11;
       }
-      const events = json.events ?? [];
-      if (mode === "replace") onReplace(events);
-      else onAppend(events);
-      setIcsText("");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "ICS 가져오기 실패";
-      setIcsError(
-        /<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(msg)
-          ? "ICS/URL을 가져오지 못했습니다. 주소를 확인하거나 파일로 넣어 보세요."
-          : msg,
-      );
-    } finally {
-      setBusy(null);
-    }
+      return m - 1;
+    });
   };
 
-  const importIcs = () => void importIcsViaServer(icsText, "append");
-
-  const onFile = async (file: File | null) => {
-    if (!file) return;
-    try {
-      const text = await file.text();
-      await importIcsViaServer(text, "append");
-    } catch (e) {
-      setIcsError(e instanceof Error ? e.message : "파일 읽기 실패");
-    }
+  const goNextMonth = () => {
+    setMonthIndex((m) => {
+      if (m === 11) {
+        setYear((y) => y + 1);
+        return 0;
+      }
+      return m + 1;
+    });
   };
 
-  const sorted = [...events].sort((a, b) => a.start.localeCompare(b.start));
+  const goToday = () => {
+    const t = parseYearMonth(todayIsoKst());
+    setYear(t.year);
+    setMonthIndex(t.monthIndex);
+  };
+
+  const monthPrefix = useMemo(() => {
+    const m = String(monthIndex + 1).padStart(2, "0");
+    return `${year}-${m}`;
+  }, [year, monthIndex]);
+
+  const monthEventCount = useMemo(
+    () =>
+      events.filter((ev) => {
+        const start = ev.start.slice(0, 10);
+        const end = (ev.end?.slice(0, 10) || start);
+        const monthStart = `${monthPrefix}-01`;
+        const last = new Date(year, monthIndex + 1, 0).getDate();
+        const monthEnd = `${monthPrefix}-${String(last).padStart(2, "0")}`;
+        return start <= monthEnd && end >= monthStart;
+      }).length,
+    [events, monthPrefix, year, monthIndex],
+  );
+
   const configured = status?.configured ?? false;
   const connected = status?.connected ?? false;
 
@@ -263,22 +245,6 @@ export function CalendarPanel({
           >
             샘플
           </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".ics,text/calendar"
-            className="hidden"
-            onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-          />
-          <Button
-            type="button"
-            size="lg"
-            variant="outline"
-            className="min-h-11"
-            onClick={() => fileRef.current?.click()}
-          >
-            ICS 파일
-          </Button>
         </>
       }
     >
@@ -307,6 +273,7 @@ export function CalendarPanel({
               <span className="font-semibold text-[#217346]">연결됨</span>
               {status?.email ? ` · ${status.email}` : ""}
               {lastFetchCount != null ? ` · ${lastFetchCount}건` : null}
+              {` · 이 달 ${monthEventCount}건`}
             </p>
           ) : configured ? (
             <p className="text-[var(--ink)]">연결을 누르면 Google 로그인합니다.</p>
@@ -316,7 +283,7 @@ export function CalendarPanel({
               {status?.missing?.length
                 ? ` (${status.missing.join(", ")})`
                 : ""}
-              .
+              . 「샘플」로 달력 모양을 확인할 수 있습니다.
             </p>
           )}
           {busy === "refresh" ? (
@@ -332,45 +299,10 @@ export function CalendarPanel({
           ) : null}
         </div>
 
-        <div className="space-y-2 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 p-3">
-          <p className="text-xs font-medium text-[var(--ink-muted)]">
-            ICS / iCal URL
-          </p>
-          <Textarea
-            rows={3}
-            className="font-mono text-xs"
-            placeholder="iCal URL 또는 BEGIN:VCALENDAR …"
-            value={icsText}
-            onChange={(e) => setIcsText(e.target.value)}
-          />
-          <Button
-            type="button"
-            size="lg"
-            variant="outline"
-            className="min-h-11"
-            disabled={!icsText.trim() || busy === "ics"}
-            onClick={importIcs}
-          >
-            {busy === "ics" ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                가져오는 중…
-              </>
-            ) : (
-              "가져오기"
-            )}
-          </Button>
-          {icsError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {icsError}
-            </p>
-          ) : null}
-        </div>
-
-        {sorted.length === 0 ? (
+        {events.length === 0 ? (
           <EmptyState
             title="캘린더 일정이 없습니다"
-            description="연결하거나 ICS·샘플로 일정을 불러오세요."
+            description="Google을 연결하거나 「샘플」로 달력을 확인해 보세요."
             action={
               <Button type="button" size="lg" onClick={loadMock}>
                 샘플 넣기
@@ -378,40 +310,14 @@ export function CalendarPanel({
             }
           />
         ) : (
-          <ul className="space-y-2" aria-label="캘린더 일정 목록">
-            {sorted.map((ev) => (
-              <li
-                key={ev.id}
-                className="rounded-xl border border-[var(--grid-line)] border-l-[3px] border-l-[var(--accent-ongoing)] bg-[var(--sheet-header)]/30 px-3 py-3 sm:px-4"
-              >
-                <p className="text-[12px] font-medium text-[var(--brand)]">
-                  {formatCalendarWhen(ev)}
-                  {ev.end && !ev.allDay ? (
-                    <span className="text-[var(--ink-muted)]">
-                      {" "}
-                      ~{" "}
-                      {formatCalendarWhen({
-                        ...ev,
-                        start: ev.end,
-                      })}
-                    </span>
-                  ) : null}
-                </p>
-                <p className="mt-0.5 text-base font-semibold text-[var(--ink)]">
-                  {ev.title}
-                </p>
-                <p className="mt-1 text-[12px] text-[var(--ink-muted)]">
-                  {ev.calendarName ? `${ev.calendarName} · ` : ""}
-                  {ev.notes || "메모 없음"} · 출처{" "}
-                  {ev.source === "google"
-                    ? "Google"
-                    : ev.source === "ics"
-                      ? "ICS"
-                      : "mock"}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <MonthCalendarGrid
+            events={events}
+            year={year}
+            monthIndex={monthIndex}
+            onPrevMonth={goPrevMonth}
+            onNextMonth={goNextMonth}
+            onGoToday={goToday}
+          />
         )}
       </div>
     </PanelShell>

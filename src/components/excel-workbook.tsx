@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
@@ -33,6 +34,7 @@ import {
   todayIsoKst,
   weekRangeContaining,
 } from "@/lib/date-range";
+import { confirmNoBlockingOverlap } from "@/lib/overlap";
 import {
   applyColumnSort,
   columnSortLabel,
@@ -80,6 +82,8 @@ interface ExcelWorkbookProps {
   /** Tasks for the selected program frame (ignored when frame=gcal) */
   activeTasks: Task[];
   doneTasks: Task[];
+  /** All-frame active tasks — for 마감목표 overlap warn */
+  allActiveTasks?: Task[];
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onComplete: (id: string) => void;
   onCompleteMany?: (ids: string[]) => void;
@@ -99,6 +103,7 @@ export function ExcelWorkbook({
   onFrameChange,
   activeTasks,
   doneTasks,
+  allActiveTasks,
   onUpdate,
   onComplete,
   onCompleteMany,
@@ -127,6 +132,11 @@ export function ExcelWorkbook({
   const [gcalChip, setGcalChip] = useState<
     "none" | "today" | "week" | "month" | "all"
   >("none");
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const paintRef = useRef<{
+    active: boolean;
+    mode: "add" | "remove";
+  }>({ active: false, mode: "add" });
   const todayLabel = useMemo(
     () =>
       new Date().toLocaleDateString("ko-KR", {
@@ -138,6 +148,7 @@ export function ExcelWorkbook({
     [],
   );
   const todayKst = useMemo(() => todayIsoKst(), []);
+  const overlapPeers = allActiveTasks ?? activeTasks;
 
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
   const taskById = useMemo(() => {
@@ -212,6 +223,66 @@ export function ExcelWorkbook({
     });
   }, []);
 
+  const setSelectPaint = useCallback((id: string, mode: "add" | "remove") => {
+    setSelectedIds((prev) => {
+      const has = prev.has(id);
+      if (mode === "add" && has) return prev;
+      if (mode === "remove" && !has) return prev;
+      const next = new Set(prev);
+      if (mode === "add") next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const beginPaintSelect = useCallback(
+    (id: string, currentlyChecked: boolean) => {
+      const mode: "add" | "remove" = currentlyChecked ? "remove" : "add";
+      paintRef.current = { active: true, mode };
+      setSelectPaint(id, mode);
+    },
+    [setSelectPaint],
+  );
+
+  const paintEnterRow = useCallback(
+    (id: string) => {
+      if (!paintRef.current.active) return;
+      setSelectPaint(id, paintRef.current.mode);
+    },
+    [setSelectPaint],
+  );
+
+  useEffect(() => {
+    const endPaint = () => {
+      paintRef.current.active = false;
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!paintRef.current.active) return;
+      const scroller = tableScrollRef.current;
+      if (!scroller) return;
+      const rect = scroller.getBoundingClientRect();
+      const edge = 36;
+      if (e.clientY < rect.top + edge) {
+        scroller.scrollTop -= 18;
+      } else if (e.clientY > rect.bottom - edge) {
+        scroller.scrollTop += 18;
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const cell = el?.closest?.("[data-excel-select-cell]") as
+        | HTMLElement
+        | null
+        | undefined;
+      const id = cell?.dataset?.excelSelectCell;
+      if (id) setSelectPaint(id, paintRef.current.mode);
+    };
+    window.addEventListener("mouseup", endPaint);
+    window.addEventListener("mousemove", onMove);
+    return () => {
+      window.removeEventListener("mouseup", endPaint);
+      window.removeEventListener("mousemove", onMove);
+    };
+  }, [setSelectPaint]);
+
   const selectAllVisible = useCallback(() => {
     setSelectedIds(new Set(taskIds));
   }, [taskIds]);
@@ -224,6 +295,31 @@ export function ExcelWorkbook({
     if (allVisibleSelected) clearSelection();
     else selectAllVisible();
   }, [allVisibleSelected, clearSelection, selectAllVisible]);
+
+  /** Apply deadline-related patch after optional overlap confirm. */
+  const applyDeadlinePatch = useCallback(
+    (task: Task, patch: Partial<Task>) => {
+      const candidate = {
+        kind: (patch.kind ?? task.kind) as Task["kind"],
+        startDate:
+          patch.startDate !== undefined ? patch.startDate : task.startDate,
+        targetDate:
+          patch.targetDate !== undefined ? patch.targetDate : task.targetDate,
+      };
+      if (
+        !confirmNoBlockingOverlap({
+          candidate,
+          activeTasks: overlapPeers,
+          excludeId: task.id,
+          calendarEvents,
+        })
+      ) {
+        return;
+      }
+      onUpdate(task.id, patch);
+    },
+    [overlapPeers, calendarEvents, onUpdate],
+  );
 
   const bulkDelete = useCallback(() => {
     const ids = selectedDeletableIds;
@@ -630,7 +726,11 @@ export function ExcelWorkbook({
       </div>
       ) : null}
 
-      <div className="relative max-h-[min(66vh,720px)] min-h-[300px] overflow-auto bg-white">
+      <div
+        ref={tableScrollRef}
+        className="relative max-h-[min(66vh,720px)] min-h-[300px] overflow-auto bg-white"
+        data-excel-scroll
+      >
         <table className="w-full min-w-[860px] border-collapse text-[15px] text-black">
           <thead className="sticky top-0 z-20">
             <tr>
@@ -813,7 +913,7 @@ export function ExcelWorkbook({
                       targetDate: null,
                     });
                   } else {
-                    onUpdate(task.id, {
+                    applyDeadlinePatch(task, {
                       kind: "spot",
                       startDate: todayKst,
                       targetDate: todayKst,
@@ -841,13 +941,41 @@ export function ExcelWorkbook({
                               : "bg-white"
                     }
                   >
-                    <td className="border border-black px-1 py-0.5 text-center align-middle">
+                    <td
+                      className="border border-black px-1 py-0.5 text-center align-middle select-none"
+                      data-excel-select-cell={task.id}
+                      title="클릭하거나 드래그해서 여러 행 선택"
+                      onMouseDown={(e) => {
+                        // Paint-select from checkbox column only — never steal text edits
+                        if (e.button !== 0) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        beginPaintSelect(task.id, checked);
+                      }}
+                      onMouseEnter={() => paintEnterRow(task.id)}
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => toggleSelect(task.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="size-4 accent-[#217346]"
+                        readOnly
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === " " || e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleSelect(task.id);
+                          }
+                        }}
+                        onMouseDown={(e) => {
+                          if (e.button !== 0) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          beginPaintSelect(task.id, checked);
+                        }}
+                        className="size-4 accent-[#217346] pointer-events-auto"
                         aria-label={`${order}번 행 선택`}
                         data-excel-row-check={task.id}
                       />
@@ -1016,7 +1144,7 @@ export function ExcelWorkbook({
                                     ) {
                                       patch.targetDate = v;
                                     }
-                                    onUpdate(task.id, patch);
+                                    applyDeadlinePatch(task, patch);
                                   }}
                                   className="excel-input min-h-7 text-center text-[13px]"
                                   aria-label="시작일"
@@ -1045,7 +1173,7 @@ export function ExcelWorkbook({
                                       return;
                                     }
                                     const start = task.startDate;
-                                    onUpdate(task.id, {
+                                    applyDeadlinePatch(task, {
                                       kind:
                                         start && v && start !== v
                                           ? "ongoing"

@@ -123,7 +123,7 @@ export function useAppState() {
 
   const addTask = useCallback(
     (partial?: Partial<Task>) => {
-      const title = partial?.title?.trim() || "새 할 일";
+      const title = (partial?.title ?? "").trim();
       const task: Task = {
         id: createId(),
         title,

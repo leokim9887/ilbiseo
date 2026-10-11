@@ -88,7 +88,6 @@ type FocusCell = { rowId: string; col: ColKey };
 
 interface ExcelWorkbookProps {
   sheet: WorkbookSheet;
-  onSheetChange: (sheet: WorkbookSheet) => void;
   frame: FrameId;
   onFrameChange: (f: FrameId) => void;
   /** Tasks for the selected program frame (ignored when frame=gcal) */
@@ -110,7 +109,6 @@ interface ExcelWorkbookProps {
 
 export function ExcelWorkbook({
   sheet,
-  onSheetChange,
   frame,
   onFrameChange,
   activeTasks,
@@ -1343,26 +1341,6 @@ export function ExcelWorkbook({
         </table>
       </div>
 
-      <div className="flex flex-col border-t border-[#7a8288] bg-[#f0f2f4]">
-        <div className="flex items-end gap-0 overflow-x-auto px-1 pt-1">
-          <SheetTab
-            active={sheet === "todo"}
-            onClick={() => onSheetChange("todo")}
-          >
-            할 일
-          </SheetTab>
-          <SheetTab
-            active={sheet === "done"}
-            onClick={() => {
-              if (isGcal) onFrameChange("work");
-              onSheetChange("done");
-            }}
-          >
-            한 일
-          </SheetTab>
-        </div>
-      </div>
-
       <Dialog
         open={Boolean(similarityAlert)}
         onOpenChange={(open) => {
@@ -1396,30 +1374,6 @@ export function ExcelWorkbook({
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function SheetTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative min-w-[4.5rem] rounded-t-md border border-b-0 px-4 py-2 text-[13px] font-semibold transition-colors ${
-        active
-          ? "z-10 -mb-px border-[#7a8288] bg-white text-[#217346]"
-          : "border-transparent bg-[#cfd4d8] text-[#5c655f] hover:bg-[#e9ecef]"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

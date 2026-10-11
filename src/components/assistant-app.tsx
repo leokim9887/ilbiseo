@@ -169,7 +169,6 @@ export function AssistantApp() {
             <div className="space-y-4">
               <ExcelWorkbook
                 sheet={view === "done" ? "done" : "todo"}
-                onSheetChange={(s) => setView(s === "done" ? "done" : "todo")}
                 frame={frame}
                 onFrameChange={handleFrameChange}
                 activeTasks={active}

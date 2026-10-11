@@ -63,11 +63,16 @@ const monthSelect = page.locator("[data-cal-month-select]");
 if ((await yearSelect.count()) !== 1) throw new Error("year select missing");
 if ((await monthSelect.count()) !== 1) throw new Error("month select missing");
 
-// Prev/오늘/다음 still present
-for (const label of ["이전", "오늘", "다음"]) {
-  if ((await page.getByRole("button", { name: label }).count()) < 1) {
-    throw new Error(`nav button missing: ${label}`);
-  }
+// Prev/오늘/다음 still present (scope to month chrome — avoid 「오늘 브리핑」)
+const navPrev = cal.getByRole("button", { name: "이전" });
+const navToday = cal.getByRole("button", { name: "오늘", exact: true });
+const navNext = cal.getByRole("button", { name: "다음" });
+for (const [label, loc] of [
+  ["이전", navPrev],
+  ["오늘", navToday],
+  ["다음", navNext],
+]) {
+  if ((await loc.count()) < 1) throw new Error(`nav button missing: ${label}`);
 }
 
 const initialYear = Number(await yearSelect.inputValue());
@@ -99,7 +104,7 @@ if (gridLabel !== expectedLabel) {
 }
 
 // Jump back with 오늘
-await page.getByRole("button", { name: "오늘" }).click();
+await navToday.click();
 await page.waitForTimeout(150);
 if (Number(await yearSelect.inputValue()) !== todayY) {
   throw new Error("오늘 did not restore year");
@@ -109,7 +114,7 @@ if (Number(await monthSelect.inputValue()) !== todayM - 1) {
 }
 
 // Prev/next still move one month
-await page.getByRole("button", { name: "다음" }).click();
+await navNext.click();
 await page.waitForTimeout(120);
 let y = Number(await yearSelect.inputValue());
 let m = Number(await monthSelect.inputValue());
@@ -120,7 +125,7 @@ if (y !== afterNext.getFullYear() || m !== afterNext.getMonth()) {
   );
 }
 
-await page.getByRole("button", { name: "이전" }).click();
+await navPrev.click();
 await page.waitForTimeout(120);
 y = Number(await yearSelect.inputValue());
 m = Number(await monthSelect.inputValue());

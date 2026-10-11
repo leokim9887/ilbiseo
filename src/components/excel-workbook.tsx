@@ -872,16 +872,7 @@ export function ExcelWorkbook({
                         : "이 기간에 일정이 없습니다. 「전체」를 누르면 가져온 일정을 모두 봅니다."}
                     </p>
                   ) : sheet === "todo" ? (
-                    <>
-                      <p>할 일이 없습니다.</p>
-                      <button
-                        type="button"
-                        className="mt-2 text-[14px] font-semibold text-[#217346] underline"
-                        onClick={onAdd}
-                      >
-                        행 추가
-                      </button>
-                    </>
+                    <p>할 일이 없습니다.</p>
                   ) : (
                     <p>한 일이 없습니다.</p>
                   )}

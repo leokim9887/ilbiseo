@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
-import { formatCalendarWhen } from "@/lib/calendar-data";
+import {
+  formatCalendarDayDetailWhen,
+  formatCalendarWhen,
+} from "@/lib/calendar-data";
 import {
   eventInclusiveDayRange,
   eventOccursOnDay,
@@ -10,11 +13,25 @@ import {
 import { todayIsoKst } from "@/lib/date-range";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+const CHIP_LIMIT = 3;
 
 function monthLabelKo(year: number, monthIndex: number): string {
   return `${year}년 ${monthIndex + 1}월`;
+}
+
+function dayHeadingKo(isoDay: string): string {
+  const [y, m, d] = isoDay.split("-").map(Number);
+  const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()]!;
+  return `${y}년 ${m}월 ${d}일 (${wd})`;
 }
 
 function daysInMonthGrid(year: number, monthIndex: number): (string | null)[] {
@@ -30,6 +47,20 @@ function daysInMonthGrid(year: number, monthIndex: number): (string | null)[] {
   }
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
+}
+
+function compareEventsForDay(a: CalendarEvent, b: CalendarEvent): number {
+  const aAll = a.allDay || a.start.length === 10;
+  const bAll = b.allDay || b.start.length === 10;
+  if (aAll !== bAll) return aAll ? -1 : 1;
+  return (
+    a.start.localeCompare(b.start) ||
+    a.title.localeCompare(b.title, "ko")
+  );
+}
+
+function eventsOnDay(events: CalendarEvent[], day: string): CalendarEvent[] {
+  return events.filter((ev) => eventOccursOnDay(ev, day)).sort(compareEventsForDay);
 }
 
 type SpanSeg = {
@@ -198,6 +229,17 @@ export function MonthCalendarGrid({
     [year, monthIndex],
   );
   const weeks = useMemo(() => buildWeekModels(cells, events), [cells, events]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const detailEvents = useMemo(
+    () => (selectedDay ? eventsOnDay(events, selectedDay) : []),
+    [events, selectedDay],
+  );
+
+  const openDay = (day: string) => {
+    if (eventsOnDay(events, day).length === 0) return;
+    setSelectedDay(day);
+  };
 
   return (
     <div className="space-y-3" data-month-calendar>
@@ -316,16 +358,38 @@ export function MonthCalendarGrid({
                   );
                 }
                 const dayEvents = week.singles.get(day) ?? [];
+                const dayTotal = eventsOnDay(events, day).length;
+                const overflow = Math.max(0, dayEvents.length - CHIP_LIMIT);
                 const isToday = day === today;
                 const isSun = di === 0;
                 const isSat = di === 6;
+                const canOpen = dayTotal > 0;
                 return (
                   <div
                     key={day}
                     role="gridcell"
                     data-cal-day={day}
+                    data-cal-day-count={dayTotal}
+                    tabIndex={canOpen ? 0 : undefined}
+                    aria-label={
+                      canOpen
+                        ? `${dayHeadingKo(day)} 일정 ${dayTotal}건 보기`
+                        : undefined
+                    }
+                    onClick={() => openDay(day)}
+                    onKeyDown={(e) => {
+                      if (!canOpen) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openDay(day);
+                      }
+                    }}
                     className={`min-h-[5.5rem] border-r border-[var(--grid-line)] p-1 sm:min-h-[6.5rem] sm:p-1.5 ${
                       isToday ? "bg-[#e8f5ee]" : "bg-white"
+                    } ${
+                      canOpen
+                        ? "cursor-pointer transition-colors hover:bg-[#f3f7f4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#217346]/35"
+                        : ""
                     }`}
                   >
                     <p
@@ -355,7 +419,7 @@ export function MonthCalendarGrid({
                       />
                     ) : null}
                     <ul className="space-y-0.5">
-                      {dayEvents.slice(0, 3).map((ev) => (
+                      {dayEvents.slice(0, CHIP_LIMIT).map((ev) => (
                         <li
                           key={ev.id}
                           className="truncate rounded-sm border-l-2 border-l-[#3b6ea5] bg-[#eef3fa] px-1 py-0.5 text-[11px] leading-snug text-[var(--ink)] sm:text-[12px]"
@@ -368,9 +432,19 @@ export function MonthCalendarGrid({
                             : `${formatCalendarWhen(ev)} ${ev.title}`}
                         </li>
                       ))}
-                      {dayEvents.length > 3 ? (
-                        <li className="px-1 text-[10px] text-[var(--ink-muted)]">
-                          +{dayEvents.length - 3}건
+                      {overflow > 0 ? (
+                        <li>
+                          <button
+                            type="button"
+                            data-cal-overflow
+                            className="rounded px-1 text-[10px] font-medium text-[var(--ink-muted)] underline-offset-2 hover:text-[#217346] hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDay(day);
+                            }}
+                          >
+                            +{overflow}건
+                          </button>
                         </li>
                       ) : null}
                     </ul>
@@ -412,6 +486,58 @@ export function MonthCalendarGrid({
           );
         })}
       </div>
+
+      <Sheet
+        open={selectedDay != null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDay(null);
+        }}
+      >
+        <SheetContent
+          side="right"
+          data-cal-day-detail
+          className="w-[min(100%,22rem)] gap-0 border-[var(--grid-line)] bg-[var(--sheet)] p-0 sm:max-w-sm"
+        >
+          <SheetHeader className="border-b border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-3.5 pr-12">
+            <SheetTitle className="text-[15px] font-semibold text-[var(--ink)]">
+              {selectedDay ? dayHeadingKo(selectedDay) : "일정"}
+            </SheetTitle>
+            <SheetDescription className="text-[13px] text-[var(--ink-muted)]">
+              {detailEvents.length > 0
+                ? `이 날 일정 ${detailEvents.length}건`
+                : "일정이 없습니다"}
+            </SheetDescription>
+          </SheetHeader>
+          <ul
+            className="flex-1 space-y-0 overflow-y-auto px-3 py-2"
+            data-cal-day-detail-list
+          >
+            {detailEvents.map((ev) => {
+              const multi = eventInclusiveDayRange(ev).multiDay;
+              return (
+                <li
+                  key={ev.id}
+                  data-cal-day-detail-event={ev.id}
+                  data-cal-day-detail-span={multi ? "1" : "0"}
+                  className="border-b border-[var(--grid-line)]/70 px-1 py-3 last:border-b-0"
+                >
+                  <p className="text-[14px] leading-snug font-medium break-words text-[var(--ink)]">
+                    {ev.title}
+                  </p>
+                  <p className="mt-1 text-[12px] tabular-nums text-[var(--ink-muted)]">
+                    {formatCalendarDayDetailWhen(ev)}
+                  </p>
+                  {ev.calendarName ? (
+                    <p className="mt-0.5 text-[11px] text-[var(--ink-muted)]">
+                      {ev.calendarName}
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

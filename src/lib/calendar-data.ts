@@ -1,4 +1,5 @@
 import { createId } from "./id";
+import { eventInclusiveDayRange } from "./calendar-span";
 import type { CalendarEvent } from "./types";
 
 function todayIso(): string {
@@ -85,4 +86,44 @@ export function formatCalendarWhen(ev: CalendarEvent): string {
   } catch {
     return ev.start;
   }
+}
+
+function formatClock(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    const m = iso.match(/T(\d{2}):(\d{2})/);
+    return m ? `${m[1]}:${m[2]}` : iso;
+  }
+}
+
+function shortMd(isoDay: string): string {
+  const [, m, d] = isoDay.slice(0, 10).split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
+/**
+ * Day-detail panel time line: full useful when, no truncation.
+ * Multi-day spans include the inclusive date span.
+ */
+export function formatCalendarDayDetailWhen(ev: CalendarEvent): string {
+  const range = eventInclusiveDayRange(ev);
+  if (ev.allDay || ev.start.length === 10) {
+    if (range.multiDay) {
+      return `종일 · ${shortMd(range.startDay)} ~ ${shortMd(range.endDay)}`;
+    }
+    return "종일";
+  }
+  const startClock = formatClock(ev.start);
+  const endClock = ev.end ? formatClock(ev.end) : "";
+  if (range.multiDay) {
+    const endPart = endClock
+      ? `${shortMd(range.endDay)} ${endClock}`
+      : shortMd(range.endDay);
+    return `${shortMd(range.startDay)} ${startClock} ~ ${endPart}`;
+  }
+  return endClock ? `${startClock} – ${endClock}` : startClock;
 }

@@ -10,8 +10,9 @@
 1. **공개 URL (프로덕션 · 고정)**  
    https://fleet-nitrogen-6wxfp18.vercel.app  
    - GCal redirect: `https://fleet-nitrogen-6wxfp18.vercel.app/api/google/callback`  
-   - 배포는 **이 Vercel 프로젝트에만** (`npx vercel link` → `npx vercel --prod`). 새 `temporary-*` URL 금지.  
-   - 안내: [DEPLOY_TARGET.md](./DEPLOY_TARGET.md) · store `docs/production-url.md`
+   - 배포는 **이 Vercel 프로젝트에만**. 새 `temporary-*` URL 금지.  
+   - **자동 배포:** GitHub를 Vercel 프로젝트에 연결하면 `main` push → Production.  
+     안내: store `docs/auto-deploy.md` · [DEPLOY_TARGET.md](./DEPLOY_TARGET.md) · `docs/production-url.md`
 
 2. **zip으로 로컬 실행**  
    - 파일: Project store `docs/ilbiseo-laptop.zip`  

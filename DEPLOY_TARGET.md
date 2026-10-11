@@ -1,8 +1,21 @@
 # Deploy target (canonical)
 
 **Production host:** https://fleet-nitrogen-6wxfp18.vercel.app  
+**Vercel project:** `fleet-nitrogen-6wxfp18`
 
 Do **not** create anonymous/`temporary-*` deployments. Always deploy to the claimed Vercel project that owns this domain.
+
+## Auto-deploy (preferred)
+
+Connect GitHub → this Vercel project (Production Branch = `main`).  
+Then every push to `main` deploys Production — no zip, no local `npx vercel`.  
+Korean steps: store `docs/auto-deploy.md`
+
+Fallback for agents (no Git link): set `VERCEL_TOKEN` + `VERCEL_ORG_ID` + `VERCEL_PROJECT_ID`, then:
+
+```bash
+npm run deploy:prod
+```
 
 ## One-time link (on a machine with Vercel login)
 

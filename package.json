@@ -6,7 +6,8 @@
     "dev": "next dev -p 4317",
     "build": "next build",
     "start": "next start -p 4317",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy:prod": "bash scripts/deploy-production.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

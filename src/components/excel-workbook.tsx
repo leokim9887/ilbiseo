@@ -26,8 +26,10 @@ import {
 } from "@/lib/sheet-rows";
 import {
   formatDeadlineRange,
+  isPastUnfinishedTask,
   monthRangeContaining,
   todayIso,
+  todayIsoKst,
   weekRangeContaining,
 } from "@/lib/date-range";
 import {
@@ -127,14 +129,21 @@ export function ExcelWorkbook({
   const todayLabel = useMemo(
     () =>
       new Date().toLocaleDateString("ko-KR", {
+        timeZone: "Asia/Seoul",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
       }),
     [],
   );
+  const todayKst = useMemo(() => todayIsoKst(), []);
 
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
+  const taskById = useMemo(() => {
+    const m = new Map<string, Task>();
+    for (const t of baseTasks) m.set(t.id, t);
+    return m;
+  }, [baseTasks]);
 
   const rows = useMemo(() => {
     let built: SheetRow[];
@@ -182,6 +191,13 @@ export function ExcelWorkbook({
   const gcalFilterActive = Boolean(gcalRangeStart || gcalRangeEnd);
 
   const selectedCount = selectedIds.size;
+  const selectedDeletableIds = useMemo(() => {
+    if (sheet !== "todo") return Array.from(selectedIds);
+    return Array.from(selectedIds).filter((id) => {
+      const t = taskById.get(id);
+      return t ? !isPastUnfinishedTask(t, todayKst) : false;
+    });
+  }, [selectedIds, sheet, taskById, todayKst]);
   const allVisibleSelected =
     taskIds.length > 0 && taskIds.every((id) => selectedIds.has(id));
   const someVisibleSelected = taskIds.some((id) => selectedIds.has(id));
@@ -209,12 +225,12 @@ export function ExcelWorkbook({
   }, [allVisibleSelected, clearSelection, selectAllVisible]);
 
   const bulkDelete = useCallback(() => {
-    const ids = Array.from(selectedIds);
+    const ids = selectedDeletableIds;
     if (ids.length === 0) return;
     onDeleteMany(ids);
     setSelectedIds(new Set());
     setActiveRow(null);
-  }, [onDeleteMany, selectedIds]);
+  }, [onDeleteMany, selectedDeletableIds]);
 
   const bulkComplete = useCallback(() => {
     const ids = Array.from(selectedIds);
@@ -441,17 +457,19 @@ export function ExcelWorkbook({
                 완료
               </Button>
             ) : null}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-9 rounded-sm border-[#b42318]/40 text-[#b42318]"
-              onClick={bulkDelete}
-              data-excel-bulk-delete
-            >
-              <Trash2 className="size-3.5" />
-              선택 삭제
-            </Button>
+            {selectedDeletableIds.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm border-[#b42318]/40 text-[#b42318]"
+                onClick={bulkDelete}
+                data-excel-bulk-delete
+              >
+                <Trash2 className="size-3.5" />
+                선택 삭제
+              </Button>
+            ) : null}
             {sheet === "done" ? (
               <Button
                 type="button"
@@ -774,25 +792,39 @@ export function ExcelWorkbook({
                 const checked = selectedIds.has(task.id);
                 const active = activeRow === task.id || checked;
                 const zebra = order % 2 === 0;
+                const overdue =
+                  sheet === "todo" && isPastUnfinishedTask(task, todayKst);
                 const deadlineFocused =
-                  focus?.rowId === task.id && focus.col === "deadline";
+                  !overdue &&
+                  focus?.rowId === task.id &&
+                  focus.col === "deadline";
+                const startMin = todayKst;
+                const endMin =
+                  task.startDate && task.startDate >= todayKst
+                    ? task.startDate
+                    : todayKst;
                 return (
                   <tr
                     key={task.id}
                     onClick={() => setActiveRow(task.id)}
                     data-excel-row={task.id}
                     data-excel-row-selected={checked ? "1" : "0"}
+                    data-excel-overdue={overdue ? "1" : "0"}
                     className={
-                      checked
-                        ? "bg-[#dcefe3]"
-                        : active
-                          ? "bg-[#e8f5ee]"
-                          : zebra
-                            ? "bg-[#fafafa]"
-                            : "bg-white"
+                      overdue
+                        ? checked
+                          ? "bg-[#f3e6d8]"
+                          : "bg-[#faf0e6]"
+                        : checked
+                          ? "bg-[#dcefe3]"
+                          : active
+                            ? "bg-[#e8f5ee]"
+                            : zebra
+                              ? "bg-[#fafafa]"
+                              : "bg-white"
                     }
                   >
-                    <td className="border border-black px-1 py-1 text-center align-middle">
+                    <td className="border border-black px-1 py-0.5 text-center align-middle">
                       <input
                         type="checkbox"
                         checked={checked}
@@ -803,21 +835,37 @@ export function ExcelWorkbook({
                         data-excel-row-check={task.id}
                       />
                     </td>
-                    <td className="border border-black px-1 py-1 text-center align-middle text-[14px] font-medium tabular-nums">
+                    <td className="border border-black px-1 py-0.5 text-center align-middle text-[14px] font-medium tabular-nums">
                       {order}
                     </td>
 
                     <EditCell
-                      active={focus?.rowId === task.id && focus.col === "listup"}
+                      active={
+                        !overdue &&
+                        focus?.rowId === task.id &&
+                        focus.col === "listup"
+                      }
                       onFocusCell={() => {
                         setActiveRow(task.id);
-                        setFocus({ rowId: task.id, col: "listup" });
+                        if (!overdue) {
+                          setFocus({ rowId: task.id, col: "listup" });
+                        }
                       }}
                       onKeyNav={(e) =>
-                        handleNav(e, task.id, "listup", moveFocus)
+                        overdue
+                          ? undefined
+                          : handleNav(e, task.id, "listup", moveFocus)
                       }
                     >
-                      <div className="flex w-full flex-col gap-1 px-1.5 py-1.5">
+                      <div className="flex w-full flex-col gap-0.5 px-1.5 py-1">
+                        {overdue ? (
+                          <span
+                            className="w-fit rounded-sm bg-[#c45c26] px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                            data-excel-overdue-badge
+                          >
+                            지난 일정
+                          </span>
+                        ) : null}
                         <AutoGrowTextarea
                           data-excel-cell={`${task.id}:listup`}
                           value={task.title}
@@ -826,13 +874,16 @@ export function ExcelWorkbook({
                           }
                           onFocus={() => {
                             setActiveRow(task.id);
-                            setFocus({ rowId: task.id, col: "listup" });
+                            if (!overdue) {
+                              setFocus({ rowId: task.id, col: "listup" });
+                            }
                           }}
                           className="excel-textarea font-medium"
                           aria-label="할일 LIST UP"
                           placeholder="할 일 제목"
+                          readOnly={overdue}
+                          disabled={overdue}
                         />
-                        {/* Always visible for program tasks — memo is under LIST UP (6-col layout) */}
                         <label className="flex flex-col gap-0.5">
                           <span className="text-[10px] font-medium text-[#5c655f]">
                             메모
@@ -845,14 +896,17 @@ export function ExcelWorkbook({
                             onMouseDown={(e) => e.stopPropagation()}
                             onFocus={() => {
                               setActiveRow(task.id);
-                              // Keep LIST UP cell highlighted without stealing caret from memo
-                              setFocus({ rowId: task.id, col: "listup" });
+                              if (!overdue) {
+                                setFocus({ rowId: task.id, col: "listup" });
+                              }
                             }}
                             onChange={(e) =>
                               onUpdate(task.id, { memo: e.target.value })
                             }
                             className="excel-textarea excel-textarea-memo"
                             aria-label="메모"
+                            readOnly={overdue}
+                            disabled={overdue}
                           />
                         </label>
                       </div>
@@ -864,26 +918,50 @@ export function ExcelWorkbook({
                       center
                       onFocusCell={() => {
                         setActiveRow(task.id);
-                        setFocus({ rowId: task.id, col: "deadline" });
+                        if (!overdue) {
+                          setFocus({ rowId: task.id, col: "deadline" });
+                        }
                       }}
                       onKeyNav={(e) =>
-                        handleNav(e, task.id, "deadline", moveFocus)
+                        overdue
+                          ? undefined
+                          : handleNav(e, task.id, "deadline", moveFocus)
                       }
                     >
-                      {deadlineFocused ? (
-                        <div className="flex w-full flex-col gap-1 px-1.5 py-1.5">
+                      {overdue ? (
+                        <div
+                          className="flex min-h-9 w-full flex-col items-center justify-center px-1 py-1 text-center text-[13px] leading-snug text-[#5c3a1a]"
+                          aria-label="마감목표"
+                        >
+                          {formatDeadlineRange(task) || (
+                            <span className="text-[#999]">시작 ~ 종료</span>
+                          )}
+                        </div>
+                      ) : deadlineFocused ? (
+                        <div className="flex w-full flex-col gap-0.5 px-1.5 py-1">
                           <label className="flex flex-col items-stretch gap-0.5 text-[10px] text-[#5c655f]">
                             시작일
                             <input
                               data-excel-cell={`${task.id}:deadline`}
                               type="date"
                               value={task.startDate ?? ""}
-                              onChange={(e) =>
-                                onUpdate(task.id, {
-                                  startDate: e.target.value || null,
-                                })
-                              }
-                              className="excel-input min-h-8 text-center text-[13px]"
+                              min={startMin}
+                              onChange={(e) => {
+                                const v = e.target.value || null;
+                                if (v && v < todayKst) return;
+                                const patch: Partial<Task> = {
+                                  startDate: v,
+                                };
+                                if (
+                                  v &&
+                                  task.targetDate &&
+                                  task.targetDate < v
+                                ) {
+                                  patch.targetDate = v;
+                                }
+                                onUpdate(task.id, patch);
+                              }}
+                              className="excel-input min-h-7 text-center text-[13px]"
                               aria-label="시작일"
                             />
                           </label>
@@ -892,12 +970,17 @@ export function ExcelWorkbook({
                             <input
                               type="date"
                               value={task.targetDate ?? ""}
-                              onChange={(e) =>
-                                onUpdate(task.id, {
-                                  targetDate: e.target.value || null,
-                                })
-                              }
-                              className="excel-input min-h-8 text-center text-[13px]"
+                              min={endMin}
+                              onChange={(e) => {
+                                const v = e.target.value || null;
+                                const floor =
+                                  task.startDate && task.startDate >= todayKst
+                                    ? task.startDate
+                                    : todayKst;
+                                if (v && v < floor) return;
+                                onUpdate(task.id, { targetDate: v });
+                              }}
+                              className="excel-input min-h-7 text-center text-[13px]"
                               aria-label="종료일"
                             />
                           </label>
@@ -905,7 +988,7 @@ export function ExcelWorkbook({
                       ) : (
                         <button
                           type="button"
-                          className="min-h-11 w-full px-1 text-center text-[13px] leading-snug"
+                          className="min-h-9 w-full px-1 text-center text-[13px] leading-snug"
                           onClick={() => {
                             setActiveRow(task.id);
                             setFocus({ rowId: task.id, col: "deadline" });
@@ -921,15 +1004,21 @@ export function ExcelWorkbook({
 
                     <EditCell
                       active={
-                        focus?.rowId === task.id && focus.col === "importance"
+                        !overdue &&
+                        focus?.rowId === task.id &&
+                        focus.col === "importance"
                       }
                       center
                       onFocusCell={() => {
                         setActiveRow(task.id);
-                        setFocus({ rowId: task.id, col: "importance" });
+                        if (!overdue) {
+                          setFocus({ rowId: task.id, col: "importance" });
+                        }
                       }}
                       onKeyNav={(e) =>
-                        handleNav(e, task.id, "importance", moveFocus)
+                        overdue
+                          ? undefined
+                          : handleNav(e, task.id, "importance", moveFocus)
                       }
                     >
                       <ScoreSelect
@@ -939,20 +1028,27 @@ export function ExcelWorkbook({
                           onUpdate(task.id, { importance: n })
                         }
                         label="중요도"
+                        disabled={overdue}
                       />
                     </EditCell>
 
                     <EditCell
                       active={
-                        focus?.rowId === task.id && focus.col === "urgency"
+                        !overdue &&
+                        focus?.rowId === task.id &&
+                        focus.col === "urgency"
                       }
                       center
                       onFocusCell={() => {
                         setActiveRow(task.id);
-                        setFocus({ rowId: task.id, col: "urgency" });
+                        if (!overdue) {
+                          setFocus({ rowId: task.id, col: "urgency" });
+                        }
                       }}
                       onKeyNav={(e) =>
-                        handleNav(e, task.id, "urgency", moveFocus)
+                        overdue
+                          ? undefined
+                          : handleNav(e, task.id, "urgency", moveFocus)
                       }
                     >
                       <ScoreSelect
@@ -960,10 +1056,11 @@ export function ExcelWorkbook({
                         value={task.urgency}
                         onChange={(n) => onUpdate(task.id, { urgency: n })}
                         label="시급성"
+                        disabled={overdue}
                       />
                     </EditCell>
 
-                    <td className="border border-black px-1 py-1 text-center align-middle">
+                    <td className="border border-black px-1 py-0.5 text-center align-middle">
                       {sheet === "todo" ? (
                         <input
                           type="checkbox"
@@ -1068,7 +1165,7 @@ function EditCell({
       onKeyDown={onKeyNav}
     >
       <div
-        className={`flex min-h-11 items-stretch ${center ? "justify-center" : ""}`}
+        className={`flex min-h-9 items-stretch ${center ? "justify-center" : ""}`}
       >
         {children}
       </div>
@@ -1081,11 +1178,13 @@ function ScoreSelect({
   onChange,
   label,
   cellId,
+  disabled,
 }: {
   value: number;
   onChange: (n: number) => void;
   label: string;
   cellId?: string;
+  disabled?: boolean;
 }) {
   const safe = Math.min(3, Math.max(1, Number(value) || 1));
   return (
@@ -1093,8 +1192,9 @@ function ScoreSelect({
       data-excel-cell={cellId}
       value={safe}
       aria-label={label}
+      disabled={disabled}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="excel-input text-center"
+      className="excel-input text-center disabled:cursor-not-allowed disabled:opacity-60"
     >
       {[1, 2, 3].map((n) => (
         <option key={n} value={n}>

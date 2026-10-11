@@ -8,6 +8,16 @@ export function todayIso(d = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+/** YYYY-MM-DD today in Asia/Seoul (KST) — for 마감목표 min / 지난 일정 */
+export function todayIsoKst(d = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
 export function addDaysIso(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
@@ -46,6 +56,21 @@ export function taskDateRange(
   }
   const only = (start || end)!;
   return { start: only, end: only };
+}
+
+/**
+ * Active task whose deadline window is already past.
+ * Uses taskDateRange: end day (or sole date) before today → overdue.
+ * Undated tasks are never overdue.
+ */
+export function isPastUnfinishedTask(
+  task: Pick<Task, "status" | "startDate" | "targetDate">,
+  today: string = todayIsoKst(),
+): boolean {
+  if (task.status !== "active") return false;
+  const r = taskDateRange(task);
+  if (!r) return false;
+  return r.end < today;
 }
 
 /**

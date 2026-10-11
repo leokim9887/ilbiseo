@@ -24,6 +24,7 @@ import {
   writeBufferToHandle,
 } from "@/lib/excel-link";
 import { clampPriority } from "@/lib/priority";
+import { todayIsoKst } from "@/lib/date-range";
 
 type Status = "loading" | "ready" | "error";
 
@@ -105,8 +106,14 @@ export function useAppState() {
     [syncExcel],
   );
 
+  /** Insertion / state order — do not re-sort on every title keystroke. */
   const activeTasks = useCallback(
-    (category?: TaskCategory) => sortTasks(state.tasks, category),
+    (category?: TaskCategory) =>
+      state.tasks.filter(
+        (t) =>
+          t.status === "active" &&
+          (category ? t.category === category : true),
+      ),
     [state.tasks],
   );
   const completedTasks = useCallback(
@@ -124,14 +131,10 @@ export function useAppState() {
         kind: partial?.kind ?? "spot",
         startDate:
           partial?.startDate ??
-          (partial?.kind === "someday"
-            ? null
-            : new Date().toISOString().slice(0, 10)),
+          (partial?.kind === "someday" ? null : todayIsoKst()),
         targetDate:
           partial?.targetDate ??
-          (partial?.kind === "someday"
-            ? null
-            : new Date().toISOString().slice(0, 10)),
+          (partial?.kind === "someday" ? null : todayIsoKst()),
         urgency: clampPriority(partial?.urgency, 2),
         importance: clampPriority(partial?.importance, 2),
         groupKey: partial?.groupKey ?? inferGroupKey(title),
@@ -173,9 +176,8 @@ export function useAppState() {
           if (patch.importance !== undefined) {
             next.importance = clampPriority(patch.importance);
           }
-          if (patch.title && !patch.groupKey) {
-            next.groupKey = inferGroupKey(patch.title);
-          }
+          // Do not re-infer groupKey on every title keystroke — that regrouped
+          // rows under sortTasks. groupKey is set once at create/import.
           return next;
         }),
       });

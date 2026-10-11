@@ -104,7 +104,7 @@ export function applyColumnSort(
 }
 
 export function columnSortLabel(sort: ColumnSort | null): string {
-  if (!sort) return "기본(스팟·지속·언젠가)";
+  if (!sort) return "기본(추가순)";
   const name =
     sort.key === "deadline"
       ? "마감목표"

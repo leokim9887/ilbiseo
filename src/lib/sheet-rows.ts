@@ -5,6 +5,7 @@ import {
   taskDateRange,
   todayIso,
 } from "./date-range";
+import { eventInclusiveDayRange, eventOccursOnDay } from "./calendar-span";
 import { filterEventsByPeriod } from "./unified";
 
 export type SheetRow =
@@ -23,18 +24,18 @@ function eventSortKey(ev: CalendarEvent): string {
 }
 
 export function formatEventDeadline(ev: CalendarEvent): string {
-  const startDay = ev.start.slice(0, 10);
-  const endDay = ev.end?.slice(0, 10) || startDay;
+  const { startDay, endDay, multiDay } = eventInclusiveDayRange(ev);
   if (ev.allDay || ev.start.length === 10) {
-    if (startDay === endDay) return startDay;
+    if (!multiDay) return startDay;
     return `${startDay} ~ ${endDay}`;
   }
   const startTime = ev.start.includes("T") ? ev.start.slice(11, 16) : "";
   const endTime =
     ev.end && ev.end.includes("T") ? ev.end.slice(11, 16) : "";
-  if (startDay === endDay && startTime) {
+  if (!multiDay && startTime) {
     return `${startDay} ${startTime}${endTime ? `~${endTime}` : ""}`;
   }
+  if (!multiDay) return startDay;
   return `${startDay} ~ ${endDay}`;
 }
 
@@ -50,27 +51,23 @@ export function calendarListUpTitle(ev: CalendarEvent): string {
   return loc ? `${base} · ${loc}` : base;
 }
 
-/** Events on/after fromDay (inclusive). */
+/** Events on/after fromDay (inclusive display end). */
 export function eventsFromDay(
   events: CalendarEvent[],
   fromDay: string,
 ): CalendarEvent[] {
   return events.filter((e) => {
-    const end = (e.end?.slice(0, 10) || e.start.slice(0, 10));
-    return end >= fromDay;
+    const { endDay } = eventInclusiveDayRange(e);
+    return endDay >= fromDay;
   });
 }
 
-/** Events that touch a single calendar day. */
+/** Events that touch a single calendar day (inclusive display range). */
 export function eventsOnDay(
   events: CalendarEvent[],
   day: string,
 ): CalendarEvent[] {
-  return events.filter((e) => {
-    const start = e.start.slice(0, 10);
-    const end = e.end?.slice(0, 10) || start;
-    return start <= day && end >= day;
-  });
+  return events.filter((e) => eventOccursOnDay(e, day));
 }
 
 /** Program-task-only rows for a normal 틀. */

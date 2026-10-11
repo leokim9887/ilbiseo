@@ -7,6 +7,7 @@ import {
   todayIso,
 } from "./date-range";
 import { formatCalendarWhen } from "./calendar-data";
+import { eventInclusiveDayRange } from "./calendar-span";
 
 export type UnifiedSource = "task" | "calendar";
 
@@ -31,20 +32,15 @@ export type UnifiedItem = {
   eventId?: string;
 };
 
-function eventDay(ev: CalendarEvent): string {
-  return ev.start.slice(0, 10);
-}
-
 function eventOverlapsPeriod(
   ev: CalendarEvent,
   filterStart: string,
   filterEnd: string,
 ): boolean {
-  const start = eventDay(ev);
-  const end = (ev.end?.slice(0, 10) || start);
+  const { startDay, endDay } = eventInclusiveDayRange(ev);
   const fs = filterStart <= filterEnd ? filterStart : filterEnd;
   const fe = filterStart <= filterEnd ? filterEnd : filterStart;
-  return start <= fe && end >= fs;
+  return startDay <= fe && endDay >= fs;
 }
 
 export function filterEventsByPeriod(

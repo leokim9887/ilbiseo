@@ -34,7 +34,11 @@ import {
   todayIsoKst,
   weekRangeContaining,
 } from "@/lib/date-range";
-import { confirmNoBlockingOverlap } from "@/lib/overlap";
+import {
+  buildSimilarityAlertMessage,
+  findSimilarActiveTasks,
+  taskWordingBlob,
+} from "@/lib/text-similarity";
 import {
   applyColumnSort,
   columnSortLabel,
@@ -44,6 +48,14 @@ import {
   type ColumnSortKey,
 } from "@/lib/column-sort";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
@@ -82,7 +94,7 @@ interface ExcelWorkbookProps {
   /** Tasks for the selected program frame (ignored when frame=gcal) */
   activeTasks: Task[];
   doneTasks: Task[];
-  /** All-frame active tasks — for 마감목표 overlap warn */
+  /** All-frame active tasks — for title/memo similarity warn */
   allActiveTasks?: Task[];
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onComplete: (id: string) => void;
@@ -148,7 +160,10 @@ export function ExcelWorkbook({
     [],
   );
   const todayKst = useMemo(() => todayIsoKst(), []);
-  const overlapPeers = allActiveTasks ?? activeTasks;
+  const similarityPeers = allActiveTasks ?? activeTasks;
+  const [similarityAlert, setSimilarityAlert] = useState<string | null>(null);
+  const similarityAckRef = useRef<Set<string>>(new Set());
+  const similarityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
   const taskById = useMemo(() => {
@@ -296,29 +311,56 @@ export function ExcelWorkbook({
     else selectAllVisible();
   }, [allVisibleSelected, clearSelection, selectAllVisible]);
 
-  /** Apply deadline-related patch after optional overlap confirm. */
+  /** Deadline edits — no date-range overlap warn (replaced by wording alert). */
   const applyDeadlinePatch = useCallback(
     (task: Task, patch: Partial<Task>) => {
-      const candidate = {
-        kind: (patch.kind ?? task.kind) as Task["kind"],
-        startDate:
-          patch.startDate !== undefined ? patch.startDate : task.startDate,
-        targetDate:
-          patch.targetDate !== undefined ? patch.targetDate : task.targetDate,
-      };
-      if (
-        !confirmNoBlockingOverlap({
-          candidate,
-          activeTasks: overlapPeers,
-          excludeId: task.id,
-          calendarEvents,
-        })
-      ) {
-        return;
-      }
       onUpdate(task.id, patch);
     },
-    [overlapPeers, calendarEvents, onUpdate],
+    [onUpdate],
+  );
+
+  const maybeWarnSimilarWording = useCallback(
+    (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
+      const candidate = {
+        title: patch.title !== undefined ? patch.title : task.title,
+        memo: patch.memo !== undefined ? patch.memo : task.memo,
+      };
+      const blob = taskWordingBlob(candidate);
+      if (!blob) return;
+      const hits = findSimilarActiveTasks(candidate, similarityPeers, task.id);
+      if (hits.length === 0) return;
+      const fingerprint = `${task.id}|${blob}|${hits.map((h) => h.task.id).join(",")}`;
+      if (similarityAckRef.current.has(fingerprint)) return;
+      const msg = buildSimilarityAlertMessage(hits);
+      if (!msg) return;
+      similarityAckRef.current.add(fingerprint);
+      setSimilarityAlert(msg);
+    },
+    [similarityPeers],
+  );
+
+  const scheduleSimilarityCheck = useCallback(
+    (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
+      if (similarityTimerRef.current) clearTimeout(similarityTimerRef.current);
+      similarityTimerRef.current = setTimeout(() => {
+        maybeWarnSimilarWording(task, patch);
+      }, 700);
+    },
+    [maybeWarnSimilarWording],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (similarityTimerRef.current) clearTimeout(similarityTimerRef.current);
+    };
+  }, []);
+
+  const updateListUp = useCallback(
+    (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
+      onUpdate(task.id, patch);
+      scheduleSimilarityCheck(task, patch);
+    },
+    [onUpdate, scheduleSimilarityCheck],
   );
 
   const bulkDelete = useCallback(() => {
@@ -1015,7 +1057,12 @@ export function ExcelWorkbook({
                           data-excel-cell={`${task.id}:listup`}
                           value={task.title}
                           onChange={(e) =>
-                            onUpdate(task.id, { title: e.target.value })
+                            updateListUp(task, { title: e.target.value })
+                          }
+                          onBlur={(e) =>
+                            maybeWarnSimilarWording(task, {
+                              title: e.currentTarget.value,
+                            })
                           }
                           onFocus={() => {
                             setActiveRow(task.id);
@@ -1046,7 +1093,12 @@ export function ExcelWorkbook({
                               }
                             }}
                             onChange={(e) =>
-                              onUpdate(task.id, { memo: e.target.value })
+                              updateListUp(task, { memo: e.target.value })
+                            }
+                            onBlur={(e) =>
+                              maybeWarnSimilarWording(task, {
+                                memo: e.currentTarget.value,
+                              })
                             }
                             className="excel-textarea excel-textarea-memo"
                             aria-label="메모"
@@ -1319,6 +1371,39 @@ export function ExcelWorkbook({
           </SheetTab>
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(similarityAlert)}
+        onOpenChange={(open) => {
+          if (!open) setSimilarityAlert(null);
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-md"
+          data-similarity-alert
+          showCloseButton={false}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-[15px] text-[#1a2420]">
+              비슷한 할 일
+            </DialogTitle>
+            <DialogDescription className="text-[13px] leading-relaxed text-[#3d4a44]">
+              {similarityAlert}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-9 bg-[#217346] text-white hover:bg-[#1a5c38]"
+              data-similarity-alert-ok
+              onClick={() => setSimilarityAlert(null)}
+            >
+              확인
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

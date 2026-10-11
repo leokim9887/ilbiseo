@@ -99,17 +99,25 @@ export function buildTaskOnlyRows(
   }));
 }
 
-/** Google Calendar 틀 — calendar events only (기간 시작~종료; 비어 있으면 오늘부터). */
+/**
+ * Google Calendar 틀 — calendar events only.
+ * - showAll: 가져온 일정 전체
+ * - 기간 시작~종료: 구간에 겹치는 일정
+ * - 둘 다 비움(기본): 오늘부터
+ */
 export function buildGcalFrameRows(
   events: CalendarEvent[],
   opts: {
     rangeStart?: string | null;
     rangeEnd?: string | null;
+    showAll?: boolean;
   },
 ): SheetRow[] {
   const hasRange = Boolean(opts.rangeStart || opts.rangeEnd);
   let list: CalendarEvent[];
-  if (!hasRange) {
+  if (opts.showAll && !hasRange) {
+    list = events;
+  } else if (!hasRange) {
     list = eventsFromDay(events, todayIso());
   } else {
     const fs = opts.rangeStart || opts.rangeEnd || todayIso();

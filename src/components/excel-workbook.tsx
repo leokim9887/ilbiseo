@@ -29,7 +29,6 @@ import {
   monthRangeContaining,
   todayIso,
   weekRangeContaining,
-  type PeriodSort,
 } from "@/lib/date-range";
 import {
   applyColumnSort,
@@ -107,14 +106,13 @@ export function ExcelWorkbook({
   const [activeRow, setActiveRow] = useState<string | null>(null);
   const [filterStart, setFilterStart] = useState<string>("");
   const [filterEnd, setFilterEnd] = useState<string>("");
-  const [periodSort, setPeriodSort] = useState<PeriodSort>("default");
-  /** Excel header column sort — overrides period dropdown when set */
+  /** Excel header column sort (click 마감목표·중요도·시급성) */
   const [columnSort, setColumnSort] = useState<ColumnSort | null>(null);
   const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
   const [gcalRangeStart, setGcalRangeStart] = useState("");
   const [gcalRangeEnd, setGcalRangeEnd] = useState("");
   const [gcalChip, setGcalChip] = useState<
-    "none" | "today" | "week" | "month"
+    "none" | "today" | "week" | "month" | "all"
   >("none");
   const todayLabel = useMemo(
     () =>
@@ -134,6 +132,7 @@ export function ExcelWorkbook({
       built = buildGcalFrameRows(calendarEvents, {
         rangeStart: gcalRangeStart || null,
         rangeEnd: gcalRangeEnd || null,
+        showAll: gcalChip === "all",
       });
     } else if (isGcal && sheet === "done") {
       built = [];
@@ -141,8 +140,7 @@ export function ExcelWorkbook({
       built = buildTaskOnlyRows(baseTasks, {
         filterStart: filterStart || null,
         filterEnd: filterEnd || null,
-        // Column sort takes over ordering; keep period filter only
-        periodSort: columnSort ? "default" : periodSort,
+        periodSort: "default",
       });
     }
     return applyColumnSort(built, columnSort);
@@ -152,21 +150,16 @@ export function ExcelWorkbook({
     calendarEvents,
     gcalRangeStart,
     gcalRangeEnd,
+    gcalChip,
     baseTasks,
     filterStart,
     filterEnd,
-    periodSort,
     columnSort,
   ]);
 
   const onHeaderSort = (key: ColKey) => {
     if (!isSortableCol(key)) return;
     setColumnSort((prev) => cycleColumnSort(prev, key as ColumnSortKey));
-  };
-
-  const clearColumnSort = () => {
-    setColumnSort(null);
-    setPeriodSort("default");
   };
 
   const taskIds = useMemo(
@@ -327,9 +320,14 @@ export function ExcelWorkbook({
         : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1]"
     }`;
 
-  const applyGcalChip = (c: "today" | "week" | "month") => {
-    const t = todayIso();
+  const applyGcalChip = (c: "today" | "week" | "month" | "all") => {
     setGcalChip(c);
+    if (c === "all") {
+      setGcalRangeStart("");
+      setGcalRangeEnd("");
+      return;
+    }
+    const t = todayIso();
     if (c === "today") {
       setGcalRangeStart(t);
       setGcalRangeEnd(t);
@@ -441,9 +439,12 @@ export function ExcelWorkbook({
           {FRAME_LABEL[frame]} · {rows.length}행
           {isGcal && calCount > 0 ? ` (캘린더)` : ""}
           {!isGcal && filterActive ? ` · 필터 적용` : ""}
-          {isGcal && gcalFilterActive ? ` · 기간 필터` : ""}
-          {isGcal && !gcalFilterActive && sheet === "todo"
-            ? ` · 오늘부터`
+          {isGcal && sheet === "todo"
+            ? gcalFilterActive
+              ? ` · 기간 필터`
+              : gcalChip === "all"
+                ? ` · 전체`
+                : ` · 오늘부터`
             : ""}
           {columnSort ? ` · ${columnSortLabel(columnSort)}` : ""}
         </span>
@@ -502,7 +503,14 @@ export function ExcelWorkbook({
             >
               이번 달
             </button>
-            {gcalFilterActive ? (
+            <button
+              type="button"
+              className={gcalChipClass("all")}
+              onClick={() => applyGcalChip("all")}
+            >
+              전체
+            </button>
+            {gcalFilterActive || gcalChip === "all" ? (
               <button
                 type="button"
                 onClick={clearGcalFilter}
@@ -511,18 +519,6 @@ export function ExcelWorkbook({
                 <X className="size-3.5" />
                 필터 지우기
               </button>
-            ) : null}
-            {columnSort ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 min-h-8 gap-1 px-2 text-[12px]"
-                onClick={clearColumnSort}
-              >
-                <RotateCcw className="size-3.5" />
-                기본 정렬
-              </Button>
             ) : null}
           </div>
         </div>
@@ -579,39 +575,6 @@ export function ExcelWorkbook({
               필터 지우기
             </button>
           ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-semibold text-[#1a2420]">정렬</span>
-          <select
-            value={columnSort ? "column" : periodSort}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "column") return;
-              setColumnSort(null);
-              setPeriodSort(v as PeriodSort);
-            }}
-            className="h-8 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px]"
-            aria-label="기간 정렬"
-          >
-            <option value="default">기본(스팟·지속·언젠가)</option>
-            <option value="start">시작일 순</option>
-            <option value="end">마감(종료)일 순</option>
-            {columnSort ? (
-              <option value="column">{columnSortLabel(columnSort)}</option>
-            ) : null}
-          </select>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 min-h-8 gap-1 px-2 text-[12px]"
-            disabled={!columnSort && periodSort === "default"}
-            onClick={clearColumnSort}
-            title="스팟·지속·언젠가 기본 순서로 되돌림"
-          >
-            <RotateCcw className="size-3.5" />
-            기본 정렬
-          </Button>
         </div>
       </div>
       ) : null}
@@ -710,7 +673,11 @@ export function ExcelWorkbook({
                       이 기간에 겹치는 할 일이 없습니다. 「전체」를 누르세요.
                     </p>
                   ) : isGcal && sheet === "todo" ? (
-                    <p>이 기간에 일정이 없습니다.</p>
+                    <p>
+                      {gcalChip === "all"
+                        ? "일정이 없습니다."
+                        : "이 기간에 일정이 없습니다. 「전체」를 누르면 가져온 일정을 모두 봅니다."}
+                    </p>
                   ) : sheet === "todo" ? (
                     <>
                       <p>할 일이 없습니다.</p>

@@ -94,5 +94,8 @@ await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/ilbiseo-column-sort-deadline-asc.png`, fullPage: true });
 
 const hasBasic = await page.getByRole("button", { name: "기본 정렬" }).count();
-console.log(JSON.stringify({ hasBasicBtn: hasBasic > 0 }));
+const hasSortStrip = await page.getByText("정렬", { exact: true }).count();
+console.log(
+  JSON.stringify({ hasBasicBtn: hasBasic > 0, hasSortStrip: hasSortStrip > 0 }),
+);
 await browser.close();

@@ -187,18 +187,27 @@ await page.screenshot({
   fullPage: true,
 });
 
-// Accept overlapping change
-await rowB.locator("[data-excel-deadline-display]").click();
-await page.waitForTimeout(80);
+// Accept overlapping change (editor may still be open from cancel path)
 page.__acceptOverlap = true;
 dialogs.length = 0;
-await rowB.locator('input[aria-label="시작일"]').fill(today);
-await page.waitForTimeout(100);
-await rowB.locator('input[aria-label="종료일"]').fill(overlapEnd);
-await page.waitForTimeout(300);
-if (dialogs.length < 1) {
-  throw new Error("expected overlap confirm on accept path");
+const startB = rowB.locator('input[aria-label="시작일"]');
+const endB = rowB.locator('input[aria-label="종료일"]');
+const displayB = rowB.locator("[data-excel-deadline-display]");
+try {
+  await startB.waitFor({ state: "visible", timeout: 1500 });
+} catch {
+  await displayB.click({ timeout: 5000 });
+  await startB.waitFor({ state: "visible", timeout: 5000 });
 }
+await startB.fill(today);
+await page.waitForTimeout(250);
+if (dialogs.length < 1) {
+  throw new Error("expected overlap confirm on accept path (start)");
+}
+// end may still be farEnd; tighten while accepting overlap
+dialogs.length = 0;
+await endB.fill(overlapEnd);
+await page.waitForTimeout(250);
 const afterAccept = await page.evaluate(() => {
   const s = JSON.parse(localStorage.getItem("ilbiseo-state-v2") || "{}");
   return s.tasks.find((t) => t.id === "t-b");

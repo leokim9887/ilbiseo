@@ -180,6 +180,13 @@ export function ExcelWorkbook({
       });
     } else if (isGcal && sheet === "done") {
       built = [];
+    } else if (sheet === "done") {
+      // 한 일: no period filter — always show all completed (「전체」)
+      built = buildTaskOnlyRows(baseTasks, {
+        filterStart: null,
+        filterEnd: null,
+        periodSort: "default",
+      });
     } else {
       built = buildTaskOnlyRows(baseTasks, {
         filterStart: filterStart || null,
@@ -625,7 +632,7 @@ export function ExcelWorkbook({
         <span className="ml-auto text-[12px] text-[#5c655f]">
           {FRAME_LABEL[frame]} · {rows.length}행
           {isGcal && calCount > 0 ? ` (캘린더)` : ""}
-          {!isGcal && filterActive ? ` · 필터 적용` : ""}
+          {!isGcal && sheet === "todo" && filterActive ? ` · 필터 적용` : ""}
           {isGcal && sheet === "todo"
             ? gcalFilterActive
               ? ` · 기간 필터`
@@ -709,7 +716,7 @@ export function ExcelWorkbook({
             ) : null}
           </div>
         </div>
-      ) : !isGcal ? (
+      ) : !isGcal && sheet === "todo" ? (
       <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-[#1a2420]">기간</span>
@@ -859,7 +866,7 @@ export function ExcelWorkbook({
                   colSpan={isGcal ? 6 : 7}
                   className="border border-black px-4 py-16 text-center text-[15px] text-[#555]"
                 >
-                  {filterActive && !isGcal ? (
+                  {filterActive && !isGcal && sheet === "todo" ? (
                     <p>
                       이 기간에 겹치는 할 일이 없습니다. 「전체」를 누르세요.
                     </p>

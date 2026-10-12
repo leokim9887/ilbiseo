@@ -376,6 +376,25 @@ export function useAppState() {
     [persist, state],
   );
 
+  /** Mark selected 지침/습관 items done (checked-off); no-op if already done. */
+  const completeSideItems = useCallback(
+    (kind: SideListKind, ids: string[]) => {
+      if (ids.length === 0) return;
+      const key = sideKey(kind);
+      const complete = new Set(ids);
+      const completedAt = new Date().toISOString();
+      persist({
+        ...state,
+        [key]: state[key].map((item) =>
+          complete.has(item.id) && !item.done
+            ? { ...item, done: true, completedAt }
+            : item,
+        ),
+      });
+    },
+    [persist, state],
+  );
+
   const forceExcelSync = useCallback(async () => {
     await syncExcel(state);
   }, [state, syncExcel]);
@@ -411,6 +430,7 @@ export function useAppState() {
     toggleSideItem,
     deleteSideItem,
     deleteSideItems,
+    completeSideItems,
     setCalendarEvents,
     replaceCalendar,
     clearAllData,

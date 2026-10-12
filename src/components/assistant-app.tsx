@@ -202,6 +202,9 @@ export function AssistantApp() {
                 onDeleteMany={(ids) =>
                   app.deleteSideItems("guideline", ids)
                 }
+                onCompleteMany={(ids) =>
+                  app.completeSideItems("guideline", ids)
+                }
               />
               <SideListSection
                 kind="habit"
@@ -213,6 +216,9 @@ export function AssistantApp() {
                 onToggle={(id) => app.toggleSideItem("habit", id)}
                 onDelete={(id) => app.deleteSideItem("habit", id)}
                 onDeleteMany={(ids) => app.deleteSideItems("habit", ids)}
+                onCompleteMany={(ids) =>
+                  app.completeSideItems("habit", ids)
+                }
               />
             </div>
           ) : null}

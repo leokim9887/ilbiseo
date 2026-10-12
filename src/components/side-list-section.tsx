@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SideListItem, SideListKind } from "@/lib/types";
 import { SIDE_LIST_LABEL } from "@/lib/types";
@@ -14,6 +14,7 @@ interface SideListSectionProps {
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onDeleteMany: (ids: string[]) => void;
+  onCompleteMany: (ids: string[]) => void;
 }
 
 /** ~5 checklist rows visible before the list scrolls. */
@@ -27,6 +28,7 @@ export function SideListSection({
   onToggle,
   onDelete,
   onDeleteMany,
+  onCompleteMany,
 }: SideListSectionProps) {
   const label = SIDE_LIST_LABEL[kind];
   const accent =
@@ -164,6 +166,13 @@ export function SideListSection({
     setSelectedIds(new Set());
   }, [onDeleteMany, selectedIds]);
 
+  const bulkComplete = useCallback(() => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    onCompleteMany(ids);
+    setSelectedIds(new Set());
+  }, [onCompleteMany, selectedIds]);
+
   const handleAdd = useCallback(() => {
     onAdd();
     requestAnimationFrame(() => {
@@ -213,17 +222,33 @@ export function SideListSection({
             </label>
           ) : null}
           {selectedCount > 0 ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-9 rounded-sm border-[#b42318]/40 px-2 text-[13px] text-[#b42318]"
-              onClick={bulkDelete}
-              data-side-bulk-delete={kind}
+            <div
+              className="flex flex-col gap-1"
+              data-side-bulk-actions={kind}
             >
-              <Trash2 className="size-3.5" />
-              선택 삭제
-            </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm border-[#b42318]/40 px-2 text-[13px] text-[#b42318]"
+                onClick={bulkDelete}
+                data-side-bulk-delete={kind}
+              >
+                <Trash2 className="size-3.5" />
+                선택 삭제
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm border-[#217346]/50 px-2 text-[13px] text-[#217346]"
+                onClick={bulkComplete}
+                data-side-bulk-complete={kind}
+              >
+                <Check className="size-3.5" />
+                완료
+              </Button>
+            </div>
           ) : null}
         </div>
         <Button

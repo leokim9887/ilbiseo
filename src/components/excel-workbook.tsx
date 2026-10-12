@@ -582,68 +582,45 @@ export function ExcelWorkbook({
         ) : null}
         {!isGcal && selectedCount > 0 ? (
           <>
-            {/* 할 일: 선택 삭제 위 · 완료 아래 (세로 스택, 아버지 가독 크기 유지) */}
+            {/* 할 일 / 한 일: 완료·삭제·복원 가로 배치 (세로 스택 아님) */}
             {sheet === "todo" ? (
-              <div
-                className="flex flex-col gap-1"
-                data-excel-bulk-actions
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm border-[#217346]/50 px-3 text-[14px] text-[#217346]"
+                onClick={bulkComplete}
+                data-excel-bulk-complete
               >
-                {selectedDeletableIds.length > 0 ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-9 rounded-sm border-[#b42318]/40 px-3 text-[14px] text-[#b42318]"
-                    onClick={bulkDelete}
-                    data-excel-bulk-delete
-                  >
-                    <Trash2 className="size-3.5" />
-                    선택 삭제
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-9 rounded-sm border-[#217346]/50 px-3 text-[14px] text-[#217346]"
-                  onClick={bulkComplete}
-                  data-excel-bulk-complete
-                >
-                  <Check className="size-3.5" />
-                  완료
-                </Button>
-              </div>
+                <Check className="size-3.5" />
+                완료
+              </Button>
+            ) : null}
+            {selectedDeletableIds.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm border-[#b42318]/40 px-3 text-[14px] text-[#b42318]"
+                onClick={bulkDelete}
+                data-excel-bulk-delete
+              >
+                <Trash2 className="size-3.5" />
+                선택 삭제
+              </Button>
             ) : null}
             {sheet === "done" ? (
-              <div
-                className="flex flex-col gap-1"
-                data-excel-bulk-actions
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm px-3 text-[14px]"
+                onClick={bulkRestore}
+                data-excel-bulk-restore
               >
-                {selectedDeletableIds.length > 0 ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-9 rounded-sm border-[#b42318]/40 px-3 text-[14px] text-[#b42318]"
-                    onClick={bulkDelete}
-                    data-excel-bulk-delete
-                  >
-                    <Trash2 className="size-3.5" />
-                    선택 삭제
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-9 rounded-sm px-3 text-[14px]"
-                  onClick={bulkRestore}
-                  data-excel-bulk-restore
-                >
-                  <RotateCcw className="size-3.5" />
-                  선택 복원
-                </Button>
-              </div>
+                <RotateCcw className="size-3.5" />
+                선택 복원
+              </Button>
             ) : null}
           </>
         ) : null}

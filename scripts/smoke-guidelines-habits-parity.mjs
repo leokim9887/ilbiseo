@@ -1,6 +1,7 @@
 /**
- * Smoke: 지침/습관 blank default · drag multi-select · scroll >5 ·
- * 할 일 bulk toolbar 완료 below 선택 삭제
+ * Smoke: 지침/습관 blank · drag select · scroll >5 ·
+ * 지침/습관 bulk: 삭제 위 · 완료 아래 (세로)
+ * 할 일 bulk: 완료 · 선택 삭제 가로 (세로 스택 아님)
  */
 import { chromium } from "playwright";
 import { mkdirSync } from "fs";
@@ -41,7 +42,7 @@ const habitVal = await habitTitle.inputValue();
 const habitPh = await habitTitle.getAttribute("placeholder");
 const blankHabitOk = habitVal === "" && (habitPh || "").includes("습관");
 
-// Seed 7 guidelines for scroll + paint select
+// Seed 7 guidelines for scroll + paint select; 2 habits for paint + side stack
 await page.evaluate(() => {
   const now = new Date().toISOString();
   const s = JSON.parse(localStorage.getItem("ilbiseo-state-v2") || "{}");
@@ -97,41 +98,28 @@ await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2, {
 });
 await page.mouse.up();
 await page.waitForTimeout(200);
-const selectedHabit = await page.locator(
-  '[data-side-kind="habit"] [data-side-item-selected="1"]',
-).count();
+const selectedHabit = await page
+  .locator('[data-side-kind="habit"] [data-side-item-selected="1"]')
+  .count();
 const paintOk = selectedHabit === 2;
-const bulkHabit = await page.locator('[data-side-bulk-delete="habit"]').count();
-const paintToolbarOk = bulkHabit === 1;
+const bulkHabitDelete = await page
+  .locator('[data-side-bulk-delete="habit"]')
+  .count();
+const bulkHabitComplete = await page
+  .locator('[data-side-bulk-complete="habit"]')
+  .count();
+const paintToolbarOk = bulkHabitDelete === 1 && bulkHabitComplete === 1;
 
-await page.screenshot({
-  path: `${OUT}/ilbiseo-habits-drag-select.png`,
-  fullPage: true,
-});
-
-// --- 할 일: 완료 below 선택 삭제 ---
-await page.locator('select[aria-label="틀"]').selectOption("work");
-await page.waitForTimeout(200);
-await page.getByRole("button", { name: "행 추가" }).first().click();
-await page.waitForTimeout(150);
-await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
-  .first()
-  .fill("스택완료-테스트");
-await page.locator("input[data-excel-row-check]").first().click({ force: true });
-await page.waitForTimeout(200);
-
-const stackOrder = await page.evaluate(() => {
-  const wrap = document.querySelector("[data-excel-bulk-actions]");
+// 지침/습관 only: 선택 삭제 위 · 완료 아래 (세로 스택)
+const sideStackOrder = await page.evaluate(() => {
+  const wrap = document.querySelector('[data-side-bulk-actions="habit"]');
   if (!wrap) return { ok: false, reason: "no wrap" };
   const kids = [...wrap.querySelectorAll("button")].map((b) =>
-    (b.getAttribute("data-excel-bulk-delete") !== null
+    b.getAttribute("data-side-bulk-delete") !== null
       ? "delete"
-      : b.getAttribute("data-excel-bulk-complete") !== null
+      : b.getAttribute("data-side-bulk-complete") !== null
         ? "complete"
-        : b.getAttribute("data-excel-bulk-restore") !== null
-          ? "restore"
-          : "other"),
+        : "other",
   );
   const rects = [...wrap.querySelectorAll("button")].map((b) =>
     b.getBoundingClientRect(),
@@ -147,8 +135,64 @@ const stackOrder = await page.evaluate(() => {
   };
 });
 
+// Mark both habits done via bulk 완료
+await page.locator('[data-side-bulk-complete="habit"]').click();
+await page.waitForTimeout(300);
+const habitDoneAfter = await page.evaluate(() => {
+  const s = JSON.parse(localStorage.getItem("ilbiseo-state-v2") || "{}");
+  return (s.habits || [])
+    .filter((h) => String(h.id).startsWith("parity-h"))
+    .map((h) => ({ id: h.id, done: !!h.done }));
+});
+const sideCompleteOk =
+  habitDoneAfter.length === 2 && habitDoneAfter.every((h) => h.done);
+
 await page.screenshot({
-  path: `${OUT}/ilbiseo-bulk-complete-below-delete.png`,
+  path: `${OUT}/ilbiseo-habits-drag-select.png`,
+  fullPage: true,
+});
+
+// --- 할 일: 완료 · 선택 삭제 가로 (세로 스택이 아님) ---
+await page.locator('select[aria-label="틀"]').selectOption("work");
+await page.waitForTimeout(200);
+await page.getByRole("button", { name: "행 추가" }).first().click();
+await page.waitForTimeout(150);
+await page
+  .locator('textarea[aria-label="할일 LIST UP"]')
+  .first()
+  .fill("가로완료-테스트");
+await page.locator("input[data-excel-row-check]").first().click({ force: true });
+await page.waitForTimeout(200);
+
+const todoHorizontal = await page.evaluate(() => {
+  const del = document.querySelector("[data-excel-bulk-delete]");
+  const complete = document.querySelector("[data-excel-bulk-complete]");
+  if (!del || !complete) return { ok: false, reason: "missing buttons" };
+  const dr = del.getBoundingClientRect();
+  const cr = complete.getBoundingClientRect();
+  const sameRow = Math.abs(dr.top - cr.top) < 12;
+  const sideBySide = Math.abs(dr.left - cr.left) > 40;
+  const notStacked = !(
+    Math.abs(dr.left - cr.left) < 24 && dr.top > cr.bottom - 4
+  );
+  return {
+    ok: sameRow && sideBySide && notStacked,
+    sameRow,
+    sideBySide,
+    notStacked,
+  };
+});
+
+await page.screenshot({
+  path: `${OUT}/ilbiseo-todo-bulk-horizontal.png`,
+  fullPage: false,
+});
+
+// Optional: guideline stack screenshot (select one)
+await page.locator('[data-side-select-cell="parity-g1"]').click({ force: true });
+await page.waitForTimeout(150);
+await page.screenshot({
+  path: `${OUT}/ilbiseo-side-complete-below-delete.png`,
   fullPage: false,
 });
 
@@ -162,7 +206,10 @@ const summary = {
   paintOk,
   paintToolbarOk,
   selectedHabit,
-  stackOrder,
+  sideStackOrder,
+  sideCompleteOk,
+  habitDoneAfter,
+  todoHorizontal,
 };
 const allOk =
   blankGuideOk &&
@@ -170,7 +217,9 @@ const allOk =
   scrollOk &&
   paintOk &&
   paintToolbarOk &&
-  stackOrder.ok;
+  sideStackOrder.ok &&
+  sideCompleteOk &&
+  todoHorizontal.ok;
 
 console.log(JSON.stringify(summary, null, 2));
 console.log(allOk ? "PASS" : "FAIL");

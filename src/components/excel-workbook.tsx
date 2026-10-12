@@ -180,14 +180,8 @@ export function ExcelWorkbook({
       });
     } else if (isGcal && sheet === "done") {
       built = [];
-    } else if (sheet === "done") {
-      // 한 일: no period filter — always show all completed (「전체」)
-      built = buildTaskOnlyRows(baseTasks, {
-        filterStart: null,
-        filterEnd: null,
-        periodSort: "default",
-      });
     } else {
+      // 할 일 · 한 일: empty dates = all rows; set dates = deadline overlap filter
       built = buildTaskOnlyRows(baseTasks, {
         filterStart: filterStart || null,
         filterEnd: filterEnd || null,
@@ -632,7 +626,7 @@ export function ExcelWorkbook({
         <span className="ml-auto text-[13px] text-[#454d48]">
           {FRAME_LABEL[frame]} · {rows.length}행
           {isGcal && calCount > 0 ? ` (캘린더)` : ""}
-          {!isGcal && sheet === "todo" && filterActive ? ` · 필터 적용` : ""}
+          {!isGcal && filterActive ? ` · 필터 적용` : ""}
           {isGcal && sheet === "todo"
             ? gcalFilterActive
               ? ` · 기간 필터`
@@ -716,7 +710,7 @@ export function ExcelWorkbook({
             ) : null}
           </div>
         </div>
-      ) : !isGcal && sheet === "todo" ? (
+      ) : !isGcal ? (
       <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
@@ -747,18 +741,23 @@ export function ExcelWorkbook({
               aria-label="기간 종료일"
             />
           </label>
-          <button type="button" className={chipClass("today")} onClick={() => applyChip("today")}>
-            오늘
-          </button>
-          <button type="button" className={chipClass("week")} onClick={() => applyChip("week")}>
-            이번 주
-          </button>
-          <button type="button" className={chipClass("month")} onClick={() => applyChip("month")}>
-            이번 달
-          </button>
-          <button type="button" className={chipClass("all")} onClick={() => applyChip("all")}>
-            전체
-          </button>
+          {/* 한 일: date inputs only — no 오늘/이번 주/이번 달/전체 chips */}
+          {sheet === "todo" ? (
+            <>
+              <button type="button" className={chipClass("today")} onClick={() => applyChip("today")}>
+                오늘
+              </button>
+              <button type="button" className={chipClass("week")} onClick={() => applyChip("week")}>
+                이번 주
+              </button>
+              <button type="button" className={chipClass("month")} onClick={() => applyChip("month")}>
+                이번 달
+              </button>
+              <button type="button" className={chipClass("all")} onClick={() => applyChip("all")}>
+                전체
+              </button>
+            </>
+          ) : null}
           {filterActive ? (
             <button
               type="button"
@@ -869,6 +868,11 @@ export function ExcelWorkbook({
                   {filterActive && !isGcal && sheet === "todo" ? (
                     <p>
                       이 기간에 겹치는 할 일이 없습니다. 「전체」를 누르세요.
+                    </p>
+                  ) : filterActive && !isGcal && sheet === "done" ? (
+                    <p>
+                      이 기간에 한 일이 없습니다. 날짜를 비우거나 「필터 지우기」로
+                      전체를 봅니다.
                     </p>
                   ) : isGcal && sheet === "todo" ? (
                     <p>

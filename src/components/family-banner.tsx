@@ -6,9 +6,12 @@ export interface FamilyBannerProps {
   calendarCount: number;
 }
 
+/** Refined gold — readable on night photo, not neon. */
+const MOTTO_GOLD = "#D4B56A";
+
 /**
  * Seamless top surface: family atmosphere + motto + inline stats.
- * Shown on PC and mobile (shorter on phone). No separate title strip / stats card.
+ * Shown on PC and mobile (taller crop on phone). No separate title strip / stats card.
  */
 export function FamilyBanner({
   activeCount,
@@ -21,26 +24,55 @@ export function FamilyBanner({
       aria-label="가족 응원 배너"
       data-family-banner
     >
-      {/* Phone: shorter crop; desktop: full banner aspect */}
-      <div className="relative aspect-[1680/980] w-full sm:aspect-[1680/700]">
+      {/* Phone: taller balanced crop; desktop: wide banner */}
+      <div className="relative aspect-[1170/780] w-full sm:aspect-[1680/700]">
+        {/* Mobile asset */}
         <Image
-          src="/ilbiseo-family-banner.jpg"
+          src="/ilbiseo-family-banner-mobile.jpg"
+          alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center sm:hidden"
+        />
+        {/* PC asset */}
+        <Image
+          src="/ilbiseo-family-banner-pc.jpg"
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority
           sizes="(min-width: 640px) min(72rem, 100vw), 100vw"
-          className="object-cover object-[22%_40%] sm:object-center"
+          className="hidden object-cover object-center sm:block"
         />
-        {/* Soft scrim only — calm left/bottom for motto + stats (same surface) */}
+        {/* Soft scrim — calm top/left/bottom for motto + stats (same surface) */}
         <div
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,rgba(22,63,57,0.58)_0%,rgba(22,63,57,0.3)_26%,rgba(22,63,57,0.08)_46%,transparent_58%),linear-gradient(to_top,rgba(22,63,57,0.5)_0%,rgba(22,63,57,0.18)_34%,transparent_55%)]"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(22,63,57,0.55)_0%,rgba(22,63,57,0.22)_22%,transparent_42%),linear-gradient(100deg,rgba(22,63,57,0.42)_0%,rgba(22,63,57,0.18)_22%,transparent_42%),linear-gradient(to_top,rgba(22,63,57,0.48)_0%,rgba(22,63,57,0.16)_32%,transparent_52%)] sm:bg-[linear-gradient(100deg,rgba(22,63,57,0.55)_0%,rgba(22,63,57,0.28)_24%,rgba(22,63,57,0.08)_44%,transparent_56%),linear-gradient(to_top,rgba(22,63,57,0.5)_0%,rgba(22,63,57,0.18)_34%,transparent_55%)]"
           aria-hidden
         />
 
-        <div className="absolute inset-0 flex flex-col justify-end gap-2.5 px-3.5 pb-3 pt-8 sm:justify-between sm:gap-0 sm:px-8 sm:pb-5 sm:pt-7 lg:px-10">
-          <p className="max-w-[min(22rem,94%)] font-sans text-[1.28rem] font-semibold leading-snug tracking-tight text-[#f4faf8] sm:mt-1 sm:max-w-[min(28rem,46%)] sm:text-[1.7rem] sm:font-bold lg:text-[1.9rem]">
-            진인사대천명(盡人事待天命)
-          </p>
+        <div className="absolute inset-0 flex flex-col justify-between gap-2 px-3.5 pb-3 pt-3.5 sm:justify-between sm:gap-0 sm:px-8 sm:pb-5 sm:pt-7 lg:px-10">
+          <div className="max-w-[min(22rem,94%)] sm:mt-1 sm:max-w-[min(28rem,46%)]">
+            <p
+              className="font-sans text-[1.22rem] font-semibold leading-snug tracking-tight sm:text-[1.7rem] sm:font-bold lg:text-[1.9rem]"
+              style={{
+                color: MOTTO_GOLD,
+                textShadow:
+                  "0 1px 2px rgba(8,20,18,0.72), 0 0 18px rgba(22,63,57,0.35)",
+              }}
+            >
+              진인사대천명(盡人事待天命)
+            </p>
+            <p
+              className="mt-1 font-sans text-[0.92rem] font-medium leading-snug tracking-tight sm:mt-1.5 sm:text-[1.05rem] sm:font-semibold"
+              style={{
+                color: MOTTO_GOLD,
+                textShadow:
+                  "0 1px 2px rgba(8,20,18,0.68), 0 0 14px rgba(22,63,57,0.3)",
+              }}
+            >
+              언제나 화이팅입니다!
+            </p>
+          </div>
 
           {/* Inline muted stats fused into banner — no white card */}
           <dl

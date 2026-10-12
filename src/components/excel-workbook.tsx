@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -65,6 +66,7 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  Pencil,
   Plus,
   RotateCcw,
   Trash2,
@@ -90,9 +92,16 @@ function openDatePickerFromEvent(
   }
 }
 
-type ColKey = "order" | "listup" | "deadline" | "importance" | "urgency" | "done";
+type ColKey =
+  | "order"
+  | "listup"
+  | "deadline"
+  | "importance"
+  | "urgency"
+  | "done"
+  | "edit";
 
-const COLS: {
+const COLS_TODO: {
   key: ColKey;
   label: string;
   shortLabel: string;
@@ -119,6 +128,36 @@ const COLS: {
   },
   { key: "urgency", label: "시급성", shortLabel: "시급", width: "72px" },
   { key: "done", label: "완료여부", shortLabel: "완료", width: "84px" },
+];
+
+/** 한 일: 완료여부 대신 잠금 해제용 「수정」 */
+const COLS_DONE: {
+  key: ColKey;
+  label: string;
+  shortLabel: string;
+  width: string;
+}[] = [
+  { key: "order", label: "순서", shortLabel: "순", width: "56px" },
+  {
+    key: "listup",
+    label: "할일 LIST UP",
+    shortLabel: "할일",
+    width: "42%",
+  },
+  {
+    key: "deadline",
+    label: "마감목표",
+    shortLabel: "마감",
+    width: "168px",
+  },
+  {
+    key: "importance",
+    label: "중요도",
+    shortLabel: "중요",
+    width: "72px",
+  },
+  { key: "urgency", label: "시급성", shortLabel: "시급", width: "72px" },
+  { key: "edit", label: "수정", shortLabel: "수정", width: "84px" },
 ];
 
 const EDITABLE: ColKey[] = ["listup", "deadline", "importance", "urgency"];
@@ -166,8 +205,14 @@ export function ExcelWorkbook({
 }: ExcelWorkbookProps) {
   const isGcal = frame === "gcal";
   const isAll = isAllFrame(frame);
+  const isDoneSheet = sheet === "done";
+  const COLS = isDoneSheet ? COLS_DONE : COLS_TODO;
   const [focus, setFocus] = useState<FocusCell | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  /** 한 일 rows unlocked via 「수정」 (locked by default, like done 지침/습관). */
+  const [editingDoneIds, setEditingDoneIds] = useState<Set<string>>(
     () => new Set(),
   );
   // Keep active row highlight for keyboard/editing (separate from multi-select)
@@ -522,6 +567,7 @@ export function ExcelWorkbook({
     setFocus(null);
     setActiveRow(null);
     setSelectedIds(new Set());
+    setEditingDoneIds(new Set());
   }, [sheet, frame]);
 
   // Drop selection ids that are no longer in the workbook tasks
@@ -538,6 +584,38 @@ export function ExcelWorkbook({
       return changed ? next : prev;
     });
   }, [baseTasks]);
+
+  useEffect(() => {
+    setEditingDoneIds((prev) => {
+      if (prev.size === 0) return prev;
+      const alive = new Set(baseTasks.map((t) => t.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (alive.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [baseTasks]);
+
+  const beginEditDone = useCallback((id: string) => {
+    setEditingDoneIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const endEditDone = useCallback((id: string) => {
+    setEditingDoneIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setFocus((f) => (f?.rowId === id ? null : f));
+  }, []);
 
   useEffect(() => {
     if (!focus) return;
@@ -1030,17 +1108,22 @@ export function ExcelWorkbook({
                 const task = row.task;
                 const order = idx + 1;
                 const checked = selectedIds.has(task.id);
+                const editingDone = editingDoneIds.has(task.id);
+                const locked = isDoneSheet && !editingDone;
                 const active = activeRow === task.id || checked;
                 const zebra = order % 2 === 0;
                 const someday = isSomedayDeadline(task);
                 const deadlineFocused =
-                  focus?.rowId === task.id && focus.col === "deadline";
+                  !locked &&
+                  focus?.rowId === task.id &&
+                  focus.col === "deadline";
                 const startMin = todayKst;
                 const endMin =
                   task.startDate && task.startDate >= todayKst
                     ? task.startDate
                     : todayKst;
                 const setSomeday = (on: boolean) => {
+                  if (locked) return;
                   if (on) {
                     onUpdate(task.id, {
                       kind: "someday",
@@ -1055,20 +1138,37 @@ export function ExcelWorkbook({
                     });
                   }
                 };
+                const relockIfLeavingRow = (
+                  e: FocusEvent<HTMLElement>,
+                ) => {
+                  if (!isDoneSheet || locked) return;
+                  const next = e.relatedTarget as Node | null;
+                  const rowEl = e.currentTarget.closest("[data-excel-row]");
+                  if (rowEl && next && rowEl.contains(next)) return;
+                  endEditDone(task.id);
+                };
                 return (
                   <tr
                     key={task.id}
                     onClick={() => setActiveRow(task.id)}
                     data-excel-row={task.id}
                     data-excel-row-selected={checked ? "1" : "0"}
+                    data-excel-row-locked={locked ? "1" : "0"}
+                    data-excel-row-editing={
+                      isDoneSheet && editingDone ? "1" : "0"
+                    }
                     className={
                       checked
                         ? "bg-[#dcefe3]"
-                        : active
-                          ? "bg-[#e8f5ee]"
-                          : zebra
-                            ? "bg-[#fafafa]"
-                            : "bg-white"
+                        : locked
+                          ? zebra
+                            ? "bg-[#f2f6f3]"
+                            : "bg-[#f7faf8]"
+                          : active
+                            ? "bg-[#e8f5ee]"
+                            : zebra
+                              ? "bg-[#fafafa]"
+                              : "bg-white"
                     }
                   >
                     <td
@@ -1116,9 +1216,13 @@ export function ExcelWorkbook({
 
                     <EditCell
                       active={
-                        focus?.rowId === task.id && focus.col === "listup"
+                        !locked &&
+                        focus?.rowId === task.id &&
+                        focus.col === "listup"
                       }
+                      locked={locked}
                       onFocusCell={() => {
+                        if (locked) return;
                         setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "listup" });
                       }}
@@ -1141,16 +1245,24 @@ export function ExcelWorkbook({
                           onChange={(e) =>
                             updateListUp(task, { title: e.target.value })
                           }
-                          onBlur={(e) =>
+                          onBlur={(e) => {
                             maybeWarnSimilarWording(task, {
                               title: e.currentTarget.value,
-                            })
-                          }
+                            });
+                            relockIfLeavingRow(e);
+                          }}
                           onFocus={() => {
+                            if (locked) return;
                             setActiveRow(task.id);
                             setFocus({ rowId: task.id, col: "listup" });
                           }}
-                          className="excel-textarea font-medium"
+                          readOnly={locked}
+                          disabled={locked}
+                          className={`excel-textarea font-medium ${
+                            locked
+                              ? "cursor-default opacity-90 text-[#5a635e]"
+                              : ""
+                          }`}
                           aria-label="할일 LIST UP"
                           placeholder="할 일 제목"
                         />
@@ -1165,18 +1277,26 @@ export function ExcelWorkbook({
                             onClick={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
                             onFocus={() => {
+                              if (locked) return;
                               setActiveRow(task.id);
                               setFocus({ rowId: task.id, col: "listup" });
                             }}
                             onChange={(e) =>
                               updateListUp(task, { memo: e.target.value })
                             }
-                            onBlur={(e) =>
+                            onBlur={(e) => {
                               maybeWarnSimilarWording(task, {
                                 memo: e.currentTarget.value,
-                              })
-                            }
-                            className="excel-textarea excel-textarea-memo"
+                              });
+                              relockIfLeavingRow(e);
+                            }}
+                            readOnly={locked}
+                            disabled={locked}
+                            className={`excel-textarea excel-textarea-memo ${
+                              locked
+                                ? "cursor-default opacity-90 text-[#6a7670]"
+                                : ""
+                            }`}
                             aria-label="메모"
                           />
                         </label>
@@ -1187,7 +1307,9 @@ export function ExcelWorkbook({
                     <EditCell
                       active={deadlineFocused}
                       center
+                      locked={locked}
                       onFocusCell={() => {
+                        if (locked) return;
                         setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "deadline" });
                       }}
@@ -1196,7 +1318,10 @@ export function ExcelWorkbook({
                       }
                     >
                       {deadlineFocused ? (
-                        <div className="flex w-full flex-col gap-1 px-1 py-1">
+                        <div
+                          className="flex w-full flex-col gap-1 px-1 py-1"
+                          onBlur={relockIfLeavingRow}
+                        >
                           <button
                             type="button"
                             data-excel-someday={task.id}
@@ -1355,10 +1480,14 @@ export function ExcelWorkbook({
 
                     <EditCell
                       active={
-                        focus?.rowId === task.id && focus.col === "importance"
+                        !locked &&
+                        focus?.rowId === task.id &&
+                        focus.col === "importance"
                       }
                       center
+                      locked={locked}
                       onFocusCell={() => {
+                        if (locked) return;
                         setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "importance" });
                       }}
@@ -1372,16 +1501,22 @@ export function ExcelWorkbook({
                         onChange={(n) =>
                           onUpdate(task.id, { importance: n })
                         }
+                        onBlur={relockIfLeavingRow}
                         label="중요도"
+                        disabled={locked}
                       />
                     </EditCell>
 
                     <EditCell
                       active={
-                        focus?.rowId === task.id && focus.col === "urgency"
+                        !locked &&
+                        focus?.rowId === task.id &&
+                        focus.col === "urgency"
                       }
                       center
+                      locked={locked}
                       onFocusCell={() => {
+                        if (locked) return;
                         setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "urgency" });
                       }}
@@ -1393,7 +1528,9 @@ export function ExcelWorkbook({
                         cellId={`${task.id}:urgency`}
                         value={task.urgency}
                         onChange={(n) => onUpdate(task.id, { urgency: n })}
+                        onBlur={relockIfLeavingRow}
                         label="시급성"
+                        disabled={locked}
                       />
                     </EditCell>
 
@@ -1405,21 +1542,42 @@ export function ExcelWorkbook({
                           aria-label={`${task.title} 완료여부`}
                           onChange={() => onComplete(task.id)}
                         />
+                      ) : locked ? (
+                        <button
+                          type="button"
+                          className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346]/40 bg-white px-1.5 text-[12px] font-medium text-[#217346] hover:bg-[#e8f5ee] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            beginEditDone(task.id);
+                            setActiveRow(task.id);
+                            setFocus({ rowId: task.id, col: "listup" });
+                          }}
+                          aria-label={`${task.title || "할 일"} 수정`}
+                          data-excel-edit={task.id}
+                          title="수정하려면 누르세요"
+                        >
+                          <Pencil className="size-3 sm:size-3.5" aria-hidden />
+                          수정
+                        </button>
                       ) : (
                         <button
                           type="button"
-                          className="inline-flex flex-col items-center gap-0 text-[11px] font-medium leading-tight text-[#217346] sm:flex-row sm:gap-1 sm:text-[14px]"
-                          onClick={() => onRestore(task.id)}
-                          title="클릭하면 할 일로 복원"
+                          className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346] bg-[#217346] px-1.5 text-[12px] font-medium text-white hover:bg-[#1a5c38] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
+                          onMouseDown={(e) => {
+                            // Keep focus in the row so blur does not re-lock
+                            // before this click runs.
+                            e.preventDefault();
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            endEditDone(task.id);
+                          }}
+                          aria-label={`${task.title || "할 일"} 수정 끝내기`}
+                          data-excel-edit-done={task.id}
+                          title="수정 끝 — 다시 잠금"
                         >
-                          <input
-                            type="checkbox"
-                            checked
-                            readOnly
-                            className="size-3.5 accent-[#217346] sm:size-[16px]"
-                            tabIndex={-1}
-                          />
-                          <span>완료</span>
+                          <Check className="size-3 sm:size-3.5" aria-hidden />
+                          수정 끝
                         </button>
                       )}
                     </td>
@@ -1479,12 +1637,14 @@ function EditCell({
   children,
   active,
   center,
+  locked,
   onFocusCell,
   onKeyNav,
 }: {
   children: ReactNode;
   active?: boolean;
   center?: boolean;
+  locked?: boolean;
   onFocusCell: () => void;
   onKeyNav: (e: KeyboardEvent) => void;
 }) {
@@ -1493,10 +1653,12 @@ function EditCell({
       className={`border border-black p-0 align-middle ${
         active
           ? "bg-[#eef7f1] outline outline-2 outline-[#217346] outline-offset-[-2px]"
-          : ""
+          : locked
+            ? "bg-[#eef2ef]"
+            : ""
       } ${center ? "text-center" : ""}`}
       onClick={onFocusCell}
-      onKeyDown={onKeyNav}
+      onKeyDown={locked ? undefined : onKeyNav}
     >
       <div
         className={`flex min-h-9 items-stretch ${center ? "justify-center" : ""}`}
@@ -1513,12 +1675,14 @@ function ScoreSelect({
   label,
   cellId,
   disabled,
+  onBlur,
 }: {
   value: number;
   onChange: (n: number) => void;
   label: string;
   cellId?: string;
   disabled?: boolean;
+  onBlur?: (e: FocusEvent<HTMLSelectElement>) => void;
 }) {
   const safe = Math.min(3, Math.max(1, Number(value) || 1));
   return (
@@ -1527,6 +1691,7 @@ function ScoreSelect({
       value={safe}
       aria-label={label}
       disabled={disabled}
+      onBlur={onBlur}
       onChange={(e) => onChange(Number(e.target.value))}
       className="excel-input text-center disabled:cursor-not-allowed disabled:opacity-60"
     >

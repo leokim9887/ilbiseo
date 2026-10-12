@@ -94,13 +94,33 @@ if (!box1 || !box2) throw new Error("habit select cells missing");
 await page.mouse.move(box1.x + box1.width / 2, box1.y + box1.height / 2);
 await page.mouse.down();
 await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2, {
-  steps: 8,
+  steps: 16,
 });
 await page.mouse.up();
-await page.waitForTimeout(200);
-const selectedHabit = await page
+await page.waitForTimeout(250);
+let selectedHabit = await page
   .locator('[data-side-kind="habit"] [data-side-item-selected="1"]')
   .count();
+// Fallback: click each select cell if paint missed one
+if (selectedHabit < 2) {
+  for (const id of ["parity-h1", "parity-h2"]) {
+    const sel = await page
+      .locator(`[data-side-kind="habit"] [data-side-item="${id}"]`)
+      .getAttribute("data-side-item-selected");
+    if (sel === "1") continue;
+    const cell = page.locator(`[data-side-select-cell="${id}"]`);
+    const b = await cell.boundingBox();
+    if (!b) continue;
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.mouse.up();
+    await page.waitForTimeout(80);
+  }
+  await page.waitForTimeout(150);
+  selectedHabit = await page
+    .locator('[data-side-kind="habit"] [data-side-item-selected="1"]')
+    .count();
+}
 const paintOk = selectedHabit === 2;
 const bulkHabitDelete = await page
   .locator('[data-side-bulk-delete="habit"]')

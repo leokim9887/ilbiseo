@@ -6,8 +6,8 @@ export interface FamilyBannerProps {
   calendarCount: number;
 }
 
-/** Refined champagne gold — readable on night photo, not neon yellow. */
-const MOTTO_GOLD = "#C9A66B";
+/** Refined champagne gold — soft metallic, readable on night photo (not neon). */
+const MOTTO_GOLD = "#C9B27C";
 
 /**
  * Seamless top surface: family atmosphere + motto + inline stats.

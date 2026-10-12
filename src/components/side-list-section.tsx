@@ -230,7 +230,7 @@ export function SideListSection({
       data-side-kind={kind}
     >
       <div
-        className={`flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad]/60 bg-gradient-to-b ${accent.head} px-3 py-2.5`}
+        className={`flex flex-col gap-2 border-b border-[#9aa5ad]/60 bg-gradient-to-b ${accent.head} px-2.5 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-3`}
       >
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -240,7 +240,7 @@ export function SideListSection({
           </span>
           <p className="text-[13px] text-[#454d48]">{items.length}건</p>
           {items.length > 0 ? (
-            <label className="flex items-center gap-1.5 text-[13px] text-[#454d48]">
+            <label className="flex min-h-10 items-center gap-1.5 text-[13px] text-[#454d48] sm:min-h-0">
               <input
                 type="checkbox"
                 checked={allSelected}
@@ -249,7 +249,7 @@ export function SideListSection({
                     el.indeterminate = someSelected && !allSelected;
                 }}
                 onChange={() => (allSelected ? clearSelection() : selectAll())}
-                className="size-3.5 accent-[#217346]"
+                className="size-4 accent-[#217346] sm:size-3.5"
                 aria-label={`${label} 모두 선택`}
                 data-side-select-all={kind}
               />
@@ -265,7 +265,7 @@ export function SideListSection({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 rounded-sm border-[#217346]/50 px-2 text-[13px] text-[#217346]"
+                className="h-10 min-h-10 touch-manipulation rounded-sm border-[#217346]/50 px-2.5 text-[13px] text-[#217346] sm:h-9 sm:min-h-9"
                 onClick={bulkComplete}
                 data-side-bulk-complete={kind}
               >
@@ -276,7 +276,7 @@ export function SideListSection({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 rounded-sm border-[#b42318]/40 px-2 text-[13px] text-[#b42318]"
+                className="h-10 min-h-10 touch-manipulation rounded-sm border-[#b42318]/40 px-2.5 text-[13px] text-[#b42318] sm:h-9 sm:min-h-9"
                 onClick={bulkDelete}
                 data-side-bulk-delete={kind}
               >
@@ -289,7 +289,7 @@ export function SideListSection({
         <Button
           type="button"
           size="sm"
-          className={`h-8 rounded-sm px-3 text-white ${
+          className={`h-11 min-h-11 w-full touch-manipulation rounded-sm px-3 text-white sm:h-8 sm:min-h-8 sm:w-auto ${
             kind === "guideline"
               ? "bg-[#3b6ea5] hover:bg-[#2f5a88]"
               : "bg-[#2d7a4f] hover:bg-[#246340]"

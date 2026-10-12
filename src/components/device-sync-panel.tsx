@@ -115,11 +115,11 @@ export function DeviceSyncPanel({
                 ) : null}
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Button
                   type="button"
                   size="lg"
-                  className="min-h-11"
+                  className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
                   onClick={handleCopy}
                 >
                   {copied ? (
@@ -133,7 +133,7 @@ export function DeviceSyncPanel({
                   type="button"
                   variant="outline"
                   size="lg"
-                  className="min-h-11"
+                  className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
                   disabled={busy}
                   onClick={onSyncNow}
                 >
@@ -148,7 +148,7 @@ export function DeviceSyncPanel({
                   type="button"
                   variant="ghost"
                   size="lg"
-                  className="min-h-11"
+                  className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
                   onClick={handleDisable}
                 >
                   동기화 끄기
@@ -187,11 +187,11 @@ export function DeviceSyncPanel({
                   spellCheck={false}
                 />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Button
                   type="button"
                   size="lg"
-                  className="min-h-11"
+                  className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
                   onClick={handleCreate}
                 >
                   새 코드 만들기 (PC에서)
@@ -200,7 +200,7 @@ export function DeviceSyncPanel({
                   type="button"
                   variant="outline"
                   size="lg"
-                  className="min-h-11"
+                  className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
                   disabled={busy}
                   onClick={handleConnect}
                 >

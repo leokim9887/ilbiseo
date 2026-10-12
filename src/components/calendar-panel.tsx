@@ -205,7 +205,7 @@ export function CalendarPanel({
               <Button
                 type="button"
                 size="lg"
-                className="min-h-11"
+                className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
                 disabled={busy !== null}
                 onClick={() => void refreshGoogle()}
               >
@@ -220,7 +220,7 @@ export function CalendarPanel({
                 type="button"
                 size="lg"
                 variant="outline"
-                className="min-h-11"
+                className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
                 disabled={busy !== null}
                 onClick={() => void disconnect()}
               >
@@ -231,13 +231,13 @@ export function CalendarPanel({
           ) : configured ? (
             <a
               href="/api/google/auth"
-              className="inline-flex h-11 min-h-11 items-center justify-center gap-1.5 rounded-lg bg-[#217346] px-3 text-sm font-medium text-white hover:bg-[#1a5c38]"
+              className="inline-flex h-12 min-h-12 w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg bg-[#217346] px-3 text-sm font-medium text-white hover:bg-[#1a5c38] sm:h-11 sm:min-h-11 sm:w-auto"
             >
               <Link2 className="size-4" />
               Google 캘린더 연결
             </a>
           ) : (
-            <Button type="button" size="lg" variant="ghost" className="min-h-11" disabled>
+            <Button type="button" size="lg" variant="ghost" className="min-h-12 w-full sm:min-h-11 sm:w-auto" disabled>
               OAuth 미설정
             </Button>
           )}
@@ -245,7 +245,7 @@ export function CalendarPanel({
             type="button"
             size="lg"
             variant="secondary"
-            className="min-h-11"
+            className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
             onClick={loadMock}
           >
             샘플

@@ -84,9 +84,13 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
       <nav
         aria-label="주요 메뉴"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--grid-line)] bg-[var(--sheet)]/95 backdrop-blur-md sm:hidden"
-        style={{ paddingBottom: "max(0.35rem, env(safe-area-inset-bottom))" }}
+        style={{
+          paddingBottom: "max(0.4rem, env(safe-area-inset-bottom))",
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
+        }}
       >
-        <ul className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pt-1.5">
+        <ul className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pt-1">
           {NAV.map((item) => {
             const active = value === item.id;
             const Icon = item.icon;
@@ -96,14 +100,16 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
                   type="button"
                   onClick={() => onChange(item.id)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex min-h-12 w-full flex-col items-center gap-1 rounded-lg px-0.5 py-2 text-[12px] font-medium leading-tight ${
+                  className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 rounded-lg px-0.5 py-2 text-[12px] font-semibold leading-tight touch-manipulation ${
                     active
                       ? "bg-[var(--group-bg)] text-[var(--brand)]"
                       : "text-[var(--ink-muted)]"
                   }`}
                 >
-                  <Icon className="size-5" />
-                  <span className="leading-none">{item.short}</span>
+                  <Icon className="size-6 shrink-0" aria-hidden />
+                  <span className="max-w-full truncate leading-none">
+                    {item.short}
+                  </span>
                 </button>
               </li>
             );

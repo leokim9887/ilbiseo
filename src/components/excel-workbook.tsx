@@ -505,7 +505,7 @@ export function ExcelWorkbook({
   }, [focus]);
 
   const chipClass = (c: typeof chip) =>
-    `h-9 rounded-sm px-2.5 text-[14px] font-medium border ${
+    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border ${
       chip === c
         ? "border-[#217346] bg-[#217346] text-white"
         : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1]"
@@ -542,7 +542,7 @@ export function ExcelWorkbook({
   };
 
   const gcalChipClass = (c: typeof gcalChip) =>
-    `h-9 rounded-sm px-2.5 text-[14px] font-medium border ${
+    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border ${
       gcalChip === c
         ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
         : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa]"
@@ -560,14 +560,14 @@ export function ExcelWorkbook({
         <p className="text-[14px] tabular-nums text-[#454d48]">{todayLabel}</p>
       </div>
 
-      {/* Ribbon */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#9aa5ad] bg-[#f0f2f4] px-3 py-2">
-        <label className="flex items-center gap-2 text-[14px] text-[#1a2420]">
-          <span className="font-semibold">틀</span>
+      {/* Ribbon — stack on phone so 틀 + actions stay tappable */}
+      <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#f0f2f4] px-2.5 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-3 sm:py-2">
+        <label className="flex w-full min-w-0 items-center gap-2 text-[14px] text-[#1a2420] sm:w-auto sm:flex-initial">
+          <span className="shrink-0 font-semibold">틀</span>
           <select
             value={frame}
             onChange={(e) => onFrameChange(e.target.value as FrameId)}
-            className="h-9 min-w-[8.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] font-medium outline-none focus:border-[#217346]"
+            className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2.5 text-[15px] font-medium outline-none focus:border-[#217346] sm:h-9 sm:min-h-9 sm:w-auto sm:min-w-[8.5rem]"
             aria-label="틀"
           >
             {FRAME_ORDER.filter((c) => sheet === "todo" || c !== "gcal").map(
@@ -580,13 +580,13 @@ export function ExcelWorkbook({
           </select>
         </label>
         {!isGcal && sheet === "todo" ? (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             {/* 「전체」 집계 틀: 행 추가 불가 (개별 틀에서만) */}
             {!isAll ? (
               <Button
                 type="button"
                 size="sm"
-                className="h-9 rounded-sm bg-[#217346] px-3 text-white hover:bg-[#1a5c38]"
+                className="h-11 min-h-11 touch-manipulation rounded-sm bg-[#217346] px-3 text-white hover:bg-[#1a5c38] sm:h-9 sm:min-h-9"
                 onClick={onAdd}
                 data-excel-add-row
               >
@@ -600,17 +600,17 @@ export function ExcelWorkbook({
                 <OcrImport category={frame} onImport={onImport} />
               </>
             ) : null}
-          </>
+          </div>
         ) : null}
         {!isGcal && selectedCount > 0 ? (
-          <>
-            {/* 할 일 / 한 일: 완료·삭제·복원 가로 배치 (세로 스택 아님) */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 할 일 / 한 일: 완료·삭제·복원 가로 배치 */}
             {sheet === "todo" ? (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 rounded-sm border-[#217346]/50 px-3 text-[14px] text-[#217346]"
+                className="h-11 min-h-11 touch-manipulation rounded-sm border-[#217346]/50 px-3 text-[14px] text-[#217346] sm:h-9 sm:min-h-9"
                 onClick={bulkComplete}
                 data-excel-bulk-complete
               >
@@ -623,7 +623,7 @@ export function ExcelWorkbook({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 rounded-sm border-[#b42318]/40 px-3 text-[14px] text-[#b42318]"
+                className="h-11 min-h-11 touch-manipulation rounded-sm border-[#b42318]/40 px-3 text-[14px] text-[#b42318] sm:h-9 sm:min-h-9"
                 onClick={bulkDelete}
                 data-excel-bulk-delete
               >
@@ -636,7 +636,7 @@ export function ExcelWorkbook({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 rounded-sm px-3 text-[14px]"
+                className="h-11 min-h-11 touch-manipulation rounded-sm px-3 text-[14px] sm:h-9 sm:min-h-9"
                 onClick={bulkRestore}
                 data-excel-bulk-restore
               >
@@ -644,9 +644,9 @@ export function ExcelWorkbook({
                 선택 복원
               </Button>
             ) : null}
-          </>
+          </div>
         ) : null}
-        <span className="ml-auto text-[13px] text-[#454d48]">
+        <span className="text-[13px] leading-snug text-[#454d48] sm:ml-auto">
           {FRAME_LABEL[frame]} · {rows.length}행
           {isGcal && calCount > 0 ? ` (캘린더)` : ""}
           {!isGcal && filterActive ? ` · 필터 적용` : ""}
@@ -667,11 +667,11 @@ export function ExcelWorkbook({
 
       {/* Period filter OR Google calendar picker */}
       {isGcal && sheet === "todo" ? (
-        <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
-            <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
-              시작일
+        <div className="flex flex-col gap-2.5 border-b border-[#9aa5ad] bg-[#e8ecef] px-2.5 py-2.5 sm:px-3">
+          <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+              <span className="w-12 shrink-0 sm:w-auto">시작일</span>
               <input
                 type="date"
                 value={gcalRangeStart}
@@ -679,13 +679,13 @@ export function ExcelWorkbook({
                   setGcalRangeStart(e.target.value);
                   setGcalChip("none");
                 }}
-                className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
+                className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
                 aria-label="캘린더 기간 시작일"
               />
             </label>
-            <span className="text-[#454d48]">~</span>
-            <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
-              종료일
+            <span className="hidden text-[#454d48] sm:inline">~</span>
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+              <span className="w-12 shrink-0 sm:w-auto">종료일</span>
               <input
                 type="date"
                 value={gcalRangeEnd}
@@ -693,10 +693,12 @@ export function ExcelWorkbook({
                   setGcalRangeEnd(e.target.value);
                   setGcalChip("none");
                 }}
-                className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
+                className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
                 aria-label="캘린더 기간 종료일"
               />
             </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               className={gcalChipClass("today")}
@@ -729,7 +731,7 @@ export function ExcelWorkbook({
               <button
                 type="button"
                 onClick={clearGcalFilter}
-                className="inline-flex h-9 items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] text-[#454d48]"
+                className="inline-flex h-10 min-h-10 touch-manipulation items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2.5 text-[14px] text-[#454d48] sm:h-9 sm:min-h-9"
               >
                 <X className="size-3.5" />
                 필터 지우기
@@ -738,11 +740,11 @@ export function ExcelWorkbook({
           </div>
         </div>
       ) : !isGcal ? (
-      <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
-          <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
-            시작일
+      <div className="flex flex-col gap-2.5 border-b border-[#9aa5ad] bg-[#e8ecef] px-2.5 py-2.5 sm:px-3">
+        <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+            <span className="w-12 shrink-0 sm:w-auto">시작일</span>
             <input
               type="date"
               value={filterStart}
@@ -750,13 +752,13 @@ export function ExcelWorkbook({
                 setFilterStart(e.target.value);
                 setChip("all");
               }}
-              className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
+              className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
               aria-label="기간 시작일"
             />
           </label>
-          <span className="text-[#454d48]">~</span>
-          <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
-            종료일
+          <span className="hidden text-[#454d48] sm:inline">~</span>
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+            <span className="w-12 shrink-0 sm:w-auto">종료일</span>
             <input
               type="date"
               value={filterEnd}
@@ -764,47 +766,55 @@ export function ExcelWorkbook({
                 setFilterEnd(e.target.value);
                 setChip("all");
               }}
-              className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
+              className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
               aria-label="기간 종료일"
             />
           </label>
-          {/* 한 일: date inputs only — no 오늘/이번 주/이번 달/전체 chips */}
-          {sheet === "todo" ? (
-            <>
-              <button type="button" className={chipClass("today")} onClick={() => applyChip("today")}>
-                오늘
-              </button>
-              <button type="button" className={chipClass("week")} onClick={() => applyChip("week")}>
-                이번 주
-              </button>
-              <button type="button" className={chipClass("month")} onClick={() => applyChip("month")}>
-                이번 달
-              </button>
-              <button type="button" className={chipClass("all")} onClick={() => applyChip("all")}>
-                전체
-              </button>
-            </>
-          ) : null}
-          {filterActive ? (
-            <button
-              type="button"
-              onClick={clearFilter}
-              className="inline-flex h-9 items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] text-[#454d48]"
-            >
-              <X className="size-3.5" />
-              필터 지우기
-            </button>
-          ) : null}
         </div>
+        {/* 한 일: date inputs only — no 오늘/이번 주/이번 달/전체 chips */}
+        {sheet === "todo" || filterActive ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {sheet === "todo" ? (
+              <>
+                <button type="button" className={chipClass("today")} onClick={() => applyChip("today")}>
+                  오늘
+                </button>
+                <button type="button" className={chipClass("week")} onClick={() => applyChip("week")}>
+                  이번 주
+                </button>
+                <button type="button" className={chipClass("month")} onClick={() => applyChip("month")}>
+                  이번 달
+                </button>
+                <button type="button" className={chipClass("all")} onClick={() => applyChip("all")}>
+                  전체
+                </button>
+              </>
+            ) : null}
+            {filterActive ? (
+              <button
+                type="button"
+                onClick={clearFilter}
+                className="inline-flex h-10 min-h-10 touch-manipulation items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2.5 text-[14px] text-[#454d48] sm:h-9 sm:min-h-9"
+              >
+                <X className="size-3.5" />
+                필터 지우기
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       ) : null}
 
+      <p className="excel-hscroll-hint" aria-hidden>
+        ← 표를 좌우로 밀어 보세요 (글자가 줄어들지 않습니다)
+      </p>
+      <div className="excel-scroll-wrap">
       <div
         ref={tableScrollRef}
-        className="relative max-h-[min(66vh,720px)] min-h-[300px] overflow-auto bg-white"
+        className="relative max-h-[min(62vh,720px)] min-h-[280px] overflow-auto overscroll-x-contain bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(66vh,720px)] sm:min-h-[300px]"
         data-excel-scroll
       >
-        <table className="w-full min-w-[860px] border-collapse text-[16px] text-black">
+        <table className="w-full min-w-[780px] border-collapse text-[16px] text-black sm:min-w-[860px]">
           <thead className="sticky top-0 z-20">
             <tr>
               {!isGcal ? (
@@ -1345,6 +1355,7 @@ export function ExcelWorkbook({
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       <Dialog

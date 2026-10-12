@@ -33,7 +33,7 @@ export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
   };
 
   return (
-    <div className="animate-fade-up rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] px-5 py-5 shadow-[0_1px_0_rgba(26,43,54,0.04)] sm:px-6">
+    <div className="animate-fade-up rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-4 shadow-[0_1px_0_rgba(26,43,54,0.04)] sm:px-6 sm:py-5">
       <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--brand)]">
         일비서
       </p>
@@ -41,7 +41,12 @@ export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
         할 일·한 일 시트와 틀(업무·개인·과제·팀원)로 일정을 정리합니다.
       </p>
       <div className="mt-4">
-        <Button type="button" size="lg" className="min-h-11" onClick={close}>
+        <Button
+          type="button"
+          size="lg"
+          className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
+          onClick={close}
+        >
           시작하기
         </Button>
       </div>

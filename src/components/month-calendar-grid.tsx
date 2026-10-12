@@ -243,7 +243,7 @@ export function MonthCalendarGrid({
 
   return (
     <div className="space-y-3" data-month-calendar>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div
           className="flex flex-wrap items-center gap-1.5"
           data-cal-year-month-picker
@@ -287,12 +287,12 @@ export function MonthCalendarGrid({
             ))}
           </select>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center">
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="min-h-9"
+            className="min-h-11 touch-manipulation sm:min-h-9"
             onClick={onPrevMonth}
             aria-label="이전 달"
           >
@@ -303,7 +303,7 @@ export function MonthCalendarGrid({
             type="button"
             size="sm"
             variant="outline"
-            className="min-h-9"
+            className="min-h-11 touch-manipulation sm:min-h-9"
             onClick={onGoToday}
           >
             오늘
@@ -312,7 +312,7 @@ export function MonthCalendarGrid({
             type="button"
             size="sm"
             variant="outline"
-            className="min-h-9"
+            className="min-h-11 touch-manipulation sm:min-h-9"
             onClick={onNextMonth}
             aria-label="다음 달"
           >
@@ -323,15 +323,16 @@ export function MonthCalendarGrid({
       </div>
 
       <div
-        className="overflow-hidden rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)]"
+        className="-mx-0.5 overflow-x-auto overscroll-x-contain rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] sm:mx-0 sm:overflow-hidden"
         role="grid"
         aria-label={`${monthLabelKo(year, monthIndex)} 캘린더`}
       >
+        <div className="min-w-[min(100%,22rem)] sm:min-w-0">
         <div className="grid grid-cols-7 border-b border-[var(--grid-line)] bg-[var(--sheet-header)]/70">
           {WEEKDAYS.map((w) => (
             <div
               key={w}
-              className="px-1 py-2.5 text-center text-[13px] font-semibold text-[var(--ink-muted)] sm:text-[14px]"
+              className="px-0.5 py-2 text-center text-[12px] font-semibold text-[var(--ink-muted)] sm:px-1 sm:py-2.5 sm:text-[14px]"
               role="columnheader"
             >
               {w}
@@ -352,7 +353,7 @@ export function MonthCalendarGrid({
                   return (
                     <div
                       key={`pad-${wi}-${di}`}
-                      className="min-h-[6rem] border-r border-[var(--grid-line)] bg-[var(--sheet-header)]/20 sm:min-h-[7rem]"
+                      className="min-h-[4.75rem] border-r border-[var(--grid-line)] bg-[var(--sheet-header)]/20 sm:min-h-[7rem]"
                       aria-hidden
                     />
                   );
@@ -384,7 +385,7 @@ export function MonthCalendarGrid({
                         openDay(day);
                       }
                     }}
-                    className={`min-h-[6rem] border-r border-[var(--grid-line)] p-1.5 sm:min-h-[7rem] sm:p-2 ${
+                    className={`min-h-[4.75rem] border-r border-[var(--grid-line)] p-1 touch-manipulation sm:min-h-[7rem] sm:p-2 ${
                       isToday ? "bg-[#e8f5ee]" : "bg-white"
                     } ${
                       canOpen
@@ -393,7 +394,7 @@ export function MonthCalendarGrid({
                     }`}
                   >
                     <p
-                      className={`mb-1 text-[13px] font-semibold tabular-nums sm:text-[14px] ${
+                      className={`mb-0.5 text-[12px] font-semibold tabular-nums sm:mb-1 sm:text-[14px] ${
                         isToday
                           ? "text-[#217346]"
                           : isSun
@@ -405,7 +406,7 @@ export function MonthCalendarGrid({
                     >
                       {Number(day.slice(8, 10))}
                       {isToday ? (
-                        <span className="ml-1 text-[12px] font-medium">
+                        <span className="ml-0.5 text-[10px] font-medium sm:ml-1 sm:text-[12px]">
                           오늘
                         </span>
                       ) : null}
@@ -422,7 +423,7 @@ export function MonthCalendarGrid({
                       {dayEvents.slice(0, CHIP_LIMIT).map((ev) => (
                         <li
                           key={ev.id}
-                          className="truncate rounded-sm border-l-2 border-l-[#3b6ea5] bg-[#eef3fa] px-1.5 py-1 text-[12px] leading-snug text-[var(--ink)] sm:text-[13px]"
+                          className="truncate rounded-sm border-l-2 border-l-[#3b6ea5] bg-[#eef3fa] px-1 py-0.5 text-[10px] leading-snug text-[var(--ink)] sm:px-1.5 sm:py-1 sm:text-[13px]"
                           title={`${ev.title} · ${formatCalendarWhen(ev)}`}
                           data-cal-event={ev.id}
                           data-cal-single="1"
@@ -437,7 +438,7 @@ export function MonthCalendarGrid({
                           <button
                             type="button"
                             data-cal-overflow
-                            className="rounded px-1 text-[12px] font-medium text-[var(--ink-muted)] underline-offset-2 hover:text-[#217346] hover:underline"
+                            className="min-h-7 touch-manipulation rounded px-1 text-[11px] font-semibold text-[var(--ink-muted)] underline-offset-2 hover:text-[#217346] hover:underline sm:text-[12px]"
                             onClick={(e) => {
                               e.stopPropagation();
                               openDay(day);
@@ -485,6 +486,7 @@ export function MonthCalendarGrid({
             </div>
           );
         })}
+        </div>
       </div>
 
       <Sheet
@@ -494,9 +496,12 @@ export function MonthCalendarGrid({
         }}
       >
         <SheetContent
-          side="right"
+          side="bottom"
           data-cal-day-detail
-          className="w-[min(100%,22rem)] gap-0 border-[var(--grid-line)] bg-[var(--sheet)] p-0 sm:max-w-sm"
+          className="max-h-[min(88dvh,40rem)] w-full max-w-none gap-0 rounded-t-2xl border-[var(--grid-line)] bg-[var(--sheet)] p-0"
+          style={{
+            paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+          }}
         >
           <SheetHeader className="border-b border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-3.5 pr-12">
             <SheetTitle className="text-[16px] font-semibold text-[var(--ink)]">
@@ -509,7 +514,7 @@ export function MonthCalendarGrid({
             </SheetDescription>
           </SheetHeader>
           <ul
-            className="flex-1 space-y-0 overflow-y-auto px-3 py-2"
+            className="min-h-0 flex-1 space-y-0 overflow-y-auto px-3 py-2"
             data-cal-day-detail-list
           >
             {detailEvents.map((ev) => {
@@ -519,7 +524,7 @@ export function MonthCalendarGrid({
                   key={ev.id}
                   data-cal-day-detail-event={ev.id}
                   data-cal-day-detail-span={multi ? "1" : "0"}
-                  className="border-b border-[var(--grid-line)]/70 px-1 py-3 last:border-b-0"
+                  className="border-b border-[var(--grid-line)]/70 px-1 py-3.5 last:border-b-0"
                 >
                   <p className="text-[15px] leading-snug font-medium break-words text-[var(--ink)]">
                     {ev.title}

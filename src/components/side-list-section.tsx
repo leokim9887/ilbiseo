@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SideListItem, SideListKind } from "@/lib/types";
 import { SIDE_LIST_LABEL } from "@/lib/types";
@@ -47,6 +47,10 @@ export function SideListSection({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
   );
+  /** Completed items unlocked for editing via 「수정」. */
+  const [editingDoneIds, setEditingDoneIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const listScrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const paintRef = useRef<{
@@ -74,6 +78,22 @@ export function SideListSection({
       const next = new Set<string>();
       for (const id of prev) {
         if (alive.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [items]);
+
+  useEffect(() => {
+    setEditingDoneIds((prev) => {
+      if (prev.size === 0) return prev;
+      const doneAlive = new Set(
+        items.filter((i) => i.done).map((i) => i.id),
+      );
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (doneAlive.has(id)) next.add(id);
         else changed = true;
       }
       return changed ? next : prev;
@@ -170,6 +190,23 @@ export function SideListSection({
     onCompleteMany(ids);
     setSelectedIds(new Set());
   }, [onCompleteMany, selectedIds]);
+
+  const beginEditDone = useCallback((id: string) => {
+    setEditingDoneIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const endEditDone = useCallback((id: string) => {
+    setEditingDoneIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
 
   const handleAdd = useCallback(() => {
     onAdd();
@@ -278,16 +315,20 @@ export function SideListSection({
           <ul ref={listRef} className="space-y-2">
             {ordered.map((item) => {
               const checked = selectedIds.has(item.id);
+              const editingDone = editingDoneIds.has(item.id);
+              const locked = item.done && !editingDone;
               return (
                 <li
                   key={item.id}
                   data-side-item={item.id}
                   data-side-item-selected={checked ? "1" : "0"}
+                  data-side-item-done={item.done ? "1" : "0"}
+                  data-side-item-locked={locked ? "1" : "0"}
                   className={`flex flex-col gap-1.5 rounded-sm border px-2.5 py-2 sm:flex-row sm:items-start ${
                     checked
                       ? "border-[#217346]/50 bg-[#e8f5ee]"
                       : item.done
-                        ? "border-[#c5ccd2] bg-[#f3f4f5] opacity-80"
+                        ? "border-[#217346]/35 bg-[#eef6f1]"
                         : "border-[#c5ccd2] bg-[#fafbfc]"
                   }`}
                 >
@@ -331,19 +372,47 @@ export function SideListSection({
                     />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
+                    {item.done ? (
+                      <div
+                        className="mb-0.5 flex flex-wrap items-center gap-1.5"
+                        data-side-done-badge={item.id}
+                      >
+                        <span className="inline-flex items-center gap-1 rounded-sm bg-[#217346] px-1.5 py-0.5 text-[12px] font-bold text-white">
+                          <Check className="size-3.5 stroke-[3]" aria-hidden />
+                          완료됨
+                        </span>
+                        {locked ? (
+                          <span className="text-[12px] font-medium text-[#5a6b62]">
+                            수정하려면 「수정」을 누르세요
+                          </span>
+                        ) : (
+                          <span className="text-[12px] font-medium text-[#217346]">
+                            수정 중
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
                     <input
                       type="text"
                       value={item.title}
                       onChange={(e) =>
                         onUpdate(item.id, { title: e.target.value })
                       }
-                      className={`h-9 w-full rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] outline-none ${accent.focus} ${
-                        item.done
-                          ? "text-[#777] line-through"
-                          : "text-[#1a2420]"
+                      onBlur={() => {
+                        if (item.done) endEditDone(item.id);
+                      }}
+                      disabled={locked}
+                      readOnly={locked}
+                      className={`h-9 w-full rounded-sm border px-2 text-[15px] outline-none ${
+                        locked
+                          ? "cursor-default border-[#b7c4bc] bg-[#e4ebe6] text-[#6a7670] line-through decoration-2 decoration-[#6a7670]/70"
+                          : item.done
+                            ? `border-[#8a939a] bg-white text-[#3a4540] line-through decoration-[#6a7670]/60 ${accent.focus}`
+                            : `border-[#8a939a] bg-white text-[#1a2420] ${accent.focus}`
                       }`}
                       aria-label={`${label} 제목`}
                       placeholder={`${label} 내용`}
+                      data-side-title={item.id}
                     />
                     <input
                       type="text"
@@ -351,20 +420,57 @@ export function SideListSection({
                       onChange={(e) =>
                         onUpdate(item.id, { memo: e.target.value })
                       }
-                      className="h-9 w-full rounded-sm border border-[#d0d5d9] bg-white px-2 text-[14px] text-[#2a3230] outline-none focus:border-[#8a939a]"
+                      onBlur={() => {
+                        if (item.done) endEditDone(item.id);
+                      }}
+                      disabled={locked}
+                      readOnly={locked}
+                      className={`h-9 w-full rounded-sm border px-2 text-[14px] outline-none ${
+                        locked
+                          ? "cursor-default border-[#c5d0c9] bg-[#e8eee9] text-[#7a8680]"
+                          : "border-[#d0d5d9] bg-white text-[#2a3230] focus:border-[#8a939a]"
+                      }`}
                       aria-label={`${label} 메모`}
                       placeholder="메모 (선택)"
+                      data-side-memo={item.id}
                     />
                   </div>
-                  <button
-                    type="button"
-                    className="inline-flex h-9 shrink-0 items-center justify-center gap-1 self-end rounded-sm border border-[#8a939a] bg-white px-2 text-[13px] text-[#454d48] hover:bg-[#f0f2f4] sm:self-start"
-                    onClick={() => onDelete(item.id)}
-                    aria-label={`${label} 삭제`}
-                  >
-                    <Trash2 className="size-3.5" />
-                    삭제
-                  </button>
+                  <div className="flex shrink-0 flex-row gap-1.5 self-end sm:flex-col sm:self-start">
+                    {item.done ? (
+                      locked ? (
+                        <button
+                          type="button"
+                          className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#217346]/45 bg-white px-2 text-[13px] font-medium text-[#217346] hover:bg-[#e8f5ee]"
+                          onClick={() => beginEditDone(item.id)}
+                          aria-label={`${label} 수정`}
+                          data-side-edit={item.id}
+                        >
+                          <Pencil className="size-3.5" />
+                          수정
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#217346] bg-[#217346] px-2 text-[13px] font-medium text-white hover:bg-[#1a5c38]"
+                          onClick={() => endEditDone(item.id)}
+                          aria-label={`${label} 수정 끝내기`}
+                          data-side-edit-done={item.id}
+                        >
+                          <Check className="size-3.5" />
+                          수정 끝
+                        </button>
+                      )
+                    ) : null}
+                    <button
+                      type="button"
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px] text-[#454d48] hover:bg-[#f0f2f4]"
+                      onClick={() => onDelete(item.id)}
+                      aria-label={`${label} 삭제`}
+                    >
+                      <Trash2 className="size-3.5" />
+                      삭제
+                    </button>
+                  </div>
                 </li>
               );
             })}

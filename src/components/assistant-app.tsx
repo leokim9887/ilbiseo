@@ -13,6 +13,7 @@ import { AppNav, type MainView } from "@/components/app-nav";
 import { PanelShell } from "@/components/panel-shell";
 import { Button } from "@/components/ui/button";
 import {
+  isAllFrame,
   isTaskCategory,
   type FrameId,
   type TaskCategory,
@@ -92,8 +93,16 @@ export function AssistantApp() {
   const taskFrame: TaskCategory | undefined = isTaskCategory(frame)
     ? frame
     : undefined;
-  const active = taskFrame ? app.activeTasks(taskFrame) : [];
-  const done = taskFrame ? app.completedTasks(taskFrame) : [];
+  const active = isAllFrame(frame)
+    ? app.activeTasks()
+    : taskFrame
+      ? app.activeTasks(taskFrame)
+      : [];
+  const done = isAllFrame(frame)
+    ? app.completedTasks()
+    : taskFrame
+      ? app.completedTasks(taskFrame)
+      : [];
   const workbookOpen = view === "todo" || view === "done";
 
   const handleFrameChange = (f: FrameId) => {

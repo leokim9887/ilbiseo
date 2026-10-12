@@ -2,8 +2,8 @@ export type TaskKind = "spot" | "ongoing" | "someday";
 export type TaskSource = "manual" | "memo" | "ocr" | "import";
 export type TaskStatus = "active" | "completed";
 export type TaskCategory = "work" | "personal" | "project" | "team";
-/** 틀 dropdown: 4 program frames + Google Calendar frame */
-export type FrameId = TaskCategory | "gcal";
+/** 틀 dropdown: 전체 집계 + 4 program frames + Google Calendar frame */
+export type FrameId = "all" | TaskCategory | "gcal";
 export type CalendarSource = "mock" | "ics" | "google";
 
 /** 장부 아래 별도 영역 — 지침 / 습관 (틀이 아님) */
@@ -85,7 +85,7 @@ export const APP_VERSION = 3;
 
 export const CATEGORY_ORDER: TaskCategory[] = [...TASK_CATEGORIES];
 
-export const FRAME_ORDER: FrameId[] = [...TASK_CATEGORIES, "gcal"];
+export const FRAME_ORDER: FrameId[] = ["all", ...TASK_CATEGORIES, "gcal"];
 
 export const CATEGORY_LABEL: Record<TaskCategory, string> = {
   work: "업무용",
@@ -95,9 +95,15 @@ export const CATEGORY_LABEL: Record<TaskCategory, string> = {
 };
 
 export const FRAME_LABEL: Record<FrameId, string> = {
+  all: "전체",
   ...CATEGORY_LABEL,
   gcal: "구글 캘린더",
 };
+
+/** 「전체」 틀 — 4개 프로그램 틀만 합침 (구글 캘린더 제외) */
+export function isAllFrame(f: FrameId | string): f is "all" {
+  return f === "all";
+}
 
 export const SIDE_LIST_LABEL: Record<SideListKind, string> = {
   guideline: "지침",

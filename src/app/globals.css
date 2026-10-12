@@ -188,6 +188,21 @@
   cursor: pointer;
   appearance: auto;
 }
+/* 마감목표 date: 텍스트·아이콘 영역 어디를 눌러도 피커 열림 */
+.excel-input[type="date"] {
+  position: relative;
+  cursor: pointer;
+}
+.excel-input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
 .excel-textarea {
   width: 100%;
   min-height: 1.85rem;

@@ -10,8 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import {
+  CATEGORY_LABEL,
   FRAME_LABEL,
   FRAME_ORDER,
+  isAllFrame,
   isTaskCategory,
   type CalendarEvent,
   type FrameId,
@@ -71,6 +73,23 @@ import {
 
 export type WorkbookSheet = "todo" | "done";
 
+/** Open native date picker when clicking anywhere on the field (not only the icon). */
+function openDatePickerFromEvent(
+  e: { currentTarget: EventTarget & HTMLElement },
+) {
+  const input =
+    e.currentTarget instanceof HTMLInputElement &&
+    e.currentTarget.type === "date"
+      ? e.currentTarget
+      : e.currentTarget.querySelector?.("input[type='date']");
+  if (!(input instanceof HTMLInputElement)) return;
+  try {
+    input.showPicker?.();
+  } catch {
+    input.focus();
+  }
+}
+
 type ColKey = "order" | "listup" | "deadline" | "importance" | "urgency" | "done";
 
 const COLS: { key: ColKey; label: string; width: string }[] = [
@@ -126,6 +145,7 @@ export function ExcelWorkbook({
   calendarEvents = [],
 }: ExcelWorkbookProps) {
   const isGcal = frame === "gcal";
+  const isAll = isAllFrame(frame);
   const [focus, setFocus] = useState<FocusCell | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
@@ -188,9 +208,16 @@ export function ExcelWorkbook({
         periodSort: "default",
       });
     }
-    return applyColumnSort(built, columnSort);
+    // 「전체」 기본: 시작일 내림차순 (언젠가 맨 아래). 헤더 클릭 정렬이 있으면 그게 우선.
+    const effectiveSort =
+      columnSort ??
+      (isAll && !isGcal
+        ? ({ key: "deadline", dir: "desc" } as ColumnSort)
+        : null);
+    return applyColumnSort(built, effectiveSort);
   }, [
     isGcal,
+    isAll,
     sheet,
     calendarEvents,
     gcalRangeStart,
@@ -635,7 +662,11 @@ export function ExcelWorkbook({
                 ? ` · 전체`
                 : ` · 오늘부터`
             : ""}
-          {columnSort ? ` · ${columnSortLabel(columnSort)}` : ""}
+          {columnSort
+            ? ` · ${columnSortLabel(columnSort)}`
+            : isAll && !isGcal
+              ? ` · 시작일 내림차순▼`
+              : ""}
         </span>
       </div>
 
@@ -1054,6 +1085,14 @@ export function ExcelWorkbook({
                             지난 일정
                           </span>
                         ) : null}
+                        {isAll ? (
+                          <span
+                            className="w-fit rounded-sm bg-[#e8ecef] px-1.5 py-0.5 text-[12px] font-semibold text-[#3a4540]"
+                            data-excel-frame-badge={task.category}
+                          >
+                            {CATEGORY_LABEL[task.category]}
+                          </span>
+                        ) : null}
                         <AutoGrowTextarea
                           data-excel-cell={`${task.id}:listup`}
                           value={task.title}
@@ -1163,13 +1202,22 @@ export function ExcelWorkbook({
                             </p>
                           ) : (
                             <>
-                              <label className="flex flex-col items-stretch gap-0 text-[12px] text-[#454d48]">
+                              <label
+                                className="flex cursor-pointer flex-col items-stretch gap-0 text-[12px] text-[#454d48]"
+                                data-excel-date-field="start"
+                                onClick={openDatePickerFromEvent}
+                              >
                                 시작일
                                 <input
                                   data-excel-cell={`${task.id}:deadline`}
+                                  data-excel-date-input="start"
                                   type="date"
                                   value={task.startDate ?? ""}
                                   min={startMin}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDatePickerFromEvent(e);
+                                  }}
                                   onChange={(e) => {
                                     const v = e.target.value || null;
                                     if (v && v < todayKst) return;
@@ -1199,16 +1247,25 @@ export function ExcelWorkbook({
                                     }
                                     applyDeadlinePatch(task, patch);
                                   }}
-                                  className="excel-input min-h-8 text-center text-[14px]"
+                                  className="excel-input min-h-8 cursor-pointer text-center text-[14px]"
                                   aria-label="시작일"
                                 />
                               </label>
-                              <label className="flex flex-col items-stretch gap-0 text-[12px] text-[#454d48]">
+                              <label
+                                className="flex cursor-pointer flex-col items-stretch gap-0 text-[12px] text-[#454d48]"
+                                data-excel-date-field="end"
+                                onClick={openDatePickerFromEvent}
+                              >
                                 종료일
                                 <input
+                                  data-excel-date-input="end"
                                   type="date"
                                   value={task.targetDate ?? ""}
                                   min={endMin}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDatePickerFromEvent(e);
+                                  }}
                                   onChange={(e) => {
                                     const v = e.target.value || null;
                                     const floor =
@@ -1234,7 +1291,7 @@ export function ExcelWorkbook({
                                       targetDate: v,
                                     });
                                   }}
-                                  className="excel-input min-h-8 text-center text-[14px]"
+                                  className="excel-input min-h-8 cursor-pointer text-center text-[14px]"
                                   aria-label="종료일"
                                 />
                               </label>

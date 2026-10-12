@@ -197,7 +197,6 @@ export function AssistantApp() {
                 onUpdate={(id, patch) =>
                   app.updateSideItem("guideline", id, patch)
                 }
-                onToggle={(id) => app.toggleSideItem("guideline", id)}
                 onDelete={(id) => app.deleteSideItem("guideline", id)}
                 onDeleteMany={(ids) =>
                   app.deleteSideItems("guideline", ids)
@@ -213,7 +212,6 @@ export function AssistantApp() {
                 onUpdate={(id, patch) =>
                   app.updateSideItem("habit", id, patch)
                 }
-                onToggle={(id) => app.toggleSideItem("habit", id)}
                 onDelete={(id) => app.deleteSideItem("habit", id)}
                 onDeleteMany={(ids) => app.deleteSideItems("habit", ids)}
                 onCompleteMany={(ids) =>

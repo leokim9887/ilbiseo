@@ -1,6 +1,7 @@
 /**
  * Smoke: 지침/습관 blank · drag select · scroll >5 ·
- * 지침/습관 bulk: 삭제 위 · 완료 아래 (세로)
+ * 지침/습관 bulk: 완료 왼쪽 · 선택 삭제 오른쪽 (가로, 겹침 없음)
+ * 행 단위 「완료」 토글 없음 (선택 체크만)
  * 할 일 bulk: 완료 · 선택 삭제 가로 (세로 스택 아님)
  */
 import { chromium } from "playwright";
@@ -42,7 +43,7 @@ const habitVal = await habitTitle.inputValue();
 const habitPh = await habitTitle.getAttribute("placeholder");
 const blankHabitOk = habitVal === "" && (habitPh || "").includes("습관");
 
-// Seed 7 guidelines for scroll + paint select; 2 habits for paint + side stack
+// Seed 7 guidelines for scroll + paint select; 2 habits for paint + side toolbar
 await page.evaluate(() => {
   const now = new Date().toISOString();
   const s = JSON.parse(localStorage.getItem("ilbiseo-state-v2") || "{}");
@@ -82,6 +83,15 @@ await page.screenshot({
   path: `${OUT}/ilbiseo-guidelines-scroll.png`,
   fullPage: true,
 });
+
+// No per-row 「완료」 toggle (aria-label "지침 완료" / "습관 완료")
+const rowDoneGuide = await page
+  .locator('[data-side-kind="guideline"] input[aria-label="지침 완료"]')
+  .count();
+const rowDoneHabit = await page
+  .locator('[data-side-kind="habit"] input[aria-label="습관 완료"]')
+  .count();
+const noRowDoneOk = rowDoneGuide === 0 && rowDoneHabit === 0;
 
 // Paint / drag multi-select on checkbox column (habit: 2 items)
 const habitScroll = page.locator('[data-side-list-scroll="habit"]');
@@ -130,8 +140,8 @@ const bulkHabitComplete = await page
   .count();
 const paintToolbarOk = bulkHabitDelete === 1 && bulkHabitComplete === 1;
 
-// 지침/습관 only: 선택 삭제 위 · 완료 아래 (세로 스택)
-const sideStackOrder = await page.evaluate(() => {
+// 지침/습관: 완료 왼쪽 · 선택 삭제 오른쪽 (가로, 겹침 없음)
+const sideHorizontalOrder = await page.evaluate(() => {
   const wrap = document.querySelector('[data-side-bulk-actions="habit"]');
   if (!wrap) return { ok: false, reason: "no wrap" };
   const kids = [...wrap.querySelectorAll("button")].map((b) =>
@@ -141,17 +151,32 @@ const sideStackOrder = await page.evaluate(() => {
         ? "complete"
         : "other",
   );
-  const rects = [...wrap.querySelectorAll("button")].map((b) =>
-    b.getBoundingClientRect(),
+  const complete = wrap.querySelector("[data-side-bulk-complete]");
+  const del = wrap.querySelector("[data-side-bulk-delete]");
+  if (!complete || !del) return { ok: false, reason: "missing buttons", kids };
+  const cr = complete.getBoundingClientRect();
+  const dr = del.getBoundingClientRect();
+  const sameRow = Math.abs(cr.top - dr.top) < 12;
+  const completeLeft = cr.right <= dr.left + 2;
+  const gap = dr.left - cr.right;
+  const noOverlap = gap >= 0;
+  const notStacked = !(
+    Math.abs(cr.left - dr.left) < 24 && dr.top > cr.bottom - 4
   );
-  const stacked =
-    rects.length >= 2 &&
-    Math.abs(rects[0].left - rects[1].left) < 24 &&
-    rects[1].top > rects[0].bottom - 4;
   return {
-    ok: kids[0] === "delete" && kids[1] === "complete" && stacked,
+    ok:
+      kids[0] === "complete" &&
+      kids[1] === "delete" &&
+      sameRow &&
+      completeLeft &&
+      noOverlap &&
+      notStacked,
     kids,
-    stacked,
+    sameRow,
+    completeLeft,
+    noOverlap,
+    gap,
+    notStacked,
   };
 });
 
@@ -192,13 +217,15 @@ const todoHorizontal = await page.evaluate(() => {
   const cr = complete.getBoundingClientRect();
   const sameRow = Math.abs(dr.top - cr.top) < 12;
   const sideBySide = Math.abs(dr.left - cr.left) > 40;
+  const completeLeft = cr.right <= dr.left + 2;
   const notStacked = !(
     Math.abs(dr.left - cr.left) < 24 && dr.top > cr.bottom - 4
   );
   return {
-    ok: sameRow && sideBySide && notStacked,
+    ok: sameRow && sideBySide && completeLeft && notStacked,
     sameRow,
     sideBySide,
+    completeLeft,
     notStacked,
   };
 });
@@ -208,11 +235,11 @@ await page.screenshot({
   fullPage: false,
 });
 
-// Optional: guideline stack screenshot (select one)
+// Side toolbar: complete left of delete
 await page.locator('[data-side-select-cell="parity-g1"]').click({ force: true });
 await page.waitForTimeout(150);
 await page.screenshot({
-  path: `${OUT}/ilbiseo-side-complete-below-delete.png`,
+  path: `${OUT}/ilbiseo-side-complete-left-of-delete.png`,
   fullPage: false,
 });
 
@@ -223,10 +250,13 @@ const summary = {
   habitVal,
   scrollOk,
   scrollMetrics,
+  noRowDoneOk,
+  rowDoneGuide,
+  rowDoneHabit,
   paintOk,
   paintToolbarOk,
   selectedHabit,
-  sideStackOrder,
+  sideHorizontalOrder,
   sideCompleteOk,
   habitDoneAfter,
   todoHorizontal,
@@ -235,9 +265,10 @@ const allOk =
   blankGuideOk &&
   blankHabitOk &&
   scrollOk &&
+  noRowDoneOk &&
   paintOk &&
   paintToolbarOk &&
-  sideStackOrder.ok &&
+  sideHorizontalOrder.ok &&
   sideCompleteOk &&
   todoHorizontal.ok;
 

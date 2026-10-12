@@ -11,7 +11,6 @@ interface SideListSectionProps {
   items: SideListItem[];
   onAdd: () => void;
   onUpdate: (id: string, patch: Partial<SideListItem>) => void;
-  onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onDeleteMany: (ids: string[]) => void;
   onCompleteMany: (ids: string[]) => void;
@@ -25,7 +24,6 @@ export function SideListSection({
   items,
   onAdd,
   onUpdate,
-  onToggle,
   onDelete,
   onDeleteMany,
   onCompleteMany,
@@ -223,20 +221,9 @@ export function SideListSection({
           ) : null}
           {selectedCount > 0 ? (
             <div
-              className="flex flex-col gap-1"
+              className="flex flex-row flex-wrap items-center gap-1.5"
               data-side-bulk-actions={kind}
             >
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-9 rounded-sm border-[#b42318]/40 px-2 text-[13px] text-[#b42318]"
-                onClick={bulkDelete}
-                data-side-bulk-delete={kind}
-              >
-                <Trash2 className="size-3.5" />
-                선택 삭제
-              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -247,6 +234,17 @@ export function SideListSection({
               >
                 <Check className="size-3.5" />
                 완료
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-sm border-[#b42318]/40 px-2 text-[13px] text-[#b42318]"
+                onClick={bulkDelete}
+                data-side-bulk-delete={kind}
+              >
+                <Trash2 className="size-3.5" />
+                선택 삭제
               </Button>
             </div>
           ) : null}
@@ -293,56 +291,44 @@ export function SideListSection({
                         : "border-[#c5ccd2] bg-[#fafbfc]"
                   }`}
                 >
-                  <div className="mt-1.5 flex shrink-0 items-center gap-2">
-                    <div
-                      className="flex items-center justify-center select-none"
-                      data-side-select-cell={item.id}
-                      title="클릭하거나 드래그해서 여러 항목 선택"
+                  <div
+                    className="mt-1.5 flex shrink-0 items-center justify-center select-none"
+                    data-side-select-cell={item.id}
+                    title="클릭하거나 드래그해서 여러 항목 선택"
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      beginPaintSelect(item.id, checked);
+                    }}
+                    onMouseEnter={() => paintEnterRow(item.id)}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      readOnly
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === " " || e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleSelect(item.id);
+                        }
+                      }}
                       onMouseDown={(e) => {
                         if (e.button !== 0) return;
                         e.preventDefault();
                         e.stopPropagation();
                         beginPaintSelect(item.id, checked);
                       }}
-                      onMouseEnter={() => paintEnterRow(item.id)}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        readOnly
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === " " || e.key === "Enter") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleSelect(item.id);
-                          }
-                        }}
-                        onMouseDown={(e) => {
-                          if (e.button !== 0) return;
-                          e.preventDefault();
-                          e.stopPropagation();
-                          beginPaintSelect(item.id, checked);
-                        }}
-                        className="size-4 accent-[#217346]"
-                        aria-label={`${label} 선택`}
-                        data-side-row-check={item.id}
-                        title="삭제할 항목 선택"
-                      />
-                    </div>
-                    <label className="flex items-center gap-1.5 text-[13px] text-[#454d48]">
-                      <input
-                        type="checkbox"
-                        checked={item.done}
-                        onChange={() => onToggle(item.id)}
-                        className="size-4 accent-[#217346]"
-                        aria-label={`${label} 완료`}
-                      />
-                      완료
-                    </label>
+                      className="size-4 accent-[#217346]"
+                      aria-label={`${label} 선택`}
+                      data-side-row-check={item.id}
+                      title="항목 선택"
+                    />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
                     <input

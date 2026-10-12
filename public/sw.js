@@ -1,7 +1,6 @@
-/* 일비서 service worker — offline shell + static assets (localStorage tasks work offline) */
-const CACHE = "ilbiseo-shell-v2";
+/* 일비서 service worker — offline shell; prefer network so new deploys reach phones */
+const CACHE = "ilbiseo-shell-v3";
 const PRECACHE = [
-  "/",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -32,6 +31,12 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -44,12 +49,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Navigations: network first, fallback to cached shell / offline page
+  // Navigations: network first (so Production HTML/CSS updates reach PWA)
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok) {
+          // Only cache real app documents (not SSO / error pages)
+          if (response.ok && response.type === "basic") {
             const copy = response.clone();
             caches.open(CACHE).then((cache) => cache.put("/", copy));
           }
@@ -63,25 +69,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // App shell assets: cache first
+  // Hashed Next assets + icons: network first, then cache (avoids sticky old CSS/JS)
   if (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname.endsWith(".webmanifest") ||
-    url.pathname === "/offline.html"
+    url.pathname === "/offline.html" ||
+    url.pathname === "/sw.js"
   ) {
     event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            if (response.ok) {
-              const copy = response.clone();
-              caches.open(CACHE).then((cache) => cache.put(request, copy));
-            }
-            return response;
-          }),
-      ),
+      fetch(request)
+        .then((response) => {
+          if (response.ok && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
     );
     return;
   }
@@ -90,7 +95,11 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok && url.pathname.startsWith("/_next/")) {
+        if (
+          response.ok &&
+          response.type === "basic" &&
+          url.pathname.startsWith("/_next/")
+        ) {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put(request, copy));
         }

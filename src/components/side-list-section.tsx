@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SideListItem, SideListKind } from "@/lib/types";
@@ -15,6 +15,9 @@ interface SideListSectionProps {
   onDelete: (id: string) => void;
   onDeleteMany: (ids: string[]) => void;
 }
+
+/** ~5 checklist rows visible before the list scrolls. */
+const LIST_MAX_HEIGHT_CLASS = "max-h-[min(28rem,calc(5*5.6rem))]";
 
 export function SideListSection({
   kind,
@@ -44,6 +47,12 @@ export function SideListSection({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const paintRef = useRef<{
+    active: boolean;
+    mode: "add" | "remove";
+  }>({ active: false, mode: "add" });
 
   const ordered = useMemo(() => {
     const open = items.filter((i) => !i.done);
@@ -80,6 +89,66 @@ export function SideListSection({
     });
   }, []);
 
+  const setSelectPaint = useCallback((id: string, mode: "add" | "remove") => {
+    setSelectedIds((prev) => {
+      const has = prev.has(id);
+      if (mode === "add" && has) return prev;
+      if (mode === "remove" && !has) return prev;
+      const next = new Set(prev);
+      if (mode === "add") next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const beginPaintSelect = useCallback(
+    (id: string, currentlyChecked: boolean) => {
+      const mode: "add" | "remove" = currentlyChecked ? "remove" : "add";
+      paintRef.current = { active: true, mode };
+      setSelectPaint(id, mode);
+    },
+    [setSelectPaint],
+  );
+
+  const paintEnterRow = useCallback(
+    (id: string) => {
+      if (!paintRef.current.active) return;
+      setSelectPaint(id, paintRef.current.mode);
+    },
+    [setSelectPaint],
+  );
+
+  useEffect(() => {
+    const endPaint = () => {
+      paintRef.current.active = false;
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!paintRef.current.active) return;
+      const scroller = listScrollRef.current;
+      if (!scroller) return;
+      const rect = scroller.getBoundingClientRect();
+      const edge = 36;
+      if (e.clientY < rect.top + edge) {
+        scroller.scrollTop -= 18;
+      } else if (e.clientY > rect.bottom - edge) {
+        scroller.scrollTop += 18;
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const cell = el?.closest?.("[data-side-select-cell]") as
+        | HTMLElement
+        | null
+        | undefined;
+      const id = cell?.dataset?.sideSelectCell;
+      if (id) setSelectPaint(id, paintRef.current.mode);
+    };
+    window.addEventListener("mouseup", endPaint);
+    window.addEventListener("mousemove", onMove);
+    return () => {
+      window.removeEventListener("mouseup", endPaint);
+      window.removeEventListener("mousemove", onMove);
+    };
+  }, [setSelectPaint]);
+
   const selectAll = useCallback(() => {
     setSelectedIds(new Set(allIds));
   }, [allIds]);
@@ -94,6 +163,21 @@ export function SideListSection({
     onDeleteMany(ids);
     setSelectedIds(new Set());
   }, [onDeleteMany, selectedIds]);
+
+  const handleAdd = useCallback(() => {
+    onAdd();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const scroller = listScrollRef.current;
+        const last = listRef.current?.lastElementChild as HTMLElement | null;
+        if (last) {
+          last.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        } else if (scroller) {
+          scroller.scrollTop = scroller.scrollHeight;
+        }
+      });
+    });
+  }, [onAdd]);
 
   return (
     <section
@@ -150,20 +234,25 @@ export function SideListSection({
               ? "bg-[#3b6ea5] hover:bg-[#2f5a88]"
               : "bg-[#2d7a4f] hover:bg-[#246340]"
           }`}
-          onClick={onAdd}
+          onClick={handleAdd}
+          data-side-add={kind}
         >
           <Plus className="size-3.5" />
           항목 추가
         </Button>
       </div>
 
-      <div className="bg-white px-2 py-2 sm:px-3">
+      <div
+        ref={listScrollRef}
+        className={`bg-white px-2 py-2 sm:px-3 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
+        data-side-list-scroll={kind}
+      >
         {items.length === 0 ? (
           <p className="px-2 py-8 text-center text-[14px] text-[#666]">
             {label}이 비어 있습니다. 「항목 추가」로 적으세요.
           </p>
         ) : (
-          <ul className="space-y-2">
+          <ul ref={listRef} className="space-y-2">
             {ordered.map((item) => {
               const checked = selectedIds.has(item.id);
               return (
@@ -180,15 +269,45 @@ export function SideListSection({
                   }`}
                 >
                   <div className="mt-1.5 flex shrink-0 items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleSelect(item.id)}
-                      className="size-4 accent-[#217346]"
-                      aria-label={`${label} 선택`}
-                      data-side-row-check={item.id}
-                      title="삭제할 항목 선택"
-                    />
+                    <div
+                      className="flex items-center justify-center select-none"
+                      data-side-select-cell={item.id}
+                      title="클릭하거나 드래그해서 여러 항목 선택"
+                      onMouseDown={(e) => {
+                        if (e.button !== 0) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        beginPaintSelect(item.id, checked);
+                      }}
+                      onMouseEnter={() => paintEnterRow(item.id)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        readOnly
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === " " || e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleSelect(item.id);
+                          }
+                        }}
+                        onMouseDown={(e) => {
+                          if (e.button !== 0) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          beginPaintSelect(item.id, checked);
+                        }}
+                        className="size-4 accent-[#217346]"
+                        aria-label={`${label} 선택`}
+                        data-side-row-check={item.id}
+                        title="삭제할 항목 선택"
+                      />
+                    </div>
                     <label className="flex items-center gap-1.5 text-[13px] text-[#454d48]">
                       <input
                         type="checkbox"
@@ -241,7 +360,6 @@ export function SideListSection({
           </ul>
         )}
       </div>
-
     </section>
   );
 }

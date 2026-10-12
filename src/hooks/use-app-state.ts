@@ -308,7 +308,7 @@ export function useAppState() {
       const key = sideKey(kind);
       const item: SideListItem = {
         id: createId(),
-        title: kind === "guideline" ? "새 지침" : "새 습관",
+        title: "",
         memo: "",
         done: false,
         createdAt: new Date().toISOString(),

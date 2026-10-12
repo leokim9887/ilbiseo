@@ -278,6 +278,7 @@ export function AssistantApp() {
               <SideListSection
                 kind="guideline"
                 items={app.guidelines}
+                mode={view === "done" ? "done" : "active"}
                 onAdd={() => app.addSideItem("guideline")}
                 onUpdate={(id, patch) =>
                   app.updateSideItem("guideline", id, patch)
@@ -293,6 +294,7 @@ export function AssistantApp() {
               <SideListSection
                 kind="habit"
                 items={app.habits}
+                mode={view === "done" ? "done" : "active"}
                 onAdd={() => app.addSideItem("habit")}
                 onUpdate={(id, patch) =>
                   app.updateSideItem("habit", id, patch)

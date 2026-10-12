@@ -6,9 +6,14 @@ import { Button } from "@/components/ui/button";
 import type { SideListItem, SideListKind } from "@/lib/types";
 import { SIDE_LIST_LABEL } from "@/lib/types";
 
+/** active = 할 일 (미완료만) · done = 한 일 (완료만) */
+export type SideListMode = "active" | "done";
+
 interface SideListSectionProps {
   kind: SideListKind;
   items: SideListItem[];
+  /** Which sheet this section sits under — filters + toolbar */
+  mode?: SideListMode;
   onAdd: () => void;
   onUpdate: (id: string, patch: Partial<SideListItem>) => void;
   onDelete: (id: string) => void;
@@ -22,6 +27,7 @@ const LIST_MAX_HEIGHT_CLASS = "max-h-[min(28rem,calc(5*5.6rem))]";
 export function SideListSection({
   kind,
   items,
+  mode = "active",
   onAdd,
   onUpdate,
   onDelete,
@@ -58,11 +64,15 @@ export function SideListSection({
     mode: "add" | "remove";
   }>({ active: false, mode: "add" });
 
-  const ordered = useMemo(() => {
-    const open = items.filter((i) => !i.done);
-    const done = items.filter((i) => i.done);
-    return [...open, ...done];
-  }, [items]);
+  /** 할 일 = open only · 한 일 = completed only (never mix on one sheet) */
+  const visible = useMemo(() => {
+    if (mode === "done") return items.filter((i) => i.done);
+    return items.filter((i) => !i.done);
+  }, [items, mode]);
+
+  const ordered = visible;
+  const showAdd = mode === "active";
+  const showComplete = mode === "active";
 
   const allIds = useMemo(() => ordered.map((i) => i.id), [ordered]);
   const selectedCount = selectedIds.size;
@@ -73,7 +83,7 @@ export function SideListSection({
   useEffect(() => {
     setSelectedIds((prev) => {
       if (prev.size === 0) return prev;
-      const alive = new Set(items.map((i) => i.id));
+      const alive = new Set(ordered.map((i) => i.id));
       let changed = false;
       const next = new Set<string>();
       for (const id of prev) {
@@ -82,13 +92,13 @@ export function SideListSection({
       }
       return changed ? next : prev;
     });
-  }, [items]);
+  }, [ordered]);
 
   useEffect(() => {
     setEditingDoneIds((prev) => {
       if (prev.size === 0) return prev;
       const doneAlive = new Set(
-        items.filter((i) => i.done).map((i) => i.id),
+        ordered.filter((i) => i.done).map((i) => i.id),
       );
       let changed = false;
       const next = new Set<string>();
@@ -98,7 +108,7 @@ export function SideListSection({
       }
       return changed ? next : prev;
     });
-  }, [items]);
+  }, [ordered]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -228,6 +238,7 @@ export function SideListSection({
       className={`overflow-hidden rounded-sm border ${accent.border} bg-[#f4f6f7] shadow-[0_1px_6px_rgba(26,43,54,0.08)]`}
       aria-label={label}
       data-side-kind={kind}
+      data-side-mode={mode}
     >
       <div
         className={`flex flex-col gap-2 border-b border-[#9aa5ad]/60 bg-gradient-to-b ${accent.head} px-2.5 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-3`}
@@ -238,8 +249,8 @@ export function SideListSection({
           >
             {label}
           </span>
-          <p className="text-[13px] text-[#454d48]">{items.length}건</p>
-          {items.length > 0 ? (
+          <p className="text-[13px] text-[#454d48]">{ordered.length}건</p>
+          {ordered.length > 0 ? (
             <label className="flex min-h-10 items-center gap-1.5 text-[13px] text-[#454d48] sm:min-h-0">
               <input
                 type="checkbox"
@@ -261,17 +272,19 @@ export function SideListSection({
               className="flex flex-row flex-wrap items-center gap-1.5"
               data-side-bulk-actions={kind}
             >
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-10 min-h-10 touch-manipulation rounded-sm border-[#217346]/50 px-2.5 text-[13px] text-[#217346] sm:h-9 sm:min-h-9"
-                onClick={bulkComplete}
-                data-side-bulk-complete={kind}
-              >
-                <Check className="size-3.5" />
-                완료
-              </Button>
+              {showComplete ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-10 min-h-10 touch-manipulation rounded-sm border-[#217346]/50 px-2.5 text-[13px] text-[#217346] sm:h-9 sm:min-h-9"
+                  onClick={bulkComplete}
+                  data-side-bulk-complete={kind}
+                >
+                  <Check className="size-3.5" />
+                  완료
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 size="sm"
@@ -286,30 +299,35 @@ export function SideListSection({
             </div>
           ) : null}
         </div>
-        <Button
-          type="button"
-          size="sm"
-          className={`h-11 min-h-11 w-full touch-manipulation rounded-sm px-3 text-white sm:h-8 sm:min-h-8 sm:w-auto ${
-            kind === "guideline"
-              ? "bg-[#3b6ea5] hover:bg-[#2f5a88]"
-              : "bg-[#2d7a4f] hover:bg-[#246340]"
-          }`}
-          onClick={handleAdd}
-          data-side-add={kind}
-        >
-          <Plus className="size-3.5" />
-          항목 추가
-        </Button>
+        {showAdd ? (
+          <Button
+            type="button"
+            size="sm"
+            className={`h-11 min-h-11 w-full touch-manipulation rounded-sm px-3 text-white sm:h-8 sm:min-h-8 sm:w-auto ${
+              kind === "guideline"
+                ? "bg-[#3b6ea5] hover:bg-[#2f5a88]"
+                : "bg-[#2d7a4f] hover:bg-[#246340]"
+            }`}
+            onClick={handleAdd}
+            data-side-add={kind}
+          >
+            <Plus className="size-3.5" />
+            항목 추가
+          </Button>
+        ) : null}
       </div>
 
       <div
         ref={listScrollRef}
         className={`bg-white px-2 py-2 sm:px-3 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
         data-side-list-scroll={kind}
+        data-side-list-mode={mode}
       >
-        {items.length === 0 ? (
+        {ordered.length === 0 ? (
           <p className="px-2 py-8 text-center text-[14px] text-[#666]">
-            {label}이 비어 있습니다. 「항목 추가」로 적으세요.
+            {mode === "done"
+              ? `완료한 ${label}이 없습니다.`
+              : `${label}이 비어 있습니다. 「항목 추가」로 적으세요.`}
           </p>
         ) : (
           <ul ref={listRef} className="space-y-2">

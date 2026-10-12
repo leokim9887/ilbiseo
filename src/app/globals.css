@@ -109,6 +109,8 @@
     font-size: 16.5px;
     /* Phone: never let wide tables push the page sideways */
     overflow-x: clip;
+    /* App-like: pan only — no page pinch-zoom */
+    touch-action: pan-x pan-y;
   }
   body {
     @apply bg-background text-foreground;
@@ -121,9 +123,20 @@
     background-attachment: fixed;
     min-height: 100dvh;
     overflow-x: clip;
+    touch-action: pan-x pan-y;
     /* notch sides; top handled by install-hint / chrome, bottom by nav */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+  /* Double-tap zoom off on controls; scroll/focus still work */
+  input,
+  textarea,
+  select,
+  button,
+  a,
+  [role="button"],
+  [contenteditable="true"] {
+    touch-action: manipulation;
   }
 }
 
@@ -271,6 +284,14 @@
   background: #fff;
   box-shadow: inset 0 0 0 1px #217346;
 }
+/* Similar-task alert: peer row flash so father sees which one overlaps */
+tr[data-similarity-focus="1"] {
+  outline: 2px solid #217346;
+  outline-offset: -2px;
+  background: #d4edda !important;
+  transition: background 0.2s ease;
+}
+
 .excel-textarea:disabled,
 .excel-textarea[readonly] {
   opacity: 0.85;

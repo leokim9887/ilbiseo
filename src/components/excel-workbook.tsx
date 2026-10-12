@@ -179,6 +179,10 @@ export function ExcelWorkbook({
   const todayKst = useMemo(() => todayIsoKst(), []);
   const similarityPeers = allActiveTasks ?? activeTasks;
   const [similarityAlert, setSimilarityAlert] = useState<string | null>(null);
+  /** Conflicting peer row to scroll/highlight when alert opens */
+  const [similarityFocusId, setSimilarityFocusId] = useState<string | null>(
+    null,
+  );
   const similarityAckRef = useRef<Set<string>>(new Set());
   const similarityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -342,15 +346,16 @@ export function ExcelWorkbook({
         title: patch.title !== undefined ? patch.title : task.title,
         memo: patch.memo !== undefined ? patch.memo : task.memo,
       };
-      const blob = taskWordingBlob(candidate);
-      if (!blob) return;
+      // Same-row title∩memo alone must never alert — peers are OTHER tasks only.
       const hits = findSimilarActiveTasks(candidate, similarityPeers, task.id);
       if (hits.length === 0) return;
+      const blob = taskWordingBlob(candidate);
       const fingerprint = `${task.id}|${blob}|${hits.map((h) => h.task.id).join(",")}`;
       if (similarityAckRef.current.has(fingerprint)) return;
       const msg = buildSimilarityAlertMessage(hits);
       if (!msg) return;
       similarityAckRef.current.add(fingerprint);
+      setSimilarityFocusId(hits[0].task.id);
       setSimilarityAlert(msg);
     },
     [similarityPeers],
@@ -359,9 +364,10 @@ export function ExcelWorkbook({
   const scheduleSimilarityCheck = useCallback(
     (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
       if (similarityTimerRef.current) clearTimeout(similarityTimerRef.current);
+      // Short debounce — still clear while typing; fire quickly after pause
       similarityTimerRef.current = setTimeout(() => {
         maybeWarnSimilarWording(task, patch);
-      }, 700);
+      }, 320);
     },
     [maybeWarnSimilarWording],
   );
@@ -371,6 +377,30 @@ export function ExcelWorkbook({
       if (similarityTimerRef.current) clearTimeout(similarityTimerRef.current);
     };
   }, []);
+
+  /** On alert: scroll conflicting peer row into view and briefly highlight */
+  useEffect(() => {
+    if (!similarityAlert || !similarityFocusId) return;
+    const id = similarityFocusId;
+    const run = () => {
+      const safe =
+        typeof CSS !== "undefined" && typeof CSS.escape === "function"
+          ? CSS.escape(id)
+          : id.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const el = document.querySelector(
+        `[data-excel-row="${safe}"]`,
+      ) as HTMLElement | null;
+      if (!el) return;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.setAttribute("data-similarity-focus", "1");
+      // Highlight only while dialog is open — do not steal dialog focus
+      window.setTimeout(() => {
+        el.removeAttribute("data-similarity-focus");
+      }, 3200);
+    };
+    const t = window.setTimeout(run, 80);
+    return () => window.clearTimeout(t);
+  }, [similarityAlert, similarityFocusId]);
 
   const updateListUp = useCallback(
     (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
@@ -1361,12 +1391,16 @@ export function ExcelWorkbook({
       <Dialog
         open={Boolean(similarityAlert)}
         onOpenChange={(open) => {
-          if (!open) setSimilarityAlert(null);
+          if (!open) {
+            setSimilarityAlert(null);
+            setSimilarityFocusId(null);
+          }
         }}
       >
         <DialogContent
           className="sm:max-w-md"
           data-similarity-alert
+          data-similarity-peer={similarityFocusId ?? undefined}
           showCloseButton={false}
         >
           <DialogHeader>
@@ -1383,7 +1417,10 @@ export function ExcelWorkbook({
               size="sm"
               className="min-h-9 bg-[#217346] text-white hover:bg-[#1a5c38]"
               data-similarity-alert-ok
-              onClick={() => setSimilarityAlert(null)}
+              onClick={() => {
+                setSimilarityAlert(null);
+                setSimilarityFocusId(null);
+              }}
             >
               확인
             </Button>

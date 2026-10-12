@@ -255,33 +255,33 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
     canvas = city_atmosphere(fam_src, W, H)
     mist_right(canvas)
 
-    # Family cluster: larger, slightly inset; all 5 faces; sky reserved for motto
-    fw, fh = 740, 620
+    # Family cluster: centered-left, all 5 faces; sky reserved for motto
+    fw, fh = 760, 640
     family = family_plane(fam_src, fw, fh)
     family = ImageEnhance.Brightness(family).enhance(0.99)
     family = ImageEnhance.Color(family).enhance(0.98)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.62)
+    fam_mask = soft_right_fade((fw, fh), fade_start=0.64)
     bot = soft_bottom_fade((fw, fh), fade_start=0.9)
     combined = ImageChops_multiply(fam_mask, bot)
-    paste_masked(canvas, family, (20, 120), combined, 1.0)
+    paste_masked(canvas, family, (40, 110), combined, 1.0)
 
-    # Baby — mid-right, moderated scale (not dominant)
+    # Baby — upper-right, kept modest vs family scale
     baby = night_grade(
-        cover_crop(load("04-baby.png"), 280, 310, bias=(0.5, 0.2)), strength=0.48
+        cover_crop(load("04-baby.png"), 250, 280, bias=(0.5, 0.2)), strength=0.48
     )
-    paste_masked(canvas, baby, (820, 100), radial_mask((280, 310), soft=0.42), 0.92)
+    paste_masked(canvas, baby, (850, 110), radial_mask((250, 280), soft=0.44), 0.91)
 
     # Dog — stronger presence vs baby
     dog = night_grade(
-        cover_crop(load("02-dog.png"), 320, 320, bias=(0.5, 0.38)), strength=0.5
+        cover_crop(load("02-dog.png"), 330, 330, bias=(0.5, 0.38)), strength=0.5
     )
-    paste_masked(canvas, dog, (680, 420), radial_mask((320, 320), soft=0.36), 0.95)
+    paste_masked(canvas, dog, (700, 420), radial_mask((330, 330), soft=0.36), 0.95)
 
-    # Cat — far right
+    # Cat — far right, similar scale to dog
     cat = night_grade(
-        cover_crop(load("03-cat.png"), 300, 300, bias=(0.52, 0.32)), strength=0.48
+        cover_crop(load("03-cat.png"), 310, 310, bias=(0.52, 0.32)), strength=0.48
     )
-    paste_masked(canvas, cat, (900, 390), radial_mask((300, 300), soft=0.38), 0.94)
+    paste_masked(canvas, cat, (900, 380), radial_mask((310, 310), soft=0.38), 0.94)
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)

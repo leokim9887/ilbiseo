@@ -117,6 +117,21 @@ export function formatDeadlineRange(
   return `${r.start} ~ ${r.end}`;
 }
 
+/** Compact M/D for phone table — avoids wide YYYY-MM-DD cells. */
+export function formatDeadlineRangeCompact(
+  task: Pick<Task, "startDate" | "targetDate" | "kind">,
+): string {
+  if (isSomedayDeadline(task)) return "언젠가";
+  const r = taskDateRange(task);
+  if (!r) return "";
+  const short = (iso: string) => {
+    const [, m, d] = iso.split("-");
+    return `${Number(m)}/${Number(d)}`;
+  };
+  if (r.start === r.end) return short(r.start);
+  return `${short(r.start)}~${short(r.end)}`;
+}
+
 export type PeriodSort = "default" | "start" | "end";
 
 export function sortByPeriod(tasks: Task[], mode: PeriodSort): Task[] {

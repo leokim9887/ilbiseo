@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDeviceSync } from "@/hooks/use-device-sync";
 import { ExcelWorkbook } from "@/components/excel-workbook";
+import { FamilyBanner } from "@/components/family-banner";
 import { SideListSection } from "@/components/side-list-section";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { DailyBriefingPanel } from "@/components/daily-briefing";
@@ -193,6 +194,7 @@ export function AssistantApp() {
         </div>
       ) : null}
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 overflow-x-clip px-2.5 py-4 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:gap-5 sm:px-6 sm:py-7 sm:pb-10">
+        <FamilyBanner />
         <WelcomeBanner onStart={() => setView("todo")} />
 
         <header className="animate-fade-up space-y-3">

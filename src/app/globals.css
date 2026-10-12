@@ -151,34 +151,17 @@
   }
 }
 
-/* Excel table: soft edge fade hints horizontal scroll on narrow screens */
+/* Excel table — phone: fit all columns (no horizontal pan). Desktop: wide table OK. */
 .excel-scroll-wrap {
   position: relative;
 }
 .excel-scroll-wrap::after {
-  content: "";
-  pointer-events: none;
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 1.25rem;
-  z-index: 15;
-  background: linear-gradient(
-    to left,
-    rgba(255, 255, 255, 0.92),
-    transparent
-  );
-}
-@media (min-width: 640px) {
-  .excel-scroll-wrap::after {
-    display: none;
-  }
+  display: none;
 }
 .excel-hscroll-hint {
   display: block;
-  padding: 0.35rem 0.65rem 0.45rem;
-  font-size: 12.5px;
+  padding: 0.3rem 0.55rem 0.4rem;
+  font-size: 12px;
   line-height: 1.35;
   color: #454d48;
   background: #eef1f3;
@@ -187,6 +170,37 @@
 @media (min-width: 640px) {
   .excel-hscroll-hint {
     display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .excel-fit-mobile {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 0 !important;
+  }
+  .excel-fit-mobile th,
+  .excel-fit-mobile td {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  .excel-fit-mobile .excel-textarea {
+    font-size: 14.5px;
+    line-height: 1.35;
+    padding: 0.08rem 0.1rem;
+    min-height: 1.55rem;
+  }
+  .excel-fit-mobile .excel-textarea-memo {
+    font-size: 12.5px;
+    min-height: 1.35rem;
+  }
+  .excel-fit-mobile .excel-input {
+    font-size: 13px;
+    min-height: 1.75rem;
+    padding: 0.12rem 0.15rem;
+  }
+  .excel-fit-mobile select.excel-input {
+    padding-inline: 0;
   }
 }
 

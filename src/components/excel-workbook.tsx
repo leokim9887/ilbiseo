@@ -29,6 +29,7 @@ import {
 } from "@/lib/sheet-rows";
 import {
   formatDeadlineRange,
+  formatDeadlineRangeCompact,
   isSomedayDeadline,
   monthRangeContaining,
   todayIso,
@@ -91,13 +92,33 @@ function openDatePickerFromEvent(
 
 type ColKey = "order" | "listup" | "deadline" | "importance" | "urgency" | "done";
 
-const COLS: { key: ColKey; label: string; width: string }[] = [
-  { key: "order", label: "순서", width: "56px" },
-  { key: "listup", label: "할일 LIST UP", width: "42%" },
-  { key: "deadline", label: "마감목표", width: "168px" },
-  { key: "importance", label: "중요도", width: "72px" },
-  { key: "urgency", label: "시급성", width: "72px" },
-  { key: "done", label: "완료여부", width: "84px" },
+const COLS: {
+  key: ColKey;
+  label: string;
+  shortLabel: string;
+  width: string;
+}[] = [
+  { key: "order", label: "순서", shortLabel: "순", width: "56px" },
+  {
+    key: "listup",
+    label: "할일 LIST UP",
+    shortLabel: "할일",
+    width: "42%",
+  },
+  {
+    key: "deadline",
+    label: "마감목표",
+    shortLabel: "마감",
+    width: "168px",
+  },
+  {
+    key: "importance",
+    label: "중요도",
+    shortLabel: "중요",
+    width: "72px",
+  },
+  { key: "urgency", label: "시급성", shortLabel: "시급", width: "72px" },
+  { key: "done", label: "완료여부", shortLabel: "완료", width: "84px" },
 ];
 
 const EDITABLE: ColKey[] = ["listup", "deadline", "importance", "urgency"];
@@ -836,21 +857,29 @@ export function ExcelWorkbook({
       ) : null}
 
       <p className="excel-hscroll-hint" aria-hidden>
-        ← 표를 좌우로 밀어 보세요 (글자가 줄어들지 않습니다)
+        좁은 화면용 압축 표 · 모든 열을 한눈에
       </p>
-      <div className="excel-scroll-wrap">
+      <div className="excel-scroll-wrap excel-fit-mobile-wrap">
       <div
         ref={tableScrollRef}
-        className="relative max-h-[min(62vh,720px)] min-h-[280px] overflow-auto overscroll-x-contain bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(66vh,720px)] sm:min-h-[300px]"
+        className="relative max-h-[min(62vh,720px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(66vh,720px)] sm:min-h-[300px] sm:overflow-auto sm:overscroll-x-contain"
         data-excel-scroll
       >
-        <table className="w-full min-w-[780px] border-collapse text-[16px] text-black sm:min-w-[860px]">
+        <table className="excel-fit-mobile w-full min-w-0 table-fixed border-collapse text-[13.5px] text-black sm:min-w-[860px] sm:table-auto sm:text-[16px]">
+          <colgroup>
+            {!isGcal ? <col className="w-8 sm:w-10" /> : null}
+            <col className="w-7 sm:w-14" />
+            <col />
+            <col className="w-[4.75rem] sm:w-[10.5rem]" />
+            <col className="w-9 sm:w-[4.5rem]" />
+            <col className="w-9 sm:w-[4.5rem]" />
+            <col className="w-10 sm:w-[5.25rem]" />
+          </colgroup>
           <thead className="sticky top-0 z-20">
             <tr>
               {!isGcal ? (
                 <th
-                  className="border border-black bg-[#f3f3f3] px-1 py-2 text-center"
-                  style={{ width: "40px", minWidth: "40px" }}
+                  className="border border-black bg-[#f3f3f3] px-0.5 py-1.5 text-center sm:px-1 sm:py-2"
                   title="여러 행 선택"
                 >
                   <input
@@ -873,23 +902,24 @@ export function ExcelWorkbook({
                 const sortable = isSortableCol(c.key);
                 const active =
                   sortable && columnSort?.key === c.key ? columnSort : null;
+                const labelNode = (
+                  <>
+                    <span className="sm:hidden">{c.shortLabel}</span>
+                    <span className="hidden sm:inline">{c.label}</span>
+                  </>
+                );
                 return (
                   <th
                     key={`H-${c.key}`}
-                    style={
-                      c.key === "listup"
-                        ? { width: c.width, minWidth: "260px" }
-                        : { width: c.width, minWidth: c.width }
-                    }
-                    className={`border border-black bg-[#f3f3f3] px-1 py-2 text-center text-[16px] font-bold leading-tight text-black ${
-                      sortable ? "p-0" : "px-2 py-3"
+                    className={`border border-black bg-[#f3f3f3] text-center text-[12.5px] font-bold leading-tight text-black sm:text-[16px] ${
+                      sortable ? "p-0" : "px-0.5 py-1.5 sm:px-2 sm:py-3"
                     }`}
                   >
                     {sortable ? (
                       <button
                         type="button"
                         onClick={() => onHeaderSort(c.key)}
-                        className={`flex min-h-11 w-full items-center justify-center gap-0.5 px-1 py-2 text-[15px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] sm:text-[16px] ${
+                        className={`flex min-h-9 w-full items-center justify-center gap-0.5 px-0.5 py-1.5 text-[12.5px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] sm:min-h-11 sm:px-1 sm:py-2 sm:text-[16px] ${
                           active ? "bg-[#e4efe6]" : ""
                         }`}
                         aria-label={`${c.label} 정렬 (${
@@ -901,24 +931,24 @@ export function ExcelWorkbook({
                         }) · 누르면 바뀜`}
                         title="클릭: 없음 → 오름차순 → 내림차순 → 기본"
                       >
-                        <span>{c.label}</span>
+                        <span>{labelNode}</span>
                         <span
                           className="inline-flex flex-col leading-none text-[#217346]"
                           aria-hidden
                         >
                           {active?.dir === "asc" ? (
-                            <ArrowUp className="size-3.5 stroke-[2.5]" />
+                            <ArrowUp className="size-3 stroke-[2.5] sm:size-3.5" />
                           ) : active?.dir === "desc" ? (
-                            <ArrowDown className="size-3.5 stroke-[2.5]" />
+                            <ArrowDown className="size-3 stroke-[2.5] sm:size-3.5" />
                           ) : (
-                            <span className="text-[12px] font-semibold text-[#5a635e]">
+                            <span className="text-[10px] font-semibold text-[#5a635e] sm:text-[12px]">
                               ↕
                             </span>
                           )}
                         </span>
                       </button>
                     ) : (
-                      c.label
+                      labelNode
                     )}
                   </th>
                 );
@@ -965,30 +995,30 @@ export function ExcelWorkbook({
                       className="bg-[#eef3fa] ring-1 ring-inset ring-[#3b6ea5]/20"
                       aria-label="캘린더 일정 행"
                     >
-                      <td className="border border-black px-1 py-1 text-center align-middle text-[15px] font-medium tabular-nums text-[#1a3a6b]">
+                      <td className="border border-black px-0.5 py-1 text-center align-middle text-[12.5px] font-medium tabular-nums text-[#1a3a6b] sm:px-1 sm:text-[15px]">
                         {order}
                       </td>
-                      <td className="border border-black border-l-[4px] border-l-[#3b6ea5] px-2 py-2 align-top">
-                        <p className="text-[15px] font-semibold leading-snug text-[#1a2420]">
+                      <td className="border border-black border-l-[3px] border-l-[#3b6ea5] px-1 py-1.5 align-top sm:border-l-[4px] sm:px-2 sm:py-2">
+                        <p className="break-words text-[13.5px] font-semibold leading-snug text-[#1a2420] sm:text-[15px]">
                           {calendarListUpTitle(ev)}
                         </p>
                         {ev.calendarName ? (
-                          <p className="mt-0.5 text-[13px] text-[#3b6ea5]">
+                          <p className="mt-0.5 text-[11px] text-[#3b6ea5] sm:text-[13px]">
                             {ev.calendarName}
                           </p>
                         ) : null}
                       </td>
-                      <td className="border border-black px-1 py-2 text-center align-middle text-[14px] text-[#1a2420]">
+                      <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[11.5px] leading-snug break-words text-[#1a2420] sm:px-1 sm:py-2 sm:text-[14px]">
                         {formatEventDeadline(ev)}
                       </td>
-                      <td className="border border-black px-1 py-2 text-center align-middle text-[#5a635e]">
+                      <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[#5a635e] sm:px-1 sm:py-2">
                         —
                       </td>
-                      <td className="border border-black px-1 py-2 text-center align-middle text-[#5a635e]">
+                      <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[#5a635e] sm:px-1 sm:py-2">
                         —
                       </td>
                       <td
-                        className="border border-black px-1 py-2 text-center align-middle text-[13px] text-[#454d48]"
+                        className="border border-black px-0.5 py-1.5 text-center align-middle text-[11px] text-[#454d48] sm:px-1 sm:py-2 sm:text-[13px]"
                         title="캘린더 일정은 완료 체크 불가"
                       >
                         —
@@ -1042,7 +1072,7 @@ export function ExcelWorkbook({
                     }
                   >
                     <td
-                      className="border border-black px-1.5 py-1 text-center align-middle select-none"
+                      className="border border-black px-0.5 py-1 text-center align-middle select-none sm:px-1.5"
                       data-excel-select-cell={task.id}
                       title="클릭하거나 드래그해서 여러 행 선택"
                       onMouseDown={(e) => {
@@ -1080,7 +1110,7 @@ export function ExcelWorkbook({
                         data-excel-row-check={task.id}
                       />
                     </td>
-                    <td className="border border-black px-1.5 py-1 text-center align-middle text-[15px] font-medium tabular-nums">
+                    <td className="border border-black px-0.5 py-1 text-center align-middle text-[12.5px] font-medium tabular-nums sm:px-1.5 sm:text-[15px]">
                       {order}
                     </td>
 
@@ -1096,10 +1126,10 @@ export function ExcelWorkbook({
                         handleNav(e, task.id, "listup", moveFocus)
                       }
                     >
-                      <div className="flex w-full flex-col gap-0.5 px-1.5 py-1">
+                      <div className="flex w-full min-w-0 flex-col gap-0.5 px-1 py-0.5 sm:px-1.5 sm:py-1">
                         {isAll ? (
                           <span
-                            className="w-fit rounded-sm bg-[#e8ecef] px-1.5 py-0.5 text-[12px] font-semibold text-[#3a4540]"
+                            className="w-fit rounded-sm bg-[#e8ecef] px-1 py-0.5 text-[11px] font-semibold text-[#3a4540] sm:px-1.5 sm:text-[12px]"
                             data-excel-frame-badge={task.category}
                           >
                             {CATEGORY_LABEL[task.category]}
@@ -1292,7 +1322,7 @@ export function ExcelWorkbook({
                       ) : (
                         <button
                           type="button"
-                          className={`min-h-9 w-full px-1 text-center text-[14px] leading-snug ${
+                          className={`min-h-8 w-full px-0.5 text-center text-[12px] leading-snug break-words sm:min-h-9 sm:px-1 sm:text-[14px] ${
                             someday ? "font-semibold text-[#217346]" : ""
                           }`}
                           onClick={() => {
@@ -1302,8 +1332,22 @@ export function ExcelWorkbook({
                           aria-label="마감목표"
                           data-excel-deadline-display={task.id}
                         >
-                          {formatDeadlineRange(task) || (
-                            <span className="text-[#5a635e]">시작 ~ 종료</span>
+                          {formatDeadlineRange(task) ? (
+                            <>
+                              <span className="sm:hidden">
+                                {formatDeadlineRangeCompact(task)}
+                              </span>
+                              <span className="hidden sm:inline">
+                                {formatDeadlineRange(task)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[#5a635e]">
+                              <span className="sm:hidden">날짜</span>
+                              <span className="hidden sm:inline">
+                                시작 ~ 종료
+                              </span>
+                            </span>
                           )}
                         </button>
                       )}
@@ -1353,18 +1397,18 @@ export function ExcelWorkbook({
                       />
                     </EditCell>
 
-                    <td className="border border-black px-1 py-0.5 text-center align-middle">
+                    <td className="border border-black px-0.5 py-0.5 text-center align-middle sm:px-1">
                       {sheet === "todo" ? (
                         <input
                           type="checkbox"
-                          className="size-[18px] accent-[#217346]"
+                          className="size-4 accent-[#217346] sm:size-[18px]"
                           aria-label={`${task.title} 완료여부`}
                           onChange={() => onComplete(task.id)}
                         />
                       ) : (
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 text-[14px] font-medium text-[#217346]"
+                          className="inline-flex flex-col items-center gap-0 text-[11px] font-medium leading-tight text-[#217346] sm:flex-row sm:gap-1 sm:text-[14px]"
                           onClick={() => onRestore(task.id)}
                           title="클릭하면 할 일로 복원"
                         >
@@ -1372,10 +1416,10 @@ export function ExcelWorkbook({
                             type="checkbox"
                             checked
                             readOnly
-                            className="size-[16px] accent-[#217346]"
+                            className="size-3.5 accent-[#217346] sm:size-[16px]"
                             tabIndex={-1}
                           />
-                          완료
+                          <span>완료</span>
                         </button>
                       )}
                     </td>

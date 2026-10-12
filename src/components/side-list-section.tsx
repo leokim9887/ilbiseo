@@ -431,9 +431,9 @@ export function SideListSection({
                       readOnly={locked}
                       className={`h-9 w-full rounded-sm border px-2 text-[15px] outline-none ${
                         locked
-                          ? "cursor-default border-[#b7c4bc] bg-[#e4ebe6] text-[#6a7670] line-through decoration-2 decoration-[#6a7670]/70"
+                          ? "cursor-default border-[#b7c4bc] bg-[#e4ebe6] text-[#6a7670] opacity-90"
                           : item.done
-                            ? `border-[#8a939a] bg-white text-[#3a4540] line-through decoration-[#6a7670]/60 ${accent.focus}`
+                            ? `border-[#8a939a] bg-white text-[#3a4540] ${accent.focus}`
                             : `border-[#8a939a] bg-white text-[#1a2420] ${accent.focus}`
                       }`}
                       aria-label={`${label} 제목`}

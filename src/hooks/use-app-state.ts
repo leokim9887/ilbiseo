@@ -25,6 +25,7 @@ import {
 } from "@/lib/excel-link";
 import { clampPriority } from "@/lib/priority";
 import { isPastUnfinishedTask, todayIsoKst } from "@/lib/date-range";
+import { loadSyncPrefs, saveSyncPrefs } from "@/lib/device-sync";
 
 type Status = "loading" | "ready" | "error";
 
@@ -34,7 +35,12 @@ export function useAppState() {
   const [error, setError] = useState<string | null>(null);
   const [excelLinked, setExcelLinked] = useState(false);
   const [excelStatus, setExcelStatus] = useState<string | null>(null);
+  /** Bumps on every local persist — device sync watches this. */
+  const [persistEpoch, setPersistEpoch] = useState(0);
+  const [localUpdatedAt, setLocalUpdatedAt] = useState<string | null>(null);
   const excelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** When true, next persist came from remote hydrate — skip push echo. */
+  const skipRemotePushRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -46,6 +52,8 @@ export function useAppState() {
         setState(empty);
         saveState(empty);
       }
+      const prefs = loadSyncPrefs();
+      setLocalUpdatedAt(prefs.localUpdatedAt);
       setStatus("ready");
       loadExcelHandle().then((h) => setExcelLinked(Boolean(h)));
     } catch (e) {
@@ -89,7 +97,7 @@ export function useAppState() {
   }, []);
 
   const persist = useCallback(
-    (next: AppState) => {
+    (next: AppState, opts?: { fromRemote?: boolean; updatedAt?: string }) => {
       const clean = { ...next, checklists: [] as AppState["checklists"] };
       setState(clean);
       try {
@@ -98,12 +106,39 @@ export function useAppState() {
       } catch (e) {
         setError(e instanceof Error ? e.message : "저장에 실패했습니다.");
       }
+
+      const now = opts?.updatedAt ?? new Date().toISOString();
+      setLocalUpdatedAt(now);
+      try {
+        const prefs = loadSyncPrefs();
+        if (prefs.enabled || prefs.code) {
+          saveSyncPrefs({ ...prefs, localUpdatedAt: now });
+        }
+      } catch {
+        /* ignore */
+      }
+
+      if (opts?.fromRemote) {
+        skipRemotePushRef.current = true;
+      } else {
+        skipRemotePushRef.current = false;
+        setPersistEpoch((n) => n + 1);
+      }
+
       if (excelTimer.current) clearTimeout(excelTimer.current);
       excelTimer.current = setTimeout(() => {
         void syncExcel(clean);
       }, 600);
     },
     [syncExcel],
+  );
+
+  /** Apply remote workbook (PC↔phone sync). Does not trigger a push echo. */
+  const hydrateFromRemote = useCallback(
+    (next: AppState, updatedAt: string) => {
+      persist(next, { fromRemote: true, updatedAt });
+    },
+    [persist],
   );
 
   /** Insertion / state order — do not re-sort on every title keystroke. */
@@ -465,5 +500,9 @@ export function useAppState() {
     excelStatus,
     setExcelLinked,
     forceExcelSync,
+    hydrateFromRemote,
+    persistEpoch,
+    localUpdatedAt,
+    skipRemotePushRef,
   };
 }

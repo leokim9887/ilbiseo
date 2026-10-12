@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
+import { useDeviceSync } from "@/hooks/use-device-sync";
 import { ExcelWorkbook } from "@/components/excel-workbook";
 import { SideListSection } from "@/components/side-list-section";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { DailyBriefingPanel } from "@/components/daily-briefing";
 import { ExcelLinker } from "@/components/excel-linker";
+import { DeviceSyncPanel } from "@/components/device-sync-panel";
 import { InstallHint } from "@/components/install-hint";
 import { WelcomeBanner } from "@/components/welcome-banner";
 import { AppNav, type MainView } from "@/components/app-nav";
@@ -59,6 +61,14 @@ function readViewFromUrl(): MainView | null {
 
 export function AssistantApp() {
   const app = useAppState();
+  const sync = useDeviceSync({
+    ready: app.status === "ready",
+    state: app.state,
+    localUpdatedAt: app.localUpdatedAt,
+    persistEpoch: app.persistEpoch,
+    skipRemotePushRef: app.skipRemotePushRef,
+    hydrateFromRemote: app.hydrateFromRemote,
+  });
   const [frame, setFrame] = useState<FrameId>("work");
   const [view, setView] = useState<MainView>("todo");
   const [gcalBanner, setGcalBanner] = useState<{
@@ -168,6 +178,20 @@ export function AssistantApp() {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <InstallHint />
+      {sync.toast ? (
+        <div
+          className={`fixed left-1/2 top-3 z-50 w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-[15px] shadow-md ${
+            sync.toast.kind === "error"
+              ? "border-destructive/30 bg-[var(--sheet)] text-destructive"
+              : sync.toast.kind === "info"
+                ? "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)]"
+                : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)]"
+          }`}
+          role="status"
+        >
+          {sync.toast.text}
+        </div>
+      ) : null}
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-3 py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-7 sm:pb-10">
         <WelcomeBanner onStart={() => setView("todo")} />
 
@@ -175,7 +199,9 @@ export function AssistantApp() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-[13px] font-semibold tracking-[0.08em] text-[var(--ink-muted)]">
-                아버지용 · 이 기기 전용
+                {sync.prefs.enabled
+                  ? "아버지용 · PC·폰 동기화"
+                  : "아버지용 · 설정에서 PC·폰 동기화"}
               </p>
               <h1 className="mt-0.5 font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--brand)] sm:text-5xl">
                 일비서
@@ -302,6 +328,15 @@ export function AssistantApp() {
           {view === "settings" ? (
             <PanelShell title="설정 · 엑셀">
               <div className="space-y-5">
+                <DeviceSyncPanel
+                  prefs={sync.prefs}
+                  busy={sync.busy}
+                  onPrefsChange={sync.writePrefs}
+                  onSyncNow={() => void sync.syncNow()}
+                  onEnabledPull={(code) =>
+                    void sync.runPull({ silent: false, code })
+                  }
+                />
                 <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
                   <p className="text-[15px] font-semibold text-[var(--ink)]">
                     앱처럼 설치하기

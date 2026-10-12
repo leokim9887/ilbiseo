@@ -51,7 +51,14 @@ npm run start -- -p 4317
 - 없으면 **mock 샘플** 또는 **ICS**로 확인.  
 - 자세한 단계: `/cursor/stores/self/docs/google-calendar-setup.md`
 
-### 4) 매일 08:00 이메일 브리핑 (네이버 SMTP)
+### 4) PC ↔ 폰 동기화
+1. **설정·엑셀** → **PC ↔ 폰 동기화** → PC에서 **새 코드 만들기**  
+2. 코드 복사 → 폰 같은 화면에서 **이 코드로 연결**  
+3. 저장·앱 열 때 자동 맞춤 · **지금 동기화** 버튼  
+4. 서버: Upstash Redis (`UPSTASH_REDIS_REST_URL` / `TOKEN`, 브리핑과 동일)  
+5. 안내: `/cursor/stores/self/docs/pc-phone-sync.md`
+
+### 5) 매일 08:00 이메일 브리핑 (네이버 SMTP)
 1. 수신·발신 고정: `goldage77@naver.com`  
 2. 네이버 **애플리케이션 비밀번호** → `NAVER_SMTP_PASSWORD`  
 3. **오늘 브리핑** → **테스트 메일 보내기** · 매일 발송 켜기  

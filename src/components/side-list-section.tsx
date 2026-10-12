@@ -398,8 +398,16 @@ export function SideListSection({
                       onChange={(e) =>
                         onUpdate(item.id, { title: e.target.value })
                       }
-                      onBlur={() => {
-                        if (item.done) endEditDone(item.id);
+                      onBlur={(e) => {
+                        if (!item.done) return;
+                        const next = e.relatedTarget as Node | null;
+                        const row = e.currentTarget.closest(
+                          "[data-side-item]",
+                        );
+                        // Stay editing while focus moves within the same row
+                        // (memo ↔ title ↔ 「수정 끝」). Relock only on leave.
+                        if (row && next && row.contains(next)) return;
+                        endEditDone(item.id);
                       }}
                       disabled={locked}
                       readOnly={locked}
@@ -420,8 +428,14 @@ export function SideListSection({
                       onChange={(e) =>
                         onUpdate(item.id, { memo: e.target.value })
                       }
-                      onBlur={() => {
-                        if (item.done) endEditDone(item.id);
+                      onBlur={(e) => {
+                        if (!item.done) return;
+                        const next = e.relatedTarget as Node | null;
+                        const row = e.currentTarget.closest(
+                          "[data-side-item]",
+                        );
+                        if (row && next && row.contains(next)) return;
+                        endEditDone(item.id);
                       }}
                       disabled={locked}
                       readOnly={locked}
@@ -452,6 +466,11 @@ export function SideListSection({
                         <button
                           type="button"
                           className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#217346] bg-[#217346] px-2 text-[13px] font-medium text-white hover:bg-[#1a5c38]"
+                          onMouseDown={(e) => {
+                            // Keep focus in the row so title/memo blur does not
+                            // re-lock before this click runs.
+                            e.preventDefault();
+                          }}
                           onClick={() => endEditDone(item.id)}
                           aria-label={`${label} 수정 끝내기`}
                           data-side-edit-done={item.id}

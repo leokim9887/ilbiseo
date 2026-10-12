@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { ExcelWorkbook } from "@/components/excel-workbook";
 import { SideListSection } from "@/components/side-list-section";
@@ -16,9 +16,31 @@ import {
   isAllFrame,
   isTaskCategory,
   type FrameId,
+  type Task,
   type TaskCategory,
 } from "@/lib/types";
 import { Loader2, RotateCcw } from "lucide-react";
+
+const AUTO_DONE_TITLE_LIMIT = 8;
+
+/** Concise father-friendly alert after overdue → 한 일. */
+function formatAutoDoneAlert(moved: Task[]): string {
+  const n = moved.length;
+  const lines = moved.slice(0, AUTO_DONE_TITLE_LIMIT).map((t, i) => {
+    const title = (t.title || "(제목 없음)").trim() || "(제목 없음)";
+    const short = title.length > 40 ? `${title.slice(0, 40)}…` : title;
+    return `${i + 1}. ${short}`;
+  });
+  const extra =
+    n > AUTO_DONE_TITLE_LIMIT
+      ? `\n… 외 ${n - AUTO_DONE_TITLE_LIMIT}건`
+      : "";
+  return (
+    `기한이 지난 할 일 ${n}건을 「한 일」로 옮겼습니다.\n\n` +
+    lines.join("\n") +
+    extra
+  );
+}
 
 function readViewFromUrl(): MainView | null {
   if (typeof window === "undefined") return null;
@@ -43,6 +65,19 @@ export function AssistantApp() {
     kind: "ok" | "error";
     text: string;
   } | null>(null);
+  /** Session: already-alerted auto-complete task ids (no spam). */
+  const autoDoneAlertedRef = useRef<Set<string>>(new Set());
+  const autoCompleteRef = useRef(app.autoCompleteOverdueTasks);
+  autoCompleteRef.current = app.autoCompleteOverdueTasks;
+
+  const runAutoCompleteOverdue = useCallback(() => {
+    const moved = autoCompleteRef.current();
+    if (moved.length === 0) return;
+    const fresh = moved.filter((t) => !autoDoneAlertedRef.current.has(t.id));
+    if (fresh.length === 0) return;
+    for (const t of fresh) autoDoneAlertedRef.current.add(t.id);
+    window.alert(formatAutoDoneAlert(fresh));
+  }, []);
 
   useEffect(() => {
     const fromUrl = readViewFromUrl();
@@ -68,6 +103,21 @@ export function AssistantApp() {
       window.history.replaceState({}, "", url.pathname + url.search);
     }
   }, []);
+
+  // Overdue → 한 일 on load / tab visible / window (not only when opening a sheet)
+  useEffect(() => {
+    if (app.status !== "ready") return;
+    runAutoCompleteOverdue();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") runAutoCompleteOverdue();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", runAutoCompleteOverdue);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", runAutoCompleteOverdue);
+    };
+  }, [app.status, runAutoCompleteOverdue]);
 
   if (app.status === "loading") {
     return (
@@ -269,6 +319,18 @@ export function AssistantApp() {
                       <strong>아이폰</strong>: Safari → 공유 → 홈 화면에 추가
                     </li>
                   </ul>
+                  <p className="mt-2 text-[14px] text-[var(--ink-muted)]">
+                    폰 사용 안내:{" "}
+                    <a
+                      className="font-medium text-[var(--brand)] underline underline-offset-2"
+                      href="https://fleet-nitrogen-6wxfp18.vercel.app"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      fleet-nitrogen-6wxfp18.vercel.app
+                    </a>
+                    을 연 뒤 위 순서대로 홈 화면에 추가하세요.
+                  </p>
                 </div>
                 <ExcelLinker
                   state={app.state}

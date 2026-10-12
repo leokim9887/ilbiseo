@@ -1,5 +1,6 @@
 /**
- * Smoke: stable LIST UP order while typing + overdue mark/lock + start min=today(KST).
+ * Smoke: stable LIST UP order while typing + start min=today(KST).
+ * Overdue rows are auto-completed to 한 일 (see smoke-all-no-add-auto-done.mjs).
  */
 import { chromium } from "playwright";
 import { mkdirSync } from "fs";
@@ -15,17 +16,12 @@ const todayKst = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 }).format(new Date());
 
-function yday(iso) {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() - 1);
-  return dt.toISOString().slice(0, 10);
-}
-
-const pastEnd = yday(todayKst);
-
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
+
+page.on("dialog", async (dialog) => {
+  await dialog.accept();
+});
 
 const seed = {
   version: 3,
@@ -62,22 +58,6 @@ const seed = {
       createdAt: "2026-10-02T00:00:00.000Z",
       completedAt: null,
     },
-    {
-      id: "a3",
-      title: "지난할일",
-      category: "work",
-      kind: "spot",
-      startDate: pastEnd,
-      targetDate: pastEnd,
-      urgency: 3,
-      importance: 3,
-      groupKey: "지난",
-      memo: "과거",
-      source: "manual",
-      status: "active",
-      createdAt: "2026-09-01T00:00:00.000Z",
-      completedAt: null,
-    },
   ],
   checklists: [],
   calendarEvents: [],
@@ -101,7 +81,6 @@ const titlesBefore = await page
   .locator('textarea[aria-label="할일 LIST UP"]')
   .evaluateAll((els) => els.map((e) => e.value));
 
-// Type into first row title heavily — order must stay
 const first = page.locator('textarea[aria-label="할일 LIST UP"]').first();
 await first.click();
 await first.fill("첫번째-타이핑중-가나다라마바사");
@@ -114,24 +93,9 @@ const titlesAfter = await page
 const orderStable =
   titlesAfter[0].startsWith("첫번째") &&
   titlesAfter[1] === "두번째" &&
-  titlesAfter[2] === "지난할일" &&
-  titlesBefore.length === 3;
+  titlesBefore.length === 2;
 
-const overdueRow = page.locator('tr[data-excel-overdue="1"]');
-const overdueCount = await overdueRow.count();
-const badge = await page.locator("[data-excel-overdue-badge]").count();
-const overdueTitleDisabled = await overdueRow
-  .locator('textarea[aria-label="할일 LIST UP"]')
-  .evaluate((el) => el.disabled || el.readOnly);
-
-// Select only overdue → 선택 삭제 hidden, 완료 visible
-await overdueRow.locator('input[data-excel-row-check]').check();
-await page.waitForTimeout(150);
-const deleteVisible = await page.locator("[data-excel-bulk-delete]").count();
-const completeVisible = await page.locator("[data-excel-bulk-complete]").count();
-
-// Open a non-overdue deadline and check start min
-await page.locator('tr[data-excel-overdue="0"]').first().locator('button[aria-label="마감목표"]').click();
+await page.locator('button[aria-label="마감목표"]').first().click();
 await page.waitForTimeout(150);
 const startMin = await page
   .locator('input[aria-label="시작일"]')
@@ -143,14 +107,7 @@ await page.screenshot({
   fullPage: false,
 });
 
-const ok =
-  orderStable &&
-  overdueCount === 1 &&
-  badge >= 1 &&
-  overdueTitleDisabled &&
-  deleteVisible === 0 &&
-  completeVisible === 1 &&
-  startMin === todayKst;
+const ok = orderStable && startMin === todayKst;
 
 console.log(
   JSON.stringify(
@@ -159,14 +116,8 @@ console.log(
       orderStable,
       titlesBefore,
       titlesAfter,
-      overdueCount,
-      badge,
-      overdueTitleDisabled,
-      deleteVisible,
-      completeVisible,
       startMin,
       todayKst,
-      pastEnd,
     },
     null,
     2,

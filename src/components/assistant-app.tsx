@@ -194,44 +194,12 @@ export function AssistantApp() {
         </div>
       ) : null}
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 overflow-x-clip px-2.5 py-4 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:gap-4 sm:px-6 sm:pt-4 sm:pb-10">
-        <FamilyBanner />
+        <FamilyBanner
+          activeCount={app.allActive.length}
+          doneCount={app.allCompleted.length}
+          calendarCount={app.calendarEvents.length}
+        />
         <WelcomeBanner onStart={() => setView("todo")} />
-
-        {/* Mobile: brand + counts. PC: counts only — FamilyBanner carries brand. */}
-        <header className="animate-fade-up space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
-            <div className="min-w-0 sm:hidden">
-              <p className="text-[13px] font-semibold tracking-[0.08em] text-[var(--ink-muted)]">
-                {sync.prefs.enabled
-                  ? "아버지용 · PC·폰 동기화"
-                  : "아버지용 · 설정에서 PC·폰 동기화"}
-              </p>
-              <h1 className="mt-0.5 font-[family-name:var(--font-display)] text-[2.15rem] font-bold leading-tight tracking-tight text-[var(--brand)]">
-                일비서
-              </h1>
-            </div>
-            <dl className="grid w-full grid-cols-3 gap-2 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-3 py-2.5 text-center text-[15px] sm:flex sm:w-auto sm:gap-4 sm:px-4 sm:py-3">
-              <div>
-                <dt className="text-[13px] text-[var(--ink-muted)]">할 일</dt>
-                <dd className="text-lg font-semibold tabular-nums text-[var(--ink)]">
-                  {app.allActive.length}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[13px] text-[var(--ink-muted)]">한 일</dt>
-                <dd className="text-lg font-semibold tabular-nums text-[var(--ink)]">
-                  {app.allCompleted.length}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[13px] text-[var(--ink-muted)]">일정</dt>
-                <dd className="text-lg font-semibold tabular-nums text-[var(--ink)]">
-                  {app.calendarEvents.length}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </header>
 
         <AppNav
           value={view}

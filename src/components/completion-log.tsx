@@ -38,7 +38,7 @@ export function CompletionLog({
               <p className="text-base font-medium text-[var(--ink)]">
                 {task.title}
               </p>
-              <p className="text-[12px] text-[var(--ink-muted)]">
+              <p className="text-[13px] text-[var(--ink-muted)]">
                 완료{" "}
                 {task.completedAt
                   ? new Date(task.completedAt).toLocaleString("ko-KR", {
@@ -51,7 +51,7 @@ export function CompletionLog({
                 · {CATEGORY_LABEL[task.category]} · {KIND_LABEL[task.kind]}
               </p>
               {task.memo ? (
-                <p className="text-[12px] text-[var(--ink)]/70">
+                <p className="text-[13px] text-[var(--ink)]/70">
                   메모 · {task.memo}
                 </p>
               ) : null}

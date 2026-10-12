@@ -106,13 +106,13 @@ export function SideListSection({
       >
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`rounded-sm px-2 py-0.5 text-[13px] font-bold tracking-wide ${accent.badge}`}
+            className={`rounded-sm px-2 py-0.5 text-[14px] font-bold tracking-wide ${accent.badge}`}
           >
             {label}
           </span>
-          <p className="text-[12px] text-[#5c655f]">{items.length}건</p>
+          <p className="text-[13px] text-[#454d48]">{items.length}건</p>
           {items.length > 0 ? (
-            <label className="flex items-center gap-1.5 text-[12px] text-[#5c655f]">
+            <label className="flex items-center gap-1.5 text-[13px] text-[#454d48]">
               <input
                 type="checkbox"
                 checked={allSelected}
@@ -133,7 +133,7 @@ export function SideListSection({
               type="button"
               size="sm"
               variant="outline"
-              className="h-8 rounded-sm border-[#b42318]/40 px-2 text-[12px] text-[#b42318]"
+              className="h-9 rounded-sm border-[#b42318]/40 px-2 text-[13px] text-[#b42318]"
               onClick={bulkDelete}
               data-side-bulk-delete={kind}
             >
@@ -189,7 +189,7 @@ export function SideListSection({
                       data-side-row-check={item.id}
                       title="삭제할 항목 선택"
                     />
-                    <label className="flex items-center gap-1.5 text-[11px] text-[#5c655f]">
+                    <label className="flex items-center gap-1.5 text-[13px] text-[#454d48]">
                       <input
                         type="checkbox"
                         checked={item.done}
@@ -221,14 +221,14 @@ export function SideListSection({
                       onChange={(e) =>
                         onUpdate(item.id, { memo: e.target.value })
                       }
-                      className="h-8 w-full rounded-sm border border-[#d0d5d9] bg-white px-2 text-[13px] text-[#444] outline-none focus:border-[#8a939a]"
+                      className="h-9 w-full rounded-sm border border-[#d0d5d9] bg-white px-2 text-[14px] text-[#2a3230] outline-none focus:border-[#8a939a]"
                       aria-label={`${label} 메모`}
                       placeholder="메모 (선택)"
                     />
                   </div>
                   <button
                     type="button"
-                    className="inline-flex h-8 shrink-0 items-center justify-center gap-1 self-end rounded-sm border border-[#8a939a] bg-white px-2 text-[12px] text-[#5c655f] hover:bg-[#f0f2f4] sm:self-start"
+                    className="inline-flex h-9 shrink-0 items-center justify-center gap-1 self-end rounded-sm border border-[#8a939a] bg-white px-2 text-[13px] text-[#454d48] hover:bg-[#f0f2f4] sm:self-start"
                     onClick={() => onDelete(item.id)}
                     aria-label={`${label} 삭제`}
                   >

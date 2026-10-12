@@ -493,7 +493,7 @@ export function ExcelWorkbook({
   }, [focus]);
 
   const chipClass = (c: typeof chip) =>
-    `h-8 rounded-sm px-2.5 text-[13px] font-medium border ${
+    `h-9 rounded-sm px-2.5 text-[14px] font-medium border ${
       chip === c
         ? "border-[#217346] bg-[#217346] text-white"
         : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1]"
@@ -530,7 +530,7 @@ export function ExcelWorkbook({
   };
 
   const gcalChipClass = (c: typeof gcalChip) =>
-    `h-8 rounded-sm px-2.5 text-[13px] font-medium border ${
+    `h-9 rounded-sm px-2.5 text-[14px] font-medium border ${
       gcalChip === c
         ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
         : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa]"
@@ -539,23 +539,23 @@ export function ExcelWorkbook({
   return (
     <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2">
-        <p className="truncate text-[15px] font-semibold text-[#1a2420]">
+        <p className="truncate text-[16px] font-semibold text-[#1a2420]">
           일비서.xlsx
-          <span className="ml-2 text-[12px] font-normal text-[#5c655f]">
+          <span className="ml-2 text-[13px] font-normal text-[#454d48]">
             — TO DO LIST
           </span>
         </p>
-        <p className="text-[13px] tabular-nums text-[#5c655f]">{todayLabel}</p>
+        <p className="text-[14px] tabular-nums text-[#454d48]">{todayLabel}</p>
       </div>
 
       {/* Ribbon */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[#9aa5ad] bg-[#f0f2f4] px-3 py-2">
-        <label className="flex items-center gap-2 text-[13px] text-[#1a2420]">
+        <label className="flex items-center gap-2 text-[14px] text-[#1a2420]">
           <span className="font-semibold">틀</span>
           <select
             value={frame}
             onChange={(e) => onFrameChange(e.target.value as FrameId)}
-            className="h-9 min-w-[8.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] font-medium outline-none focus:border-[#217346]"
+            className="h-9 min-w-[8.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] font-medium outline-none focus:border-[#217346]"
             aria-label="틀"
           >
             {FRAME_ORDER.filter((c) => sheet === "todo" || c !== "gcal").map(
@@ -629,7 +629,7 @@ export function ExcelWorkbook({
             ) : null}
           </>
         ) : null}
-        <span className="ml-auto text-[12px] text-[#5c655f]">
+        <span className="ml-auto text-[13px] text-[#454d48]">
           {FRAME_LABEL[frame]} · {rows.length}행
           {isGcal && calCount > 0 ? ` (캘린더)` : ""}
           {!isGcal && sheet === "todo" && filterActive ? ` · 필터 적용` : ""}
@@ -648,8 +648,8 @@ export function ExcelWorkbook({
       {isGcal && sheet === "todo" ? (
         <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] font-semibold text-[#1a2420]">기간</span>
-            <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+            <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
+            <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
               시작일
               <input
                 type="date"
@@ -658,12 +658,12 @@ export function ExcelWorkbook({
                   setGcalRangeStart(e.target.value);
                   setGcalChip("none");
                 }}
-                className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+                className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
                 aria-label="캘린더 기간 시작일"
               />
             </label>
-            <span className="text-[#5c655f]">~</span>
-            <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+            <span className="text-[#454d48]">~</span>
+            <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
               종료일
               <input
                 type="date"
@@ -672,7 +672,7 @@ export function ExcelWorkbook({
                   setGcalRangeEnd(e.target.value);
                   setGcalChip("none");
                 }}
-                className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+                className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
                 aria-label="캘린더 기간 종료일"
               />
             </label>
@@ -708,7 +708,7 @@ export function ExcelWorkbook({
               <button
                 type="button"
                 onClick={clearGcalFilter}
-                className="inline-flex h-8 items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px] text-[#5c655f]"
+                className="inline-flex h-9 items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] text-[#454d48]"
               >
                 <X className="size-3.5" />
                 필터 지우기
@@ -719,8 +719,8 @@ export function ExcelWorkbook({
       ) : !isGcal && sheet === "todo" ? (
       <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#e8ecef] px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-semibold text-[#1a2420]">기간</span>
-          <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+          <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
+          <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
             시작일
             <input
               type="date"
@@ -729,12 +729,12 @@ export function ExcelWorkbook({
                 setFilterStart(e.target.value);
                 setChip("all");
               }}
-              className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+              className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
               aria-label="기간 시작일"
             />
           </label>
-          <span className="text-[#5c655f]">~</span>
-          <label className="flex items-center gap-1 text-[12px] text-[#5c655f]">
+          <span className="text-[#454d48]">~</span>
+          <label className="flex items-center gap-1 text-[13px] text-[#454d48]">
             종료일
             <input
               type="date"
@@ -743,7 +743,7 @@ export function ExcelWorkbook({
                 setFilterEnd(e.target.value);
                 setChip("all");
               }}
-              className="h-8 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[13px]"
+              className="h-9 rounded-sm border border-[#8a939a] bg-white px-1.5 text-[14px]"
               aria-label="기간 종료일"
             />
           </label>
@@ -763,7 +763,7 @@ export function ExcelWorkbook({
             <button
               type="button"
               onClick={clearFilter}
-              className="inline-flex h-8 items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px] text-[#5c655f]"
+              className="inline-flex h-9 items-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[14px] text-[#454d48]"
             >
               <X className="size-3.5" />
               필터 지우기
@@ -778,7 +778,7 @@ export function ExcelWorkbook({
         className="relative max-h-[min(66vh,720px)] min-h-[300px] overflow-auto bg-white"
         data-excel-scroll
       >
-        <table className="w-full min-w-[860px] border-collapse text-[15px] text-black">
+        <table className="w-full min-w-[860px] border-collapse text-[16px] text-black">
           <thead className="sticky top-0 z-20">
             <tr>
               {!isGcal ? (
@@ -815,7 +815,7 @@ export function ExcelWorkbook({
                         ? { width: c.width, minWidth: "260px" }
                         : { width: c.width, minWidth: c.width }
                     }
-                    className={`border border-black bg-[#f3f3f3] px-1 py-2 text-center text-[15px] font-bold leading-tight text-black ${
+                    className={`border border-black bg-[#f3f3f3] px-1 py-2 text-center text-[16px] font-bold leading-tight text-black ${
                       sortable ? "p-0" : "px-2 py-3"
                     }`}
                   >
@@ -823,7 +823,7 @@ export function ExcelWorkbook({
                       <button
                         type="button"
                         onClick={() => onHeaderSort(c.key)}
-                        className={`flex min-h-11 w-full items-center justify-center gap-0.5 px-1 py-2 text-[14px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] sm:text-[15px] ${
+                        className={`flex min-h-11 w-full items-center justify-center gap-0.5 px-1 py-2 text-[15px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] sm:text-[16px] ${
                           active ? "bg-[#e4efe6]" : ""
                         }`}
                         aria-label={`${c.label} 정렬 (${
@@ -845,7 +845,7 @@ export function ExcelWorkbook({
                           ) : active?.dir === "desc" ? (
                             <ArrowDown className="size-3.5 stroke-[2.5]" />
                           ) : (
-                            <span className="text-[10px] font-semibold text-[#8a939a]">
+                            <span className="text-[12px] font-semibold text-[#5a635e]">
                               ↕
                             </span>
                           )}
@@ -864,7 +864,7 @@ export function ExcelWorkbook({
               <tr>
                 <td
                   colSpan={isGcal ? 6 : 7}
-                  className="border border-black px-4 py-16 text-center text-[15px] text-[#555]"
+                  className="border border-black px-4 py-16 text-center text-[16px] text-[#3d4641]"
                 >
                   {filterActive && !isGcal && sheet === "todo" ? (
                     <p>
@@ -894,30 +894,30 @@ export function ExcelWorkbook({
                       className="bg-[#eef3fa] ring-1 ring-inset ring-[#3b6ea5]/20"
                       aria-label="캘린더 일정 행"
                     >
-                      <td className="border border-black px-1 py-1 text-center align-middle text-[14px] font-medium tabular-nums text-[#1a3a6b]">
+                      <td className="border border-black px-1 py-1 text-center align-middle text-[15px] font-medium tabular-nums text-[#1a3a6b]">
                         {order}
                       </td>
                       <td className="border border-black border-l-[4px] border-l-[#3b6ea5] px-2 py-2 align-top">
-                        <p className="text-[14px] font-semibold leading-snug text-[#1a2420]">
+                        <p className="text-[15px] font-semibold leading-snug text-[#1a2420]">
                           {calendarListUpTitle(ev)}
                         </p>
                         {ev.calendarName ? (
-                          <p className="mt-0.5 text-[11px] text-[#3b6ea5]">
+                          <p className="mt-0.5 text-[13px] text-[#3b6ea5]">
                             {ev.calendarName}
                           </p>
                         ) : null}
                       </td>
-                      <td className="border border-black px-1 py-2 text-center align-middle text-[13px] text-[#1a2420]">
+                      <td className="border border-black px-1 py-2 text-center align-middle text-[14px] text-[#1a2420]">
                         {formatEventDeadline(ev)}
                       </td>
-                      <td className="border border-black px-1 py-2 text-center align-middle text-[#888]">
+                      <td className="border border-black px-1 py-2 text-center align-middle text-[#5a635e]">
                         —
                       </td>
-                      <td className="border border-black px-1 py-2 text-center align-middle text-[#888]">
+                      <td className="border border-black px-1 py-2 text-center align-middle text-[#5a635e]">
                         —
                       </td>
                       <td
-                        className="border border-black px-1 py-2 text-center align-middle text-[12px] text-[#5c655f]"
+                        className="border border-black px-1 py-2 text-center align-middle text-[13px] text-[#454d48]"
                         title="캘린더 일정은 완료 체크 불가"
                       >
                         —
@@ -980,7 +980,7 @@ export function ExcelWorkbook({
                     }
                   >
                     <td
-                      className="border border-black px-1 py-0.5 text-center align-middle select-none"
+                      className="border border-black px-1.5 py-1 text-center align-middle select-none"
                       data-excel-select-cell={task.id}
                       title="클릭하거나 드래그해서 여러 행 선택"
                       onMouseDown={(e) => {
@@ -1018,7 +1018,7 @@ export function ExcelWorkbook({
                         data-excel-row-check={task.id}
                       />
                     </td>
-                    <td className="border border-black px-1 py-0.5 text-center align-middle text-[14px] font-medium tabular-nums">
+                    <td className="border border-black px-1.5 py-1 text-center align-middle text-[15px] font-medium tabular-nums">
                       {order}
                     </td>
 
@@ -1040,10 +1040,10 @@ export function ExcelWorkbook({
                           : handleNav(e, task.id, "listup", moveFocus)
                       }
                     >
-                      <div className="flex w-full flex-col gap-0 px-1.5 py-0.5">
+                      <div className="flex w-full flex-col gap-0.5 px-1.5 py-1">
                         {overdue ? (
                           <span
-                            className="w-fit rounded-sm bg-[#c45c26] px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                            className="w-fit rounded-sm bg-[#c45c26] px-1.5 py-0.5 text-[12px] font-semibold text-white"
                             data-excel-overdue-badge
                           >
                             지난 일정
@@ -1073,7 +1073,7 @@ export function ExcelWorkbook({
                           disabled={overdue}
                         />
                         <label className="flex flex-col gap-0">
-                          <span className="text-[10px] font-medium leading-tight text-[#5c655f]">
+                          <span className="text-[12px] font-medium leading-tight text-[#454d48]">
                             메모
                           </span>
                           <AutoGrowTextarea
@@ -1123,15 +1123,15 @@ export function ExcelWorkbook({
                     >
                       {overdue ? (
                         <div
-                          className="flex min-h-8 w-full flex-col items-center justify-center px-1 py-0.5 text-center text-[13px] leading-snug text-[#5c3a1a]"
+                          className="flex min-h-9 w-full flex-col items-center justify-center px-1 py-0.5 text-center text-[14px] leading-snug text-[#5c3a1a]"
                           aria-label="마감목표"
                         >
                           {formatDeadlineRange(task) || (
-                            <span className="text-[#999]">시작 ~ 종료</span>
+                            <span className="text-[#5a635e]">시작 ~ 종료</span>
                           )}
                         </div>
                       ) : deadlineFocused ? (
-                        <div className="flex w-full flex-col gap-0.5 px-1 py-0.5">
+                        <div className="flex w-full flex-col gap-1 px-1 py-1">
                           <button
                             type="button"
                             data-excel-someday={task.id}
@@ -1140,7 +1140,7 @@ export function ExcelWorkbook({
                               e.stopPropagation();
                               setSomeday(!someday);
                             }}
-                            className={`mx-auto w-fit rounded-sm border px-2 py-0.5 text-[11px] font-semibold tracking-tight ${
+                            className={`mx-auto w-fit rounded-sm border px-2 py-0.5 text-[13px] font-semibold tracking-tight ${
                               someday
                                 ? "border-[#217346] bg-[#217346] text-white"
                                 : "border-[#8a939a] bg-white text-[#3a4540] hover:border-[#217346] hover:text-[#217346]"
@@ -1152,13 +1152,13 @@ export function ExcelWorkbook({
                             <p
                               data-excel-cell={`${task.id}:deadline`}
                               tabIndex={0}
-                              className="px-0.5 text-center text-[11px] leading-snug text-[#5c655f] outline-none"
+                              className="px-0.5 text-center text-[13px] leading-snug text-[#454d48] outline-none"
                             >
                               기한 없음 · 칩을 다시 누르면 날짜 선택
                             </p>
                           ) : (
                             <>
-                              <label className="flex flex-col items-stretch gap-0 text-[10px] text-[#5c655f]">
+                              <label className="flex flex-col items-stretch gap-0 text-[12px] text-[#454d48]">
                                 시작일
                                 <input
                                   data-excel-cell={`${task.id}:deadline`}
@@ -1194,11 +1194,11 @@ export function ExcelWorkbook({
                                     }
                                     applyDeadlinePatch(task, patch);
                                   }}
-                                  className="excel-input min-h-7 text-center text-[13px]"
+                                  className="excel-input min-h-8 text-center text-[14px]"
                                   aria-label="시작일"
                                 />
                               </label>
-                              <label className="flex flex-col items-stretch gap-0 text-[10px] text-[#5c655f]">
+                              <label className="flex flex-col items-stretch gap-0 text-[12px] text-[#454d48]">
                                 종료일
                                 <input
                                   type="date"
@@ -1229,7 +1229,7 @@ export function ExcelWorkbook({
                                       targetDate: v,
                                     });
                                   }}
-                                  className="excel-input min-h-7 text-center text-[13px]"
+                                  className="excel-input min-h-8 text-center text-[14px]"
                                   aria-label="종료일"
                                 />
                               </label>
@@ -1239,7 +1239,7 @@ export function ExcelWorkbook({
                       ) : (
                         <button
                           type="button"
-                          className={`min-h-8 w-full px-1 text-center text-[13px] leading-snug ${
+                          className={`min-h-9 w-full px-1 text-center text-[14px] leading-snug ${
                             someday ? "font-semibold text-[#217346]" : ""
                           }`}
                           onClick={() => {
@@ -1250,7 +1250,7 @@ export function ExcelWorkbook({
                           data-excel-deadline-display={task.id}
                         >
                           {formatDeadlineRange(task) || (
-                            <span className="text-[#999]">시작 ~ 종료</span>
+                            <span className="text-[#5a635e]">시작 ~ 종료</span>
                           )}
                         </button>
                       )}
@@ -1325,7 +1325,7 @@ export function ExcelWorkbook({
                       ) : (
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 text-[13px] font-medium text-[#217346]"
+                          className="inline-flex items-center gap-1 text-[14px] font-medium text-[#217346]"
                           onClick={() => onRestore(task.id)}
                           title="클릭하면 할 일로 복원"
                         >
@@ -1360,10 +1360,10 @@ export function ExcelWorkbook({
           showCloseButton={false}
         >
           <DialogHeader>
-            <DialogTitle className="text-[15px] text-[#1a2420]">
+            <DialogTitle className="text-[16px] text-[#1a2420]">
               비슷한 할 일
             </DialogTitle>
-            <DialogDescription className="text-[13px] leading-relaxed text-[#3d4a44]">
+            <DialogDescription className="text-[14px] leading-relaxed text-[#3d4a44]">
               {similarityAlert}
             </DialogDescription>
           </DialogHeader>
@@ -1408,7 +1408,7 @@ function EditCell({
       onKeyDown={onKeyNav}
     >
       <div
-        className={`flex min-h-8 items-stretch ${center ? "justify-center" : ""}`}
+        className={`flex min-h-9 items-stretch ${center ? "justify-center" : ""}`}
       >
         {children}
       </div>

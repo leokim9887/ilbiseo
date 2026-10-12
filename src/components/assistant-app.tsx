@@ -115,28 +115,28 @@ export function AssistantApp() {
         <header className="animate-fade-up space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold tracking-[0.1em] text-[var(--ink-muted)]">
+              <p className="text-[13px] font-semibold tracking-[0.08em] text-[var(--ink-muted)]">
                 아버지용 · 이 기기 전용
               </p>
               <h1 className="mt-0.5 font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-[var(--brand)] sm:text-5xl">
                 일비서
               </h1>
             </div>
-            <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-2.5 text-center text-sm">
+            <dl className="flex gap-4 rounded-xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-3 text-center text-[15px]">
               <div>
-                <dt className="text-[11px] text-[var(--ink-muted)]">할 일</dt>
+                <dt className="text-[13px] text-[var(--ink-muted)]">할 일</dt>
                 <dd className="text-lg font-semibold tabular-nums text-[var(--ink)]">
                   {app.allActive.length}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] text-[var(--ink-muted)]">한 일</dt>
+                <dt className="text-[13px] text-[var(--ink-muted)]">한 일</dt>
                 <dd className="text-lg font-semibold tabular-nums text-[var(--ink)]">
                   {app.allCompleted.length}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] text-[var(--ink-muted)]">일정</dt>
+                <dt className="text-[13px] text-[var(--ink-muted)]">일정</dt>
                 <dd className="text-lg font-semibold tabular-nums text-[var(--ink)]">
                   {app.calendarEvents.length}
                 </dd>
@@ -240,10 +240,10 @@ export function AssistantApp() {
             <PanelShell title="설정 · 엑셀">
               <div className="space-y-5">
                 <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
-                  <p className="text-sm font-semibold text-[var(--ink)]">
+                  <p className="text-[15px] font-semibold text-[var(--ink)]">
                     앱처럼 설치하기
                   </p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--ink-muted)]">
+                  <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-[var(--ink-muted)]">
                     <li>
                       <strong>Windows/Mac</strong>: Chrome·Edge → 주소창 설치
                       아이콘 또는 메뉴 → 앱 설치
@@ -265,7 +265,7 @@ export function AssistantApp() {
                   onSync={app.forceExcelSync}
                 />
                 <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
-                  <p className="text-sm font-semibold text-[var(--ink)]">
+                  <p className="text-[15px] font-semibold text-[var(--ink)]">
                     데이터
                   </p>
                   <Button

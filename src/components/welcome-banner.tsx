@@ -37,7 +37,7 @@ export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
       <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--brand)]">
         일비서
       </p>
-      <p className="mt-2 text-sm leading-relaxed text-[var(--ink-muted)]">
+      <p className="mt-2 text-[15px] leading-relaxed text-[var(--ink-muted)]">
         할 일·한 일 시트와 틀(업무·개인·과제·팀원)로 일정을 정리합니다.
       </p>
       <div className="mt-4">

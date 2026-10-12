@@ -331,7 +331,7 @@ export function MonthCalendarGrid({
           {WEEKDAYS.map((w) => (
             <div
               key={w}
-              className="px-1 py-2 text-center text-[12px] font-semibold text-[var(--ink-muted)] sm:text-[13px]"
+              className="px-1 py-2.5 text-center text-[13px] font-semibold text-[var(--ink-muted)] sm:text-[14px]"
               role="columnheader"
             >
               {w}
@@ -352,7 +352,7 @@ export function MonthCalendarGrid({
                   return (
                     <div
                       key={`pad-${wi}-${di}`}
-                      className="min-h-[5.5rem] border-r border-[var(--grid-line)] bg-[var(--sheet-header)]/20 sm:min-h-[6.5rem]"
+                      className="min-h-[6rem] border-r border-[var(--grid-line)] bg-[var(--sheet-header)]/20 sm:min-h-[7rem]"
                       aria-hidden
                     />
                   );
@@ -384,7 +384,7 @@ export function MonthCalendarGrid({
                         openDay(day);
                       }
                     }}
-                    className={`min-h-[5.5rem] border-r border-[var(--grid-line)] p-1 sm:min-h-[6.5rem] sm:p-1.5 ${
+                    className={`min-h-[6rem] border-r border-[var(--grid-line)] p-1.5 sm:min-h-[7rem] sm:p-2 ${
                       isToday ? "bg-[#e8f5ee]" : "bg-white"
                     } ${
                       canOpen
@@ -393,7 +393,7 @@ export function MonthCalendarGrid({
                     }`}
                   >
                     <p
-                      className={`mb-1 text-[12px] font-semibold tabular-nums sm:text-[13px] ${
+                      className={`mb-1 text-[13px] font-semibold tabular-nums sm:text-[14px] ${
                         isToday
                           ? "text-[#217346]"
                           : isSun
@@ -405,7 +405,7 @@ export function MonthCalendarGrid({
                     >
                       {Number(day.slice(8, 10))}
                       {isToday ? (
-                        <span className="ml-1 text-[10px] font-medium">
+                        <span className="ml-1 text-[12px] font-medium">
                           오늘
                         </span>
                       ) : null}
@@ -422,7 +422,7 @@ export function MonthCalendarGrid({
                       {dayEvents.slice(0, CHIP_LIMIT).map((ev) => (
                         <li
                           key={ev.id}
-                          className="truncate rounded-sm border-l-2 border-l-[#3b6ea5] bg-[#eef3fa] px-1 py-0.5 text-[11px] leading-snug text-[var(--ink)] sm:text-[12px]"
+                          className="truncate rounded-sm border-l-2 border-l-[#3b6ea5] bg-[#eef3fa] px-1.5 py-1 text-[12px] leading-snug text-[var(--ink)] sm:text-[13px]"
                           title={`${ev.title} · ${formatCalendarWhen(ev)}`}
                           data-cal-event={ev.id}
                           data-cal-single="1"
@@ -437,7 +437,7 @@ export function MonthCalendarGrid({
                           <button
                             type="button"
                             data-cal-overflow
-                            className="rounded px-1 text-[10px] font-medium text-[var(--ink-muted)] underline-offset-2 hover:text-[#217346] hover:underline"
+                            className="rounded px-1 text-[12px] font-medium text-[var(--ink-muted)] underline-offset-2 hover:text-[#217346] hover:underline"
                             onClick={(e) => {
                               e.stopPropagation();
                               openDay(day);
@@ -465,7 +465,7 @@ export function MonthCalendarGrid({
                     data-cal-span-start={range.startDay}
                     data-cal-span-end={range.endDay}
                     title={`${seg.event.title} · ${range.startDay} ~ ${range.endDay}`}
-                    className={`pointer-events-none absolute z-[1] truncate px-1.5 py-0.5 text-[11px] font-medium leading-tight text-white sm:text-[12px] ${
+                    className={`pointer-events-none absolute z-[1] truncate px-1.5 py-1 text-[12px] font-medium leading-snug text-white sm:text-[13px] ${
                       seg.continuesLeft ? "rounded-l-none" : "rounded-l-md"
                     } ${
                       seg.continuesRight ? "rounded-r-none" : "rounded-r-md"
@@ -499,10 +499,10 @@ export function MonthCalendarGrid({
           className="w-[min(100%,22rem)] gap-0 border-[var(--grid-line)] bg-[var(--sheet)] p-0 sm:max-w-sm"
         >
           <SheetHeader className="border-b border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-3.5 pr-12">
-            <SheetTitle className="text-[15px] font-semibold text-[var(--ink)]">
+            <SheetTitle className="text-[16px] font-semibold text-[var(--ink)]">
               {selectedDay ? dayHeadingKo(selectedDay) : "일정"}
             </SheetTitle>
-            <SheetDescription className="text-[13px] text-[var(--ink-muted)]">
+            <SheetDescription className="text-[14px] text-[var(--ink-muted)]">
               {detailEvents.length > 0
                 ? `이 날 일정 ${detailEvents.length}건`
                 : "일정이 없습니다"}
@@ -521,14 +521,14 @@ export function MonthCalendarGrid({
                   data-cal-day-detail-span={multi ? "1" : "0"}
                   className="border-b border-[var(--grid-line)]/70 px-1 py-3 last:border-b-0"
                 >
-                  <p className="text-[14px] leading-snug font-medium break-words text-[var(--ink)]">
+                  <p className="text-[15px] leading-snug font-medium break-words text-[var(--ink)]">
                     {ev.title}
                   </p>
-                  <p className="mt-1 text-[12px] tabular-nums text-[var(--ink-muted)]">
+                  <p className="mt-1 text-[13px] tabular-nums text-[var(--ink-muted)]">
                     {formatCalendarDayDetailWhen(ev)}
                   </p>
                   {ev.calendarName ? (
-                    <p className="mt-0.5 text-[11px] text-[var(--ink-muted)]">
+                    <p className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
                       {ev.calendarName}
                     </p>
                   ) : null}

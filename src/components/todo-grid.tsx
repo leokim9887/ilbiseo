@@ -83,7 +83,7 @@ export function TodoGrid({
       <div className="overflow-x-auto rounded-lg border border-[var(--grid-line)] bg-[var(--sheet)]">
         <table className="w-full min-w-[920px] border-collapse text-[15px]">
           <thead className="sticky top-0 z-10">
-            <tr className="bg-[var(--brand)] text-left text-[13px] font-semibold text-[var(--primary-foreground)]">
+            <tr className="bg-[var(--brand)] text-left text-[14px] font-semibold text-[var(--primary-foreground)]">
               <th className="w-12 px-3 py-3 text-center">완료</th>
               <th className="min-w-[200px] px-3 py-3">제목</th>
               <th className="w-[140px] px-3 py-3">종류</th>
@@ -107,7 +107,7 @@ export function TodoGrid({
                   >
                     <td
                       colSpan={hideCategory ? 8 : 9}
-                      className="border-b border-[var(--grid-line)] px-3 py-2 text-[12px] font-semibold tracking-wide text-[var(--brand)]"
+                      className="border-b border-[var(--grid-line)] px-3 py-2 text-[13px] font-semibold tracking-wide text-[var(--brand)]"
                     >
                       {row.label}
                     </td>
@@ -260,7 +260,7 @@ export function TodoGrid({
           행 추가
         </Button>
       ) : null}
-      <p className="text-[12px] text-[var(--ink-muted)]">
+      <p className="text-[13px] text-[var(--ink-muted)]">
         정렬: 스팟 → 지속 → 언젠가 · 칸을 바로 고치면 저장됩니다 · 완료 체크 시
         한 일로 이동
       </p>

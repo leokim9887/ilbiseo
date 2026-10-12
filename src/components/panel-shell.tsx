@@ -37,7 +37,7 @@ export function PanelShell({
             </h2>
           </div>
           {description ? (
-            <p className="max-w-2xl text-sm leading-relaxed text-[var(--ink-muted)]">
+            <p className="max-w-2xl text-[15px] leading-relaxed text-[var(--ink-muted)]">
               {description}
             </p>
           ) : null}
@@ -61,7 +61,7 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-12 text-center">
       <p className="text-base font-semibold text-[var(--ink)]">{title}</p>
-      <p className="max-w-sm text-sm leading-relaxed text-[var(--ink-muted)]">
+      <p className="max-w-sm text-[15px] leading-relaxed text-[var(--ink-muted)]">
         {description}
       </p>
       {action}

@@ -305,7 +305,7 @@ export function DailyBriefingPanel({
       <div className="space-y-5">
         <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-4 space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="work-email" className="text-xs">
+            <Label htmlFor="work-email" className="text-[14px]">
               아버지 메일 (고정)
             </Label>
             <Input
@@ -316,7 +316,7 @@ export function DailyBriefingPanel({
               aria-readonly="true"
               className="h-11 bg-[var(--sheet-header)] text-[var(--ink)]"
             />
-            <p className="text-[11px] text-[var(--ink-muted)]">
+            <p className="text-[13px] text-[var(--ink-muted)]">
               발신·수신 모두 {FATHER_EMAIL} · 네이버 SMTP (도메인 인증 불필요)
             </p>
           </div>
@@ -335,7 +335,7 @@ export function DailyBriefingPanel({
             />
             <span>
               <span className="font-semibold">매일 08:00(KST) 자동 발송</span>
-              <span className="mt-0.5 block text-[12px] text-[var(--ink-muted)]">
+              <span className="mt-0.5 block text-[13px] text-[var(--ink-muted)]">
                 켜면 이 기기의 할 일·캘린더를 서버에 동기화해 크론이 보낼 수
                 있습니다. Vercel에서는 Upstash Redis도 필요합니다.
               </span>
@@ -356,13 +356,13 @@ export function DailyBriefingPanel({
             />
             <span>
               <span className="font-semibold">엑셀(xlsx) 첨부</span>
-              <span className="mt-0.5 block text-[12px] text-[var(--ink-muted)]">
+              <span className="mt-0.5 block text-[13px] text-[var(--ink-muted)]">
                 당일 스냅샷 파일을 메일 첨부합니다.
               </span>
             </span>
           </label>
 
-          <p className="text-[13px] text-[var(--ink)]">
+          <p className="text-[14px] text-[var(--ink)]">
             다음 예정:{" "}
             <strong className="tabular-nums">{nextLabel}</strong>
             <span className="text-[var(--ink-muted)]">
@@ -411,13 +411,13 @@ export function DailyBriefingPanel({
             </Button>
           </div>
 
-          <p className="text-[12px] text-[var(--ink-muted)]">
+          <p className="text-[13px] text-[var(--ink-muted)]">
             {FATHER_EMAIL} · 매일 발송{" "}
             {settings.dailyEmailEnabled ? "켜짐" : "꺼짐"} ·{" "}
             NAVER_SMTP_PASSWORD 없으면 발송 안 함
           </p>
           {syncNote ? (
-            <p className="text-[12px] text-[var(--ink-muted)]">{syncNote}</p>
+            <p className="text-[13px] text-[var(--ink-muted)]">{syncNote}</p>
           ) : null}
         </div>
 
@@ -457,7 +457,7 @@ export function DailyBriefingPanel({
                   <div key={section.kind} className="mb-3">
                     <p className="mb-1 text-sm font-medium">
                       {section.title}{" "}
-                      <span className="text-[11px] text-[var(--ink-muted)]">
+                      <span className="text-[13px] text-[var(--ink-muted)]">
                         {section.summary}
                       </span>
                     </p>
@@ -476,13 +476,13 @@ export function DailyBriefingPanel({
                             ) : null}
                             {line.title}
                           </p>
-                          <p className="text-[11px] text-[var(--ink-muted)]">
+                          <p className="text-[13px] text-[var(--ink-muted)]">
                             {line.categoryLabel} · {line.importanceLabel} ·{" "}
                             {line.urgencyLabel}
                             {line.targetDate ? ` · 기한 ${line.targetDate}` : ""}
                           </p>
                           {line.memo ? (
-                            <p className="text-[11px] text-[var(--ink-muted)]">
+                            <p className="text-[13px] text-[var(--ink-muted)]">
                               메모: {line.memo}
                             </p>
                           ) : null}

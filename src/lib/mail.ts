@@ -169,14 +169,18 @@ export async function sendBriefingEmail(opts: {
 }
 
 export function authorizeCron(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    if (process.env.VERCEL === "1") return false;
-    return true;
-  }
+  const secret = process.env.CRON_SECRET?.trim();
   const auth = request.headers.get("authorization");
-  if (auth === `Bearer ${secret}`) return true;
   const url = new URL(request.url);
-  if (url.searchParams.get("secret") === secret) return true;
-  return false;
+  const isVercelCron = request.headers.get("x-vercel-cron") === "1";
+
+  if (secret) {
+    if (auth === `Bearer ${secret}`) return true;
+    if (url.searchParams.get("secret") === secret) return true;
+    return false;
+  }
+
+  // CRON_SECRET 미설정: 로컬은 허용. Vercel은 플랫폼 cron 헤더만 허용.
+  if (process.env.VERCEL === "1") return isVercelCron;
+  return true;
 }

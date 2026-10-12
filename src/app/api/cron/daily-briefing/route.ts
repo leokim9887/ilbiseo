@@ -25,12 +25,37 @@ async function runCron(request: Request) {
     );
   }
 
+  const url = new URL(request.url);
+  const probeOnly = url.searchParams.get("probe") === "1";
+
   const snapshot = await loadBriefingSnapshot();
+  if (probeOnly) {
+    return NextResponse.json({
+      ok: true,
+      probe: true,
+      schedule: "0 23 * * * UTC (= 08:00 Asia/Seoul)",
+      to: FATHER_EMAIL,
+      transport: mailTransportLabel(),
+      hasMailTransport: hasMailTransport(),
+      storeMode: snapshotStoreMode(),
+      hasSnapshot: Boolean(snapshot),
+      dailyEmailEnabled: snapshot?.dailyEmailEnabled ?? false,
+      attachXlsx: snapshot?.attachXlsx ?? true,
+      updatedAt: snapshot?.updatedAt ?? null,
+      taskCount: snapshot?.tasks?.length ?? 0,
+      readyToSend: Boolean(
+        snapshot?.dailyEmailEnabled &&
+          hasMailTransport() &&
+          snapshotStoreMode() !== "none",
+      ),
+    });
+  }
+
   if (!snapshot) {
     return NextResponse.json({
       ok: false,
       error:
-        "저장된 브리핑 스냅샷이 없습니다. 앱에서 매일 발송을 켠 뒤 한 번 열어 동기화하세요.",
+        "저장된 브리핑 스냅샷이 없습니다. 앱에서 매일 발송을 켠 뒤 「서버에 지금 동기화」를 누르세요.",
       storeMode: snapshotStoreMode(),
     });
   }
@@ -39,7 +64,7 @@ async function runCron(request: Request) {
     return NextResponse.json({
       ok: true,
       skipped: true,
-      reason: "매일 발송이 꺼져 있습니다.",
+      reason: "매일 발송이 꺼져 있습니다. 앱에서 「매일 08:00(KST) 자동 발송」을 켜세요.",
       updatedAt: snapshot.updatedAt,
     });
   }

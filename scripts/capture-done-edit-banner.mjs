@@ -142,10 +142,10 @@ async function shot(page, name, clip) {
     const box = await banner.boundingBox();
     if (box) {
       await shot(page, "ilbiseo-family-banner-pc.png", {
-        x: Math.max(0, box.x - 8),
-        y: Math.max(0, box.y - 8),
-        width: Math.min(1264, box.width + 16),
-        height: Math.min(400, box.height + 16),
+        x: Math.max(0, Math.floor(box.x - 8)),
+        y: Math.max(0, Math.floor(box.y - 8)),
+        width: Math.ceil(box.width + 16),
+        height: Math.ceil(box.height + 16),
       });
     }
     await ctx.close();
@@ -170,7 +170,11 @@ async function shot(page, name, clip) {
       content:
         "nextjs-portal,[data-nextjs-toast],[data-nextjs-dev-overlay]{display:none!important}",
     });
-    await page.locator("nav.fixed ul button", { hasText: "한 일" }).first().click({ force: true });
+    // Desktop top nav (sm:grid); avoid fixed mobile bottom nav
+    await page
+      .locator('nav[aria-label="주요 메뉴"]:not(.fixed) button')
+      .filter({ hasText: /^한 일/ })
+      .click();
     await page.waitForTimeout(600);
     await page.locator("[data-excel-edit]").first().waitFor({ timeout: 10000 });
 

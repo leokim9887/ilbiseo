@@ -12,14 +12,15 @@ export function FamilyBanner() {
       aria-label="가족 응원 배너"
       data-family-banner
     >
-      <div className="relative aspect-[1680/660] w-full max-h-[17.5rem] lg:max-h-[20.5rem] xl:max-h-[22rem]">
+      {/* Keep aspect = image (1680×700). Avoid max-h that widens the box and crops faces. */}
+      <div className="relative aspect-[1680/700] w-full">
         <Image
           src="/ilbiseo-family-banner.jpg"
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority
           sizes="(min-width: 640px) min(72rem, 100vw), 0px"
-          className="object-cover object-[center_42%]"
+          className="object-cover object-center"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[rgba(22,63,57,0.32)] via-[rgba(22,63,57,0.08)] to-transparent" />
         <div className="absolute inset-y-0 left-0 flex max-w-[min(36rem,52%)] flex-col justify-center px-8 py-6 lg:px-10">

@@ -1,36 +1,67 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { todayIsoKst } from "@/lib/date-range";
 import { Button } from "@/components/ui/button";
 
 const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
+const IDX_KEY = "ilbiseo-daily-cheer-idx";
 
-/** Father-friendly rotating pool — grandson cheering grandpa. */
-const CHEER_MESSAGES = [
+/** Father-friendly rotating pool — Ace cheering grandpa. */
+export const CHEER_MESSAGES = [
   "할아버지, 오늘도 화이팅이에요!",
   "할아버지 최고! 오늘 하루도 힘차게 가요!",
-  "손자가 응원해요. 언제나 화이팅!",
+  "에이스가 응원해요. 언제나 화이팅!",
   "할아버지, 오늘 할 일도 잘 해내실 거예요!",
-  "씩씩한 할아버지! 손자가 옆에서 응원할게요.",
+  "씩씩한 할아버지! 에이스가 옆에서 응원할게요.",
   "오늘도 건강하게, 천천히, 화이팅!",
   "할아버지 미소가 제일 좋아요. 오늘도 화이팅!",
-  "할 일 하나하나, 손자가 응원합니다!",
+  "할 일 하나하나, 에이스가 응원합니다!",
   "할아버지, 잠시 쉬어도 괜찮아요. 그래도 화이팅!",
   "오늘 하루도 든든한 할아버지! 화이팅입니다!",
-  "손자 응원 도착! 할아버지, 파이팅!",
+  "에이스 응원 도착! 할아버지, 파이팅!",
   "할아버지가 하면 다 잘돼요. 오늘도 화이팅!",
 ] as const;
 
-function pickMessage(dayKey: string): string {
-  let hash = 0;
-  for (let i = 0; i < dayKey.length; i++) {
-    hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
+function readIdx(
+  storage: Pick<Storage, "getItem"> | null,
+): number {
+  try {
+    const raw = storage?.getItem(IDX_KEY);
+    const idx = Number.parseInt(raw ?? "0", 10);
+    if (!Number.isFinite(idx) || idx < 0) return 0;
+    return idx;
+  } catch {
+    return 0;
   }
-  // Light day-to-day rotation; still stable within the same KST day
-  const idx = hash % CHEER_MESSAGES.length;
-  return CHEER_MESSAGES[idx]!;
+}
+
+/** Peek current rotation phrase without advancing (Strict Mode safe). */
+export function peekCheerMessage(
+  storage: Pick<Storage, "getItem"> | null = null,
+): { message: string; nextIdx: number } {
+  const store =
+    storage ?? (typeof localStorage !== "undefined" ? localStorage : null);
+  const idx = readIdx(store);
+  return {
+    message: CHEER_MESSAGES[idx % CHEER_MESSAGES.length]!,
+    nextIdx: idx + 1,
+  };
+}
+
+/** Advance rotation after a daily show is dismissed. */
+export function commitCheerIndex(
+  nextIdx: number,
+  storage: Pick<Storage, "setItem"> | null = null,
+): void {
+  try {
+    const store =
+      storage ?? (typeof localStorage !== "undefined" ? localStorage : null);
+    store?.setItem(IDX_KEY, String(nextIdx));
+  } catch {
+    /* ignore */
+  }
 }
 
 function readShownDay(): string | null {
@@ -51,22 +82,33 @@ function writeShownDay(day: string) {
 
 /**
  * Once per KST calendar day on first open of this device:
- * warm overlay with grandson face + rotating cheer message.
+ * warm overlay with Ace face + rotating cheer message.
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);
-  const dayKey = useMemo(() => todayIsoKst(), []);
-  const message = useMemo(() => pickMessage(dayKey), [dayKey]);
+  const [message, setMessage] = useState("");
+  const nextIdxRef = useRef<number | null>(null);
+  const openedRef = useRef(false);
 
   useEffect(() => {
+    if (openedRef.current) return;
+    const dayKey = todayIsoKst();
     if (readShownDay() === dayKey) return;
+    openedRef.current = true;
+    const { message: msg, nextIdx } = peekCheerMessage();
+    nextIdxRef.current = nextIdx;
+    setMessage(msg);
     setOpen(true);
-  }, [dayKey]);
+  }, []);
 
   const dismiss = useCallback(() => {
-    writeShownDay(dayKey);
+    if (nextIdxRef.current != null) {
+      commitCheerIndex(nextIdxRef.current);
+      nextIdxRef.current = null;
+    }
+    writeShownDay(todayIsoKst());
     setOpen(false);
-  }, [dayKey]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -87,7 +129,7 @@ export function DailyCheerOverlay() {
       className="animate-fade-up fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(12,28,26,0.55)] px-4 backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="daily-cheer-title"
+      aria-label="에이스 응원"
       data-daily-cheer
       onClick={dismiss}
     >
@@ -96,15 +138,7 @@ export function DailyCheerOverlay() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative overflow-hidden rounded-3xl border border-[#c9b27c]/45 bg-[linear-gradient(165deg,#f7f3ea_0%,#efe8d8_48%,#e7dfd0_100%)] px-5 pb-5 pt-6 shadow-[0_18px_48px_rgba(8,24,22,0.35)] sm:px-6 sm:pb-6 sm:pt-7">
-          <p
-            id="daily-cheer-title"
-            className="text-center font-sans text-[13px] font-medium tracking-wide text-[#5c6b66]"
-          >
-            손자 응원 · 오늘 한 번
-          </p>
-
-          <div className="relative mx-auto mt-4 flex w-fit flex-col items-center">
-            {/* Speech bubble */}
+          <div className="relative mx-auto flex w-fit flex-col items-center">
             <div
               className="relative mb-3 max-w-[18rem] rounded-2xl bg-white px-4 py-3 text-center shadow-sm ring-1 ring-[#163f39]/10"
               data-daily-cheer-bubble
@@ -118,7 +152,6 @@ export function DailyCheerOverlay() {
               />
             </div>
 
-            {/* Character frame — real grandson photo */}
             <div className="relative size-[9.5rem] sm:size-[10.5rem]">
               <div
                 className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_40%_35%,#f0e6c8_0%,#c9b27c_55%,#8a7340_100%)] opacity-90"
@@ -127,7 +160,7 @@ export function DailyCheerOverlay() {
               <div className="absolute inset-[6px] overflow-hidden rounded-full bg-[#163f39]/10 ring-2 ring-white/80">
                 <Image
                   src="/ilbiseo-grandson-cheer.png"
-                  alt="손자 아기"
+                  alt="에이스"
                   width={640}
                   height={640}
                   priority
@@ -138,18 +171,14 @@ export function DailyCheerOverlay() {
             </div>
           </div>
 
-          <p className="mt-4 text-center font-sans text-[0.95rem] font-medium text-[#6b5a3a]">
-            언제나 화이팅입니다!
-          </p>
-
           <Button
             type="button"
             size="lg"
-            className="mt-4 min-h-12 w-full touch-manipulation text-[1.05rem] font-semibold sm:min-h-11"
+            className="mt-5 min-h-12 w-full touch-manipulation text-[1.05rem] font-semibold sm:min-h-11"
             onClick={dismiss}
             data-daily-cheer-confirm
           >
-            확인
+            시작
           </Button>
         </div>
       </div>

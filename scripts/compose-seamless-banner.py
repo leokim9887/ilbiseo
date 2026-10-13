@@ -279,33 +279,69 @@ def calm_wash(canvas: Image.Image, left_w: int, bottom_h: int) -> None:
     canvas.alpha_composite(wash.filter(ImageFilter.GaussianBlur(radius=8)))
 
 
-def mist_right(canvas: Image.Image) -> None:
+def mist_right(canvas: Image.Image, strength: float = 1.0) -> None:
     w, h = canvas.size
     mist = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     md = ImageDraw.Draw(mist)
     for x in range(w):
         t = x / (w - 1)
-        a = int(24 * (t**1.45))
+        a = int(24 * strength * (t**1.45))
         md.line([(x, 0), (x, h)], fill=(*BG, a))
     canvas.alpha_composite(mist.filter(ImageFilter.GaussianBlur(radius=10)))
 
 
-def compose_pc(fam_src: Image.Image) -> Image.Image:
-    W, H = PC
-    canvas = city_atmosphere(fam_src, W, H)
-    mist_right(canvas)
+def soften_blob_edge(layer: Image.Image, radius: int = 16) -> Image.Image:
+    """Softer vignette on alpha only — RGB / face geometry unchanged.
 
-    # Wider plane — slightly contained so soft mask doesn't eat chin / elder
+    Uses darker(original, blurred) so the opaque face core stays solid and
+    edges feather inward without expanding a bright halo.
+    """
+    a = layer.getchannel("A")
+    soft = a.filter(ImageFilter.GaussianBlur(radius=radius))
+    # Never expand beyond original alpha (avoids light fringe)
+    a_out = ImageChops.darker(a, soft)
+    # Restore solid core so faces aren't eaten by the blur
+    core = a.point(lambda p: 255 if p >= 250 else 0)
+    a_out = ImageChops.lighter(a_out, core)
+    out = layer.copy()
+    out.putalpha(a_out)
+    return out
+
+
+def city_atmosphere_pc(fam_src: Image.Image, w: int, h: int) -> Image.Image:
+    """PC-only background polish — slightly calmer / deeper blur (no family change)."""
+    sky = box_crop_frac(fam_src, 0.0, 0.0, 1.0, 0.52)
+    atm = fit_cover(sky, w, h)
+    atm = ImageEnhance.Brightness(atm).enhance(0.58)
+    atm = ImageEnhance.Color(atm).enhance(0.76)
+    atm = atm.filter(ImageFilter.GaussianBlur(radius=28))
+    # Soft teal veil so family edge blends into atmosphere
+    veil = Image.new("RGBA", (w, h), (*TEAL, 28))
+    out = atm.convert("RGBA")
+    out.alpha_composite(veil)
+    return out
+
+
+def compose_pc(fam_src: Image.Image) -> Image.Image:
+    """PC banner — family crop/scale/placement frozen; only bg + edge blend polish."""
+    W, H = PC
+    canvas = city_atmosphere_pc(fam_src, W, H)
+    mist_right(canvas, strength=1.15)
+
+    # LOCKED family geometry (do not change scale/crop/anchor/paste — faces stay as shipped)
     fw, fh = 1240, H
     family = family_plane(
         fam_src, fw, fh, scale_boost=1.04, anchor_x=0.34, anchor_y=0.50
     )
     family = ImageEnhance.Brightness(family).enhance(1.05)
     family = ImageEnhance.Color(family).enhance(1.0)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
+    # Edge-only: softer blob vignette + longer right fade into background
+    family = soften_blob_edge(family, radius=18)
+    fam_mask = soft_right_fade((fw, fh), fade_start=0.78)
+    fam_mask = fam_mask.filter(ImageFilter.GaussianBlur(radius=10))
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Baby — largest inset
+    # Baby / pets — placement unchanged (family-edge polish only)
     baby = night_grade(
         cover_crop(load("04-baby.png"), 560, 610, bias=(0.5, 0.16)), strength=0.34
     )
@@ -323,15 +359,16 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)
-    for x in range(800, 1120):
+    for x in range(780, 1140):
         mid = 960
-        dist = abs(x - mid) / 180
+        dist = abs(x - mid) / 200
         peak = max(0.0, 1.0 - dist)
-        a = int(10 * peak * peak)
+        a = int(14 * peak * peak)
         bd.line([(x, 0), (x, H)], fill=(30, 50, 55, a))
-    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=16)))
+    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=22)))
 
-    calm_wash(canvas, left_w=420, bottom_h=150)
+    # Gentler wash — keep motto readable without hard edge against family
+    calm_wash(canvas, left_w=400, bottom_h=140)
     return canvas.convert("RGB")
 
 
@@ -407,19 +444,27 @@ def save_png(im: Image.Image, path: Path) -> None:
 
 
 def main() -> None:
+    import sys
+
+    # --pc-only: polish PC edge/bg without rewriting mobile family crop
+    pc_only = "--pc-only" in sys.argv
     fam_src = load("05-family.jpg")
     pc = compose_pc(fam_src)
-    mobile = compose_mobile(fam_src)
-    cheer = compose_grandson_cheer_face()
 
     save_jpeg(pc, OUT_PUBLIC / "ilbiseo-family-banner-pc.jpg")
-    save_jpeg(mobile, OUT_PUBLIC / "ilbiseo-family-banner-mobile.jpg")
     save_jpeg(pc, OUT_PUBLIC / "ilbiseo-family-banner.jpg")
-    save_png(cheer, OUT_PUBLIC / "ilbiseo-grandson-cheer.png")
-
     save_jpeg(pc, OUT_MEDIA / "ilbiseo-family-banner-pc.jpg")
-    save_jpeg(mobile, OUT_MEDIA / "ilbiseo-family-banner-mobile.jpg")
     save_jpeg(pc, OUT_MEDIA / "ilbiseo-family-banner.jpg")
+
+    if pc_only:
+        print("pc-only: left mobile banner + cheer face untouched")
+        return
+
+    mobile = compose_mobile(fam_src)
+    cheer = compose_grandson_cheer_face()
+    save_jpeg(mobile, OUT_PUBLIC / "ilbiseo-family-banner-mobile.jpg")
+    save_png(cheer, OUT_PUBLIC / "ilbiseo-grandson-cheer.png")
+    save_jpeg(mobile, OUT_MEDIA / "ilbiseo-family-banner-mobile.jpg")
     save_png(cheer, OUT_MEDIA / "ilbiseo-grandson-cheer.png")
 
 

@@ -38,7 +38,7 @@ export function FamilyBanner({
         />
         {/* PC asset */}
         <Image
-          src="/ilbiseo-family-banner-pc.jpg?v=15"
+          src="/ilbiseo-family-banner-pc.jpg?v=16"
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority

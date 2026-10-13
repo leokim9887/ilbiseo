@@ -60,7 +60,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
-import { ExcelImport } from "@/components/excel-import";
 import { ToolbarExtras } from "@/components/toolbar-extras";
 import {
   ArrowDown,
@@ -767,14 +766,11 @@ export function ExcelWorkbook({
               </Button>
             ) : null}
             {isTaskCategory(frame) ? (
-              <>
-                <ExcelImport
-                  category={frame}
-                  onImport={onImport}
-                  onReplaceCategory={onReplaceCategory}
-                />
-                <ToolbarExtras category={frame} onImport={onImport} />
-              </>
+              <ToolbarExtras
+                category={frame}
+                onImport={onImport}
+                onReplaceCategory={onReplaceCategory}
+              />
             ) : null}
           </div>
         ) : null}

@@ -37,6 +37,7 @@ async function sendViaNaverSmtp(opts: {
   to: string;
   subject: string;
   text: string;
+  html?: string;
   filename: string;
   xlsxBase64: string;
   attachXlsx: boolean;
@@ -68,6 +69,7 @@ async function sendViaNaverSmtp(opts: {
       to: opts.to,
       subject: opts.subject,
       text: opts.text,
+      ...(opts.html ? { html: opts.html } : {}),
       attachments: opts.attachXlsx
         ? [
             {
@@ -96,6 +98,7 @@ async function sendViaResendFallback(opts: {
   to: string;
   subject: string;
   text: string;
+  html?: string;
   filename: string;
   xlsxBase64: string;
   attachXlsx: boolean;
@@ -110,6 +113,7 @@ async function sendViaResendFallback(opts: {
     subject: opts.subject,
     text: opts.text,
   };
+  if (opts.html) payload.html = opts.html;
   if (opts.attachXlsx) {
     payload.attachments = [
       { filename: opts.filename, content: opts.xlsxBase64 },
@@ -137,6 +141,7 @@ export async function sendBriefingEmail(opts: {
   to?: string;
   subject: string;
   text: string;
+  html?: string;
   filename: string;
   xlsxBase64: string;
   attachXlsx?: boolean;
@@ -147,6 +152,7 @@ export async function sendBriefingEmail(opts: {
     to,
     subject: opts.subject,
     text: opts.text,
+    html: opts.html,
     filename: opts.filename,
     xlsxBase64: opts.xlsxBase64,
     attachXlsx,

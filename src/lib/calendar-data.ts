@@ -72,9 +72,26 @@ export function createMockCalendarEvents(): CalendarEvent[] {
 
 export { parseIcsToEvents, importIcsFromInput, looksLikeCalendarUrl } from "./ics";
 
+/**
+ * When label for lists / Excel / briefing.
+ * Multi-day → one string with full inclusive range, e.g. `2026-10-14 ~ 2026-10-21`.
+ * Never expands to one row per day.
+ */
 export function formatCalendarWhen(ev: CalendarEvent): string {
+  const range = eventInclusiveDayRange(ev);
   if (ev.allDay || ev.start.length === 10) {
-    return ev.start.slice(0, 10);
+    if (range.multiDay) {
+      return `${range.startDay} ~ ${range.endDay}`;
+    }
+    return range.startDay;
+  }
+  if (range.multiDay) {
+    const startClock = formatClock(ev.start);
+    const endClock = ev.end ? formatClock(ev.end) : "";
+    if (endClock) {
+      return `${range.startDay} ${startClock} ~ ${range.endDay} ${endClock}`;
+    }
+    return `${range.startDay} ~ ${range.endDay}`;
   }
   try {
     return new Date(ev.start).toLocaleString("ko-KR", {
@@ -86,6 +103,20 @@ export function formatCalendarWhen(ev: CalendarEvent): string {
   } catch {
     return ev.start;
   }
+}
+
+/** Events whose inclusive range overlaps [fromDay, toDay] (YYYY-MM-DD). */
+export function filterCalendarEventsInWindow(
+  events: readonly CalendarEvent[],
+  fromDay: string,
+  toDay: string,
+): CalendarEvent[] {
+  const fs = fromDay <= toDay ? fromDay : toDay;
+  const fe = fromDay <= toDay ? toDay : fromDay;
+  return events.filter((e) => {
+    const { startDay, endDay } = eventInclusiveDayRange(e);
+    return startDay <= fe && endDay >= fs;
+  });
 }
 
 function formatClock(iso: string): string {

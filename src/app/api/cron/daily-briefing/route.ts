@@ -107,6 +107,7 @@ async function runCron(request: Request) {
     to: email,
     subject: briefing.headline,
     text: briefing.plaintext,
+    html: briefing.html,
     filename,
     xlsxBase64: base64,
     attachXlsx: snapshot.attachXlsx,

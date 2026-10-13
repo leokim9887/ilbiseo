@@ -11,6 +11,13 @@ import {
 } from "./types";
 import { sortCompleted, sortTasks } from "./sort";
 import { formatCalendarWhen } from "./calendar-data";
+import { eventInclusiveDayRange } from "./calendar-span";
+import {
+  formatDeadlineRange,
+  overlapsPeriod,
+  todayIsoKst,
+  addDaysIso,
+} from "./date-range";
 import {
   importanceLabel,
   priorityTag as makePriorityTag,
@@ -24,6 +31,8 @@ export type BriefingLine = {
   category: TaskCategory;
   categoryLabel: string;
   targetDate: string | null;
+  /** Display 마감목표 — single day or `YYYY-MM-DD ~ YYYY-MM-DD` */
+  deadlineLabel: string;
   importance: number;
   urgency: number;
   importanceLabel: string;
@@ -55,6 +64,7 @@ export type DailyBriefing = {
   guidelineLines: { title: string; memo: string; done: boolean }[];
   habitLines: { title: string; memo: string; done: boolean }[];
   plaintext: string;
+  html: string;
   activeCount: number;
   completedCount: number;
 };
@@ -64,10 +74,6 @@ const SECTION_TITLE: Record<TaskKind, string> = {
   ongoing: "② 지속 — 목표기일까지",
   someday: "③ 언젠가 — 시급·중요 순",
 };
-
-function todayIso(d = new Date()): string {
-  return d.toISOString().slice(0, 10);
-}
 
 function formatKoDate(iso: string): string {
   const [y, m, day] = iso.split("-").map(Number);
@@ -79,12 +85,31 @@ function formatKoDate(iso: string): string {
   });
 }
 
-function nearWindow(dateStr: string, today: string, days = 7): boolean {
-  const t = dateStr.slice(0, 10);
-  if (t < today) return false;
-  const end = new Date(today);
-  end.setDate(end.getDate() + days);
-  return t <= end.toISOString().slice(0, 10);
+/** Inclusive window [today, today+days] overlap for a calendar event. */
+function eventOverlapsNearWindow(
+  ev: CalendarEvent,
+  today: string,
+  days = 7,
+): boolean {
+  const { startDay, endDay } = eventInclusiveDayRange(ev);
+  const windowEnd = addDaysIso(today, days);
+  return startDay <= windowEnd && endDay >= today;
+}
+
+/**
+ * Include task in the morning briefing window when its 마감목표 range
+ * (startDate ~ targetDate, including multi-day) overlaps [today, today+days].
+ * Spot always; high-priority someday always; undated ongoing included as focus.
+ */
+function taskInBriefingWindow(t: Task, today: string, days = 7): boolean {
+  if (t.kind === "spot") return true;
+  if (t.kind === "someday") return t.importance >= 3 || t.urgency >= 3;
+  const windowEnd = addDaysIso(today, days);
+  // Range / single-day 마감목표 — must use period overlap (not end-date only)
+  if (t.startDate || t.targetDate) {
+    return overlapsPeriod(t, today, windowEnd);
+  }
+  return true;
 }
 
 function sideLines(items: SideListItem[]) {
@@ -93,6 +118,118 @@ function sideLines(items: SideListItem[]) {
     memo: i.memo,
     done: i.done,
   }));
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildBriefingHtml(opts: {
+  headline: string;
+  summaryLine: string;
+  allLines: BriefingLine[];
+  guidelineLines: { title: string; memo: string; done: boolean }[];
+  habitLines: { title: string; memo: string; done: boolean }[];
+  calendarLines: {
+    when: string;
+    title: string;
+    notes: string;
+    calendarName?: string;
+  }[];
+}): string {
+  const blocks: string[] = [];
+  blocks.push(
+    `<div style="font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:15px;line-height:1.55;color:#1a1f1c;max-width:560px;">`,
+  );
+  blocks.push(
+    `<p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#163F39;">${escapeHtml(opts.headline)}</p>`,
+  );
+  blocks.push(
+    `<p style="margin:0 0 18px;font-size:13px;color:#5a635e;">${escapeHtml(opts.summaryLine)}</p>`,
+  );
+
+  blocks.push(`<p style="margin:0 0 8px;font-size:15px;font-weight:700;">【할 일】</p>`);
+  if (opts.allLines.length === 0) {
+    blocks.push(`<p style="margin:0 0 16px;color:#6a7670;">(활성 할 일 없음)</p>`);
+  } else {
+    for (const cat of CATEGORY_ORDER) {
+      const catLines = opts.allLines.filter((l) => l.category === cat);
+      if (catLines.length === 0) continue;
+      blocks.push(
+        `<p style="margin:12px 0 6px;font-size:14px;font-weight:700;color:#217346;">〔${escapeHtml(CATEGORY_LABEL[cat])}〕</p>`,
+      );
+      blocks.push(`<ul style="margin:0 0 8px;padding-left:18px;">`);
+      for (const line of catLines) {
+        const bits = [
+          line.priorityTag,
+          line.kindLabel,
+          line.deadlineLabel ? `기한 ${line.deadlineLabel}` : null,
+        ].filter(Boolean);
+        blocks.push(`<li style="margin:0 0 10px;">`);
+        blocks.push(
+          `<div style="font-weight:600;">☐ ${escapeHtml(line.title)}</div>`,
+        );
+        if (bits.length) {
+          blocks.push(
+            `<div style="font-size:13px;color:#5a635e;">${escapeHtml(bits.join(" · "))}</div>`,
+          );
+        }
+        if (line.memo) {
+          blocks.push(
+            `<div style="font-size:13px;color:#454d48;">메모: ${escapeHtml(line.memo)}</div>`,
+          );
+        }
+        blocks.push(`</li>`);
+      }
+      blocks.push(`</ul>`);
+    }
+  }
+
+  if (opts.guidelineLines.length > 0) {
+    blocks.push(
+      `<p style="margin:16px 0 6px;font-size:15px;font-weight:700;">【${escapeHtml(SIDE_LIST_LABEL.guideline)}】</p>`,
+    );
+    blocks.push(`<ul style="margin:0 0 8px;padding-left:18px;">`);
+    for (const line of opts.guidelineLines) {
+      blocks.push(
+        `<li style="margin:0 0 6px;">${line.done ? "☑" : "☐"} ${escapeHtml(line.title)}${line.memo ? ` <span style="color:#5a635e;">— ${escapeHtml(line.memo)}</span>` : ""}</li>`,
+      );
+    }
+    blocks.push(`</ul>`);
+  }
+
+  if (opts.habitLines.length > 0) {
+    blocks.push(
+      `<p style="margin:16px 0 6px;font-size:15px;font-weight:700;">【${escapeHtml(SIDE_LIST_LABEL.habit)}】</p>`,
+    );
+    blocks.push(`<ul style="margin:0 0 8px;padding-left:18px;">`);
+    for (const line of opts.habitLines) {
+      blocks.push(
+        `<li style="margin:0 0 6px;">${line.done ? "☑" : "☐"} ${escapeHtml(line.title)}${line.memo ? ` <span style="color:#5a635e;">— ${escapeHtml(line.memo)}</span>` : ""}</li>`,
+      );
+    }
+    blocks.push(`</ul>`);
+  }
+
+  if (opts.calendarLines.length > 0) {
+    blocks.push(
+      `<p style="margin:16px 0 6px;font-size:15px;font-weight:700;">【구글 캘린더】</p>`,
+    );
+    blocks.push(`<ul style="margin:0;padding-left:18px;">`);
+    for (const c of opts.calendarLines) {
+      blocks.push(
+        `<li style="margin:0 0 8px;"><span style="color:#5a635e;">${escapeHtml(c.when)}</span> · <strong>${escapeHtml(c.title)}</strong>${c.notes ? `<div style="font-size:13px;color:#6a7670;">${escapeHtml(c.notes)}</div>` : ""}</li>`,
+      );
+    }
+    blocks.push(`</ul>`);
+  }
+
+  blocks.push(`</div>`);
+  return blocks.join("");
 }
 
 export function buildDailyBriefing(
@@ -104,14 +241,10 @@ export function buildDailyBriefing(
 ): DailyBriefing {
   const sorted = sortTasks(tasks);
   const completed = sortCompleted(tasks);
-  const date = todayIso(now);
+  // Always KST calendar day — UTC toISOString caused "하루 앞" 날짜
+  const date = todayIsoKst(now);
 
-  const focus = sorted.filter((t) => {
-    if (t.kind === "spot") return true;
-    if (t.kind === "someday") return t.importance >= 3 || t.urgency >= 3;
-    if (t.targetDate) return nearWindow(t.targetDate, date, 7);
-    return true;
-  });
+  const focus = sorted.filter((t) => taskInBriefingWindow(t, date, 7));
   const list = focus.length > 0 ? focus : sorted;
 
   const byKind: Record<TaskKind, Task[]> = {
@@ -133,6 +266,7 @@ export function buildDailyBriefing(
         category: t.category,
         categoryLabel: CATEGORY_LABEL[t.category],
         targetDate: t.targetDate,
+        deadlineLabel: formatDeadlineRange(t),
         importance: t.importance,
         urgency: t.urgency,
         importanceLabel: importanceLabel(t.importance),
@@ -150,7 +284,7 @@ export function buildDailyBriefing(
     });
 
   const calendarLines = calendarEvents
-    .filter((e) => nearWindow(e.start, date, 7))
+    .filter((e) => eventOverlapsNearWindow(e, date, 7))
     .sort((a, b) => a.start.localeCompare(b.start))
     .map((e) => ({
       when: formatCalendarWhen(e),
@@ -165,21 +299,13 @@ export function buildDailyBriefing(
   const openHabits = habitLines.filter((h) => !h.done).length;
 
   const headline = `일비서 브리핑 · ${formatKoDate(date)}`;
-  const summaryLine = `할 일 ${list.length}건 · 지침 ${openGuidelines}건 · 습관 ${openHabits}건 · 캘린더(근접) ${calendarLines.length}건 · 한 일 ${completed.length}건`;
+  const summaryLine = `할 일 ${list.length}건 · 지침 ${openGuidelines}건 · 습관 ${openHabits}건 · 캘린더 ${calendarLines.length}건`;
 
-  const parts: string[] = [
-    headline,
-    summaryLine,
-    "※ 【할 일】(틀별) · 【지침】 · 【습관】 · 【구글 캘린더】를 구분합니다.",
-    "",
-    "【할 일】",
-  ];
+  const parts: string[] = [headline, summaryLine, "", "【할 일】"];
 
-  // Group by 틀 (category), then by kind section order for readability
   const allLines = sections.flatMap((s) => s.lines);
   if (allLines.length === 0) {
-    parts.push("  (활성 할 일 없음)");
-    parts.push("");
+    parts.push("(활성 할 일 없음)", "");
   } else {
     for (const cat of CATEGORY_ORDER) {
       const catLines = allLines.filter((l) => l.category === cat);
@@ -189,15 +315,13 @@ export function buildDailyBriefing(
         const meta = [
           line.priorityTag,
           line.kindLabel,
-          `중요 ${line.importance}(${line.importanceLabel})`,
-          `시급 ${line.urgency}(${line.urgencyLabel})`,
-          line.targetDate ? `기한 ${line.targetDate}` : null,
+          line.deadlineLabel ? `기한 ${line.deadlineLabel}` : null,
         ]
           .filter(Boolean)
           .join(" · ");
-        parts.push(`  ☐ ${line.title}`);
-        parts.push(`    ${meta}`);
-        if (line.memo) parts.push(`    메모: ${line.memo}`);
+        parts.push(`☐ ${line.title}`);
+        if (meta) parts.push(`  ${meta}`);
+        if (line.memo) parts.push(`  메모: ${line.memo}`);
       }
       parts.push("");
     }
@@ -206,8 +330,8 @@ export function buildDailyBriefing(
   if (guidelineLines.length > 0) {
     parts.push(`【${SIDE_LIST_LABEL.guideline}】`);
     for (const line of guidelineLines) {
-      parts.push(`  ${line.done ? "☑" : "☐"} ${line.title}`);
-      if (line.memo) parts.push(`    메모: ${line.memo}`);
+      parts.push(`${line.done ? "☑" : "☐"} ${line.title}`);
+      if (line.memo) parts.push(`  메모: ${line.memo}`);
     }
     parts.push("");
   }
@@ -215,8 +339,8 @@ export function buildDailyBriefing(
   if (habitLines.length > 0) {
     parts.push(`【${SIDE_LIST_LABEL.habit}】`);
     for (const line of habitLines) {
-      parts.push(`  ${line.done ? "☑" : "☐"} ${line.title}`);
-      if (line.memo) parts.push(`    메모: ${line.memo}`);
+      parts.push(`${line.done ? "☑" : "☐"} ${line.title}`);
+      if (line.memo) parts.push(`  메모: ${line.memo}`);
     }
     parts.push("");
   }
@@ -224,11 +348,20 @@ export function buildDailyBriefing(
   if (calendarLines.length > 0) {
     parts.push("【구글 캘린더】");
     for (const c of calendarLines) {
-      const cal = c.calendarName ? ` · ${c.calendarName}` : "";
-      parts.push(`  • ${c.when}  ${c.title}${cal}`);
-      if (c.notes) parts.push(`    ${c.notes}`);
+      parts.push(`• ${c.when}  ${c.title}`);
+      if (c.notes) parts.push(`  ${c.notes}`);
     }
   }
+
+  const plaintext = parts.join("\n").trim() + "\n";
+  const html = buildBriefingHtml({
+    headline,
+    summaryLine,
+    allLines,
+    guidelineLines,
+    habitLines,
+    calendarLines,
+  });
 
   return {
     date,
@@ -239,7 +372,8 @@ export function buildDailyBriefing(
     calendarLines,
     guidelineLines,
     habitLines,
-    plaintext: parts.join("\n").trim() + "\n",
+    plaintext,
+    html,
     activeCount: sorted.length,
     completedCount: completed.length,
   };

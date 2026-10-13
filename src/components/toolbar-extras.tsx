@@ -8,18 +8,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ExcelImport } from "@/components/excel-import";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
 import type { Task, TaskCategory } from "@/lib/types";
-import { ChevronDown, ImageIcon, StickyNote } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, ImageIcon, StickyNote } from "lucide-react";
 
 interface ToolbarExtrasProps {
   category: TaskCategory;
   onImport: (tasks: Task[]) => void;
+  onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
 }
 
-/** 작은 「추가 기능」— 메모·OCR은 메뉴에서만 연다 */
-export function ToolbarExtras({ category, onImport }: ToolbarExtrasProps) {
+/** 작은 「추가 기능」— 엑셀·메모·OCR은 클릭 시에만 메뉴에서 연다 */
+export function ToolbarExtras({
+  category,
+  onImport,
+  onReplaceCategory,
+}: ToolbarExtrasProps) {
+  const [excelOpen, setExcelOpen] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);
   const [ocrOpen, setOcrOpen] = useState(false);
 
@@ -44,7 +51,16 @@ export function ToolbarExtras({ category, onImport }: ToolbarExtrasProps) {
         <DropdownMenuContent align="start" className="min-w-[10.5rem]">
           <DropdownMenuItem
             className="cursor-pointer gap-2 py-2 text-[14px]"
+            onClick={() => setExcelOpen(true)}
+            data-toolbar-extras-excel
+          >
+            <FileSpreadsheet className="size-3.5" />
+            엑셀 불러오기
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer gap-2 py-2 text-[14px]"
             onClick={() => setMemoOpen(true)}
+            data-toolbar-extras-memo
           >
             <StickyNote className="size-3.5" />
             메모 붙여넣기
@@ -52,6 +68,7 @@ export function ToolbarExtras({ category, onImport }: ToolbarExtrasProps) {
           <DropdownMenuItem
             className="cursor-pointer gap-2 py-2 text-[14px]"
             onClick={() => setOcrOpen(true)}
+            data-toolbar-extras-ocr
           >
             <ImageIcon className="size-3.5" />
             사진 OCR
@@ -59,6 +76,14 @@ export function ToolbarExtras({ category, onImport }: ToolbarExtrasProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <ExcelImport
+        category={category}
+        onImport={onImport}
+        onReplaceCategory={onReplaceCategory}
+        showTrigger={false}
+        open={excelOpen}
+        onOpenChange={setExcelOpen}
+      />
       <MemoImport
         category={category}
         onImport={onImport}

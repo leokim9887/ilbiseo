@@ -35,6 +35,10 @@ const TRIVIAL = new Set([
   "중",
   "내",
   "외",
+  "새",
+  "할일",
+  "일정",
+  "메모",
   "a",
   "an",
   "the",
@@ -47,11 +51,20 @@ const TRIVIAL = new Set([
   "on",
 ]);
 
+/** Placeholder / empty-row titles that must never trigger peer alerts. */
+const PLACEHOLDER_TITLES = new Set([
+  "새 할일",
+  "새할일",
+  "할 일",
+  "할일",
+  "제목 없음",
+  "(제목 없음)",
+]);
+
 /**
- * Split title/memo into meaningful tokens (Korean-friendly):
- * spaces + punctuation; drop particles and very short tokens.
- * Long Hangul compounds also yield overlapping bigrams so
- * "병원진료" ≈ "병원 진료" still overlaps.
+ * Split title/memo into meaningful word tokens (Korean-friendly).
+ * Does NOT emit Hangul syllable bigrams — those caused false "already exists"
+ * alerts from partial syllable overlaps between unrelated phrases.
  */
 export function tokenizeMeaningful(text: string): string[] {
   const raw = text
@@ -64,24 +77,15 @@ export function tokenizeMeaningful(text: string): string[] {
 
   const out: string[] = [];
   const seen = new Set<string>();
-  const push = (t: string) => {
-    if (!t || seen.has(t)) return;
-    seen.add(t);
-    out.push(t);
-  };
-
   for (const t of raw) {
     if (TRIVIAL.has(t)) continue;
     const isHangul = /[\uac00-\ud7a3]/.test(t);
+    // Hangul: need ≥2 syllables; Latin/digits: ≥2 chars
+    if (isHangul && t.length < 2) continue;
     if (!isHangul && t.length < 2) continue;
-    if (isHangul && t.length < 1) continue;
-    push(t);
-    // Hangul compound without spaces → syllable bigrams (lower false negatives)
-    if (isHangul && t.length >= 4) {
-      for (let i = 0; i <= t.length - 2; i++) {
-        push(t.slice(i, i + 2));
-      }
-    }
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
   }
   return out;
 }
@@ -98,14 +102,51 @@ export type SimilarityHit = {
   score: number;
 };
 
+function normalizeCompact(text: string): string {
+  return text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
 /**
  * Substantial wording overlap between two fields.
- * Tuned assertive for short Korean titles + memos (fewer false negatives).
+ * Tuned for father UX: only real duplicates / near-duplicates, not loose shares.
  */
 export function wordingSimilarity(
   a: string,
   b: string,
+  opts?: { crossField?: boolean },
 ): { shared: string[]; score: number; substantial: boolean } {
+  const crossField = Boolean(opts?.crossField);
+  const na = normalizeCompact(a);
+  const nb = normalizeCompact(b);
+  if (!na || !nb) {
+    return { shared: [], score: 0, substantial: false };
+  }
+
+  // Exact / near-exact after stripping punctuation · spaces
+  if (na === nb && na.length >= 4) {
+    const ta = tokenizeMeaningful(a);
+    return { shared: ta.length ? ta : [na], score: 1, substantial: true };
+  }
+  if (
+    na.length >= 6 &&
+    nb.length >= 6 &&
+    (na.includes(nb) || nb.includes(na))
+  ) {
+    const shorter = na.length <= nb.length ? na : nb;
+    const longer = na.length > nb.length ? na : nb;
+    if (shorter.length / longer.length >= 0.72) {
+      const ta = tokenizeMeaningful(a);
+      return {
+        shared: ta.length ? ta : [shorter],
+        score: shorter.length / longer.length,
+        substantial: true,
+      };
+    }
+  }
+
   const ta = tokenizeMeaningful(a);
   const tb = tokenizeMeaningful(b);
   if (ta.length === 0 || tb.length === 0) {
@@ -115,38 +156,45 @@ export function wordingSimilarity(
   const shared = [...new Set(ta.filter((t) => setB.has(t)))];
   const union = new Set([...ta, ...tb]);
   const jaccard = shared.length / union.size;
-  const minLen = Math.min(ta.length, tb.length);
-  const hasStrongToken = shared.some((t) => t.length >= 3);
-  // Assertive thresholds:
-  // · 1 strong (≥3 char) shared token
-  // · 2+ shared tokens
-  // · Jaccard ≥ 0.35 with ≥1 shared on short sides
-  const substantial =
-    (shared.length >= 1 && hasStrongToken) ||
-    shared.length >= 2 ||
-    (shared.length >= 1 && minLen <= 4 && jaccard >= 0.35);
+  // Hangul words are usually 2 syllables — length≥2 is already meaningful
+  const strongShared = shared.filter((t) => t.length >= 2);
+
+  // Same-field (title↔title / memo↔memo): careful but catches real dupes
+  // Cross-field (title↔memo): stricter — one shared memo word must not alert
+  let substantial = false;
+  if (crossField) {
+    substantial =
+      (strongShared.length >= 3 && jaccard >= 0.45) ||
+      (strongShared.length >= 2 && jaccard >= 0.6);
+  } else {
+    substantial =
+      (strongShared.length >= 2 && jaccard >= 0.45) ||
+      (strongShared.length >= 1 &&
+        jaccard >= 0.7 &&
+        Math.min(ta.length, tb.length) <= 2);
+  }
+
   return { shared, score: jaccard, substantial };
 }
 
 /**
  * Best cross-field overlap between candidate and another task.
- * Compares title↔title, title↔memo, memo↔title, memo↔memo of the OTHER row only.
  * Never compares candidate.title ↔ candidate.memo (same-row self overlap).
  */
 function crossFieldSimilarity(
   candidate: Pick<Task, "title" | "memo">,
   other: Pick<Task, "title" | "memo">,
 ): { shared: string[]; score: number; substantial: boolean } {
-  const pairs: [string, string][] = [
-    [candidate.title ?? "", other.title ?? ""],
-    [candidate.title ?? "", other.memo ?? ""],
-    [candidate.memo ?? "", other.title ?? ""],
-    [candidate.memo ?? "", other.memo ?? ""],
+  const pairs: { a: string; b: string; crossField: boolean }[] = [
+    { a: candidate.title ?? "", b: other.title ?? "", crossField: false },
+    { a: candidate.memo ?? "", b: other.memo ?? "", crossField: false },
+    { a: candidate.title ?? "", b: other.memo ?? "", crossField: true },
+    { a: candidate.memo ?? "", b: other.title ?? "", crossField: true },
   ];
   let best = { shared: [] as string[], score: 0, substantial: false };
-  for (const [a, b] of pairs) {
+  for (const { a, b, crossField } of pairs) {
     if (!a.trim() || !b.trim()) continue;
-    const result = wordingSimilarity(a, b);
+    const result = wordingSimilarity(a, b, { crossField });
     if (
       result.substantial &&
       (result.score > best.score ||
@@ -159,6 +207,15 @@ function crossFieldSimilarity(
   return best;
 }
 
+function isPlaceholderTitle(title: string): boolean {
+  const t = title.trim().toLowerCase().replace(/\s+/g, "");
+  if (!t) return true;
+  if (PLACEHOLDER_TITLES.has(title.trim()) || PLACEHOLDER_TITLES.has(t)) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Active unfinished peers with similar title/memo.
  * Excludes self by id — same-row title∩memo never triggers.
@@ -168,15 +225,21 @@ export function findSimilarActiveTasks(
   tasks: readonly Task[],
   excludeId?: string,
 ): SimilarityHit[] {
-  const hasContent =
-    Boolean((candidate.title ?? "").trim()) ||
-    Boolean((candidate.memo ?? "").trim());
-  if (!hasContent) return [];
+  const title = (candidate.title ?? "").trim();
+  const memo = (candidate.memo ?? "").trim();
+  // Need real content; placeholders alone never alert
+  if (!title && !memo) return [];
+  if (isPlaceholderTitle(title) && !memo) return [];
+  // Too short to be a meaningful duplicate signal
+  const blob = `${title}${memo}`;
+  if (normalizeCompact(blob).length < 4) return [];
+
   const hits: SimilarityHit[] = [];
   for (const t of tasks) {
     // Hard exclude: never compare a row to itself (title↔memo same row).
     if (excludeId != null && t.id === excludeId) continue;
     if (t.status !== "active") continue;
+    if (isPlaceholderTitle(t.title) && !(t.memo ?? "").trim()) continue;
     const { shared, score, substantial } = crossFieldSimilarity(candidate, t);
     if (!substantial) continue;
     hits.push({ task: t, sharedTokens: shared, score });

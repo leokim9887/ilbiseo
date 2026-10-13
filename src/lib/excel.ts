@@ -7,8 +7,11 @@ import {
 } from "./types";
 import { sortCompleted, sortTasks } from "./sort";
 import type { DailyBriefing } from "./briefing";
-import { formatCalendarWhen } from "./calendar-data";
-import { formatDeadlineRange } from "./date-range";
+import {
+  filterCalendarEventsInWindow,
+  formatCalendarWhen,
+} from "./calendar-data";
+import { addDaysIso, formatDeadlineRange, todayIsoKst } from "./date-range";
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
@@ -157,28 +160,37 @@ export async function buildWorkbook(
     horizontal: "center",
   };
 
+  // 「구글캘린더」: only events within 2 weeks from save (KST), one row per event
+  // (multi-day → full range in 「언제」). No 「캘린더」/「출처」 columns.
   const cal = wb.addWorksheet("구글캘린더", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
   cal.columns = [
-    { header: "언제", key: "when", width: 18 },
+    { header: "언제", key: "when", width: 28 },
     { header: "일정", key: "title", width: 34 },
-    { header: "캘린더", key: "calendarName", width: 16 },
-    { header: "메모", key: "notes", width: 24 },
-    { header: "출처", key: "source", width: 10 },
+    { header: "메모", key: "notes", width: 28 },
   ];
   styleHeader(cal.getRow(1));
-  for (const e of [...calendarEvents].sort((a, b) =>
+  const saveDay = todayIsoKst();
+  const windowEnd = addDaysIso(saveDay, 14);
+  const calInWindow = filterCalendarEventsInWindow(
+    calendarEvents,
+    saveDay,
+    windowEnd,
+  );
+  for (const e of [...calInWindow].sort((a, b) =>
     a.start.localeCompare(b.start),
   )) {
     cal.addRow({
       when: formatCalendarWhen(e),
       title: e.title,
-      calendarName: e.calendarName || "",
       notes: e.notes,
-      source: e.source,
     });
   }
+  cal.getColumn("when").alignment = {
+    wrapText: true,
+    vertical: "middle",
+  };
 
   addSideSheet(wb, "지침", guidelines);
   addSideSheet(wb, "습관", habits);

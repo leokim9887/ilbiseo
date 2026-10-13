@@ -38,14 +38,21 @@ interface ExcelImportProps {
   onImport: (tasks: Task[]) => void;
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
   category: TaskCategory;
+  /** false면 툴바 트리거 없이 open/onOpenChange로만 연다 */
+  showTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ExcelImport({
   onImport,
   onReplaceCategory,
   category,
+  showTrigger = true,
+  open: openProp,
+  onOpenChange,
 }: ExcelImportProps) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [step, setStep] = useState<Step>("pick");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +63,9 @@ export function ExcelImport({
   const [replaceConfirm, setReplaceConfirm] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
 
   const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
 
@@ -80,7 +90,8 @@ export function ExcelImport({
   };
 
   const handleOpenChange = (next: boolean) => {
-    setOpen(next);
+    if (!controlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
     if (!next) reset();
   };
 
@@ -176,20 +187,22 @@ export function ExcelImport({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-11 min-h-11 touch-manipulation rounded-sm border-[#8a939a] bg-white px-3 sm:h-9 sm:min-h-9"
-            data-excel-import
-          >
-            <FileSpreadsheet className="size-3.5" />
-            엑셀 불러오기
-          </Button>
-        }
-      />
+      {showTrigger ? (
+        <DialogTrigger
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-11 min-h-11 touch-manipulation rounded-sm border-[#8a939a] bg-white px-3 sm:h-9 sm:min-h-9"
+              data-excel-import
+            >
+              <FileSpreadsheet className="size-3.5" />
+              엑셀 불러오기
+            </Button>
+          }
+        />
+      ) : null}
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>엑셀 불러오기</DialogTitle>

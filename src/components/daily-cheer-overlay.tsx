@@ -2,17 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { todayIsoKst } from "@/lib/date-range";
+import { cheerDayIsoKst } from "@/lib/date-range";
 import { Button } from "@/components/ui/button";
 
 const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
 const IDX_KEY = "ilbiseo-daily-cheer-idx";
-
-/**
- * TEMP test toggle — set to `false` to restore once-per-KST-day (localStorage).
- * When `true`, Ace cheer shows again on every page refresh/load.
- */
-const FORCE_CHEER_EVERY_LOAD = true;
 
 /** Father-friendly rotating pool — Ace cheering grandpa. */
 export const CHEER_MESSAGES = [
@@ -88,7 +82,7 @@ function writeShownDay(day: string) {
 
 /**
  * Ace cheer overlay — rotating message + 시작.
- * Default: once per KST day. TEMP: FORCE_CHEER_EVERY_LOAD shows on every refresh.
+ * Once per cheer day: Asia/Seoul day boundary at 07:00 (not midnight).
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);
@@ -98,10 +92,8 @@ export function DailyCheerOverlay() {
 
   useEffect(() => {
     if (openedRef.current) return;
-    if (!FORCE_CHEER_EVERY_LOAD) {
-      const dayKey = todayIsoKst();
-      if (readShownDay() === dayKey) return;
-    }
+    const dayKey = cheerDayIsoKst();
+    if (readShownDay() === dayKey) return;
     openedRef.current = true;
     const { message: msg, nextIdx } = peekCheerMessage();
     nextIdxRef.current = nextIdx;
@@ -114,10 +106,7 @@ export function DailyCheerOverlay() {
       commitCheerIndex(nextIdxRef.current);
       nextIdxRef.current = null;
     }
-    // Skip day lock while force-every-load testing is on
-    if (!FORCE_CHEER_EVERY_LOAD) {
-      writeShownDay(todayIsoKst());
-    }
+    writeShownDay(cheerDayIsoKst());
     setOpen(false);
   }, []);
 

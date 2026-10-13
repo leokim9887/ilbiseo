@@ -18,6 +18,36 @@ export function todayIsoKst(d = new Date()): string {
   }).format(d);
 }
 
+/**
+ * Cheer “day” key in Asia/Seoul — boundary at 07:00 KST, not midnight.
+ * Before 07:00 still counts as the previous cheer day; from 07:00 a new
+ * window opens until the next 07:00.
+ */
+export function cheerDayIsoKst(d = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const pick = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "0";
+  const y = pick("year");
+  const m = pick("month");
+  const day = pick("day");
+  let hour = Number.parseInt(pick("hour"), 10);
+  // Some engines report midnight as 24 with hourCycle quirks
+  if (hour === 24) hour = 0;
+  const calendarDay = `${y}-${m}-${day}`;
+  if (!Number.isFinite(hour) || hour < 7) {
+    return addDaysIso(calendarDay, -1);
+  }
+  return calendarDay;
+}
+
 export function addDaysIso(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(y, m - 1, d);

@@ -16,7 +16,6 @@ import {
   formatDeadlineRange,
   overlapsPeriod,
   todayIsoKst,
-  addDaysIso,
 } from "./date-range";
 import {
   importanceLabel,
@@ -85,30 +84,24 @@ function formatKoDate(iso: string): string {
   });
 }
 
-/** Inclusive window [today, today+days] overlap for a calendar event. */
-function eventOverlapsNearWindow(
-  ev: CalendarEvent,
-  today: string,
-  days = 7,
-): boolean {
+/** Calendar event overlaps the briefing day (today KST) only. */
+function eventOverlapsBriefingDay(ev: CalendarEvent, today: string): boolean {
   const { startDay, endDay } = eventInclusiveDayRange(ev);
-  const windowEnd = addDaysIso(today, days);
-  return startDay <= windowEnd && endDay >= today;
+  return startDay <= today && endDay >= today;
 }
 
 /**
- * Include task in the morning briefing window when its 마감목표 range
- * (startDate ~ targetDate, including multi-day) overlaps [today, today+days].
- * Spot always; high-priority someday always; undated ongoing included as focus.
+ * Include task in the morning briefing when its 마감목표 range
+ * (startDate ~ targetDate, including multi-day) overlaps **today only** (KST).
+ * Future ranges like `2026-10-16 ~ 2026-10-17` must not appear on 10-14.
+ * Undated spot / high-priority someday / undated ongoing stay as focus items.
  */
-function taskInBriefingWindow(t: Task, today: string, days = 7): boolean {
+function taskInBriefingWindow(t: Task, today: string): boolean {
+  if (t.startDate || t.targetDate) {
+    return overlapsPeriod(t, today, today);
+  }
   if (t.kind === "spot") return true;
   if (t.kind === "someday") return t.importance >= 3 || t.urgency >= 3;
-  const windowEnd = addDaysIso(today, days);
-  // Range / single-day 마감목표 — must use period overlap (not end-date only)
-  if (t.startDate || t.targetDate) {
-    return overlapsPeriod(t, today, windowEnd);
-  }
   return true;
 }
 
@@ -244,8 +237,9 @@ export function buildDailyBriefing(
   // Always KST calendar day — UTC toISOString caused "하루 앞" 날짜
   const date = todayIsoKst(now);
 
-  const focus = sorted.filter((t) => taskInBriefingWindow(t, date, 7));
-  const list = focus.length > 0 ? focus : sorted;
+  const focus = sorted.filter((t) => taskInBriefingWindow(t, date));
+  // Today-only: do not fall back to all active tasks when nothing overlaps today
+  const list = focus;
 
   const byKind: Record<TaskKind, Task[]> = {
     spot: [],
@@ -284,7 +278,7 @@ export function buildDailyBriefing(
     });
 
   const calendarLines = calendarEvents
-    .filter((e) => eventOverlapsNearWindow(e, date, 7))
+    .filter((e) => eventOverlapsBriefingDay(e, date))
     .sort((a, b) => a.start.localeCompare(b.start))
     .map((e) => ({
       when: formatCalendarWhen(e),

@@ -14,12 +14,39 @@ fs.mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 
+function cheerDayIsoKst(d = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const pick = (type) => parts.find((p) => p.type === type)?.value ?? "0";
+  let hour = Number.parseInt(pick("hour"), 10);
+  if (hour === 24) hour = 0;
+  const calendarDay = `${pick("year")}-${pick("month")}-${pick("day")}`;
+  if (!Number.isFinite(hour) || hour < 7) {
+    const [y, m, day] = calendarDay.split("-").map(Number);
+    const dt = new Date(y, m - 1, day);
+    dt.setDate(dt.getDate() - 1);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  }
+  return calendarDay;
+}
+
 const todayKst = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul",
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
 }).format(new Date());
+const cheerDay = cheerDayIsoKst();
 
 await page.goto(`${BASE}?view=todo`, { waitUntil: "networkidle" });
 await page.evaluate((day) => {
@@ -27,7 +54,7 @@ await page.evaluate((day) => {
   localStorage.setItem("ilbiseo-welcome-seen-v2", "1");
   localStorage.setItem("ilbiseo-install-dismissed-v1", "1");
   localStorage.setItem("ilbiseo-daily-cheer-kst", day);
-}, todayKst);
+}, cheerDay);
 await page.goto(`${BASE}?view=todo`, { waitUntil: "networkidle" });
 await page.waitForTimeout(400);
 // Dismiss cheer if it still appears
@@ -74,8 +101,9 @@ await page.screenshot({
   path: path.join(OUT, "ilbiseo-extras-toolbar-no-standalone-excel.png"),
 });
 
-await page.evaluate((todayIso) => {
-  localStorage.setItem("ilbiseo-daily-cheer-kst", todayIso);
+await page.evaluate(
+  ({ todayIso, cheerDayKey }) => {
+  localStorage.setItem("ilbiseo-daily-cheer-kst", cheerDayKey);
   const now = new Date().toISOString();
   localStorage.setItem(
     "ilbiseo-state-v2",
@@ -137,7 +165,9 @@ await page.evaluate((todayIso) => {
       habits: [],
     }),
   );
-}, todayKst);
+},
+  { todayIso: todayKst, cheerDayKey: cheerDay },
+);
 
 await page.goto(`${BASE}?view=todo`, { waitUntil: "networkidle" });
 await page.waitForTimeout(400);

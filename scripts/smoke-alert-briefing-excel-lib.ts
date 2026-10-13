@@ -8,7 +8,11 @@ import { findSimilarActiveTasks } from "../src/lib/text-similarity";
 import { buildDailyBriefing } from "../src/lib/briefing";
 import { buildWorkbook } from "../src/lib/excel";
 import { formatCalendarWhen } from "../src/lib/calendar-data";
-import { todayIsoKst, addDaysIso } from "../src/lib/date-range";
+import {
+  todayIsoKst,
+  addDaysIso,
+  cheerDayIsoKst,
+} from "../src/lib/date-range";
 import type { Task, CalendarEvent } from "../src/lib/types";
 
 const OUT =
@@ -106,38 +110,106 @@ async function main() {
     );
   }
 
-  // 5) Range 마감목표 included (overlap window, not end-date-only)
+  // 4b) Cheer day boundary at 07:00 KST
   {
-    const start = addDaysIso(today, 2);
-    const end = addDaysIso(today, 10);
-    const rangeTask = baseTask({
-      id: "range",
-      title: "휴가 준비",
+    ok(
+      "cheer-before-7-is-prev-day",
+      cheerDayIsoKst(new Date("2026-10-14T06:59:59+09:00")) === "2026-10-13",
+      cheerDayIsoKst(new Date("2026-10-14T06:59:59+09:00")),
+    );
+    ok(
+      "cheer-at-7-is-new-day",
+      cheerDayIsoKst(new Date("2026-10-14T07:00:00+09:00")) === "2026-10-14",
+      cheerDayIsoKst(new Date("2026-10-14T07:00:00+09:00")),
+    );
+    ok(
+      "cheer-evening-same-day",
+      cheerDayIsoKst(new Date("2026-10-14T23:30:00+09:00")) === "2026-10-14",
+      cheerDayIsoKst(new Date("2026-10-14T23:30:00+09:00")),
+    );
+  }
+
+  // 5) Briefing = today-only overlap (not 7-day window)
+  {
+    const futureStart = "2026-10-16";
+    const futureEnd = "2026-10-17";
+    const futureTask = baseTask({
+      id: "future-range",
+      title: "미래 기간 할일",
       category: "personal",
       kind: "ongoing",
-      startDate: start,
-      targetDate: end,
+      startDate: futureStart,
+      targetDate: futureEnd,
     });
-    const b = buildDailyBriefing([rangeTask], [], new Date(), [], []);
+    const todayRange = baseTask({
+      id: "today-range",
+      title: "오늘 포함 기간",
+      category: "work",
+      kind: "ongoing",
+      startDate: addDaysIso(today, -1),
+      targetDate: addDaysIso(today, 2),
+    });
+    const todaySingle = baseTask({
+      id: "today-single",
+      title: "오늘 하루",
+      kind: "spot",
+      startDate: today,
+      targetDate: today,
+    });
+    // Freeze “today” as 2026-10-14 for the reported bug case
+    const briefDay = new Date("2026-10-14T08:00:00+09:00");
+    const bBug = buildDailyBriefing(
+      [
+        baseTask({
+          id: "bug",
+          title: "미래 기간 버그케이스",
+          kind: "ongoing",
+          startDate: "2026-10-16",
+          targetDate: "2026-10-17",
+        }),
+        baseTask({
+          id: "ok-range",
+          title: "오늘겹침",
+          kind: "ongoing",
+          startDate: "2026-10-14",
+          targetDate: "2026-10-17",
+        }),
+      ],
+      [],
+      briefDay,
+      [],
+      [],
+    );
+    const bugTitles = bBug.sections.flatMap((s) => s.lines.map((l) => l.title));
+    ok(
+      "future-range-excluded-on-1014",
+      !bugTitles.includes("미래 기간 버그케이스"),
+      bugTitles,
+    );
+    ok("today-overlap-included-on-1014", bugTitles.includes("오늘겹침"), bugTitles);
+
+    const b = buildDailyBriefing(
+      [futureTask, todayRange, todaySingle],
+      [],
+      new Date(),
+      [],
+      [],
+    );
     const titles = b.sections.flatMap((s) => s.lines.map((l) => l.title));
-    ok("range-task-in-briefing", titles.includes("휴가 준비"), {
+    ok("future-range-not-in-briefing", !titles.includes("미래 기간 할일"), {
       titles,
-      start,
-      end,
-      plaintext: b.plaintext,
+      futureStart,
+      futureEnd,
     });
+    ok("today-range-in-briefing", titles.includes("오늘 포함 기간"), titles);
+    ok("today-single-in-briefing", titles.includes("오늘 하루"), titles);
     const line = b.sections
       .flatMap((s) => s.lines)
-      .find((l) => l.title === "휴가 준비");
+      .find((l) => l.title === "오늘 포함 기간");
     ok(
       "range-deadline-label",
       Boolean(line?.deadlineLabel.includes("~")),
       line?.deadlineLabel,
-    );
-    ok(
-      "range-in-plaintext",
-      b.plaintext.includes("휴가 준비") && b.plaintext.includes("~"),
-      b.plaintext,
     );
   }
 

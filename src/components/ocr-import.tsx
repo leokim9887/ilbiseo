@@ -21,15 +21,31 @@ import { ImageIcon, Loader2 } from "lucide-react";
 interface OcrImportProps {
   onImport: (tasks: Task[]) => void;
   category: TaskCategory;
+  showTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function OcrImport({ onImport, category }: OcrImportProps) {
-  const [open, setOpen] = useState(false);
+export function OcrImport({
+  onImport,
+  category,
+  showTrigger = true,
+  open: openProp,
+  onOpenChange,
+}: OcrImportProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!controlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
 
   const handleFile = async (file: File | null) => {
     if (!file) return;
@@ -66,19 +82,21 @@ export function OcrImport({ onImport, category }: OcrImportProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 rounded-sm border-[#8a939a] bg-white"
-          >
-            <ImageIcon className="size-3.5" />
-            사진 OCR
-          </Button>
-        }
-      />
+      {showTrigger ? (
+        <DialogTrigger
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-sm border-[#8a939a] bg-white"
+            >
+              <ImageIcon className="size-3.5" />
+              사진 OCR
+            </Button>
+          }
+        />
+      ) : null}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>종이·손글씨 OCR</DialogTitle>

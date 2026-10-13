@@ -20,12 +20,29 @@ import { StickyNote } from "lucide-react";
 interface MemoImportProps {
   onImport: (tasks: Task[]) => void;
   category: TaskCategory;
+  /** false면 툴바 트리거 없이 open/onOpenChange로만 연다 */
+  showTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function MemoImport({ onImport, category }: MemoImportProps) {
-  const [open, setOpen] = useState(false);
+export function MemoImport({
+  onImport,
+  category,
+  showTrigger = true,
+  open: openProp,
+  onOpenChange,
+}: MemoImportProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!controlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
 
   const handleImport = () => {
     try {
@@ -45,19 +62,21 @@ export function MemoImport({ onImport, category }: MemoImportProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 rounded-sm border-[#8a939a] bg-white"
-          >
-            <StickyNote className="size-3.5" />
-            메모 붙여넣기
-          </Button>
-        }
-      />
+      {showTrigger ? (
+        <DialogTrigger
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-sm border-[#8a939a] bg-white"
+            >
+              <StickyNote className="size-3.5" />
+              메모 붙여넣기
+            </Button>
+          }
+        />
+      ) : null}
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>휴대폰 메모 → 할 일</DialogTitle>

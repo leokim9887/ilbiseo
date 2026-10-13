@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Compose atmospheric family banners (PC + mobile) with clearer faces.
 
-Goals (faces-fullscreen-pull-refresh):
-- Every subject face clearly visible (family 5, baby, dog, cat)
-- Mobile: baby face noticeably larger; dog & cat a bit larger too
-- Baby still largest among insets; pets larger than prior polish
-- Keep calm sky for gold motto + fused stats (no face cover in layout)
+Goals (banner-scroll-daily-cheer):
+- Family-of-5: ALL faces fully visible (no chin/beanie/elder clip)
+- Mobile: enlarge + shift LEFT to kill empty dark gap beside family blob
+- Baby remains largest inset; pets slightly smaller
+- Also export grandson face asset for daily cheer overlay
+- Keep calm sky for gold motto + fused stats
 """
 
 from __future__ import annotations
@@ -186,8 +187,8 @@ def paste_masked(
 
 
 def family_five(fam_src: Image.Image) -> Image.Image:
-    """Face-group — keep all 5 (bearded chin + older faces); more bottom for cap-wearer."""
-    return box_crop_frac(fam_src, 0.06, 0.24, 0.92, 0.92)
+    """Face-group — tight on faces; cut empty beach left; pad chin/elder."""
+    return box_crop_frac(fam_src, 0.11, 0.29, 0.935, 0.94)
 
 
 def polish_family_faces(faces: Image.Image) -> Image.Image:
@@ -198,38 +199,55 @@ def polish_family_faces(faces: Image.Image) -> Image.Image:
     sharp = unsharp(sharp, percent=155, radius=1.55)
     top_dim = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     td = ImageDraw.Draw(top_dim)
-    band = int(h * 0.28)
+    band = int(h * 0.22)
     for y in range(0, band):
         t = 1.0 - y / max(1, band)
-        a = int(130 * (t**1.35))
+        a = int(110 * (t**1.35))
         td.line([(0, y), (w, y)], fill=(*TEAL, a))
     sharp = Image.alpha_composite(sharp, top_dim.filter(ImageFilter.GaussianBlur(radius=6)))
-    # Opaque core covers all 5 faces incl. bearded chin (bottom) + older man (right)
+    # Wide opaque core — periphery faces (cap + older man) stay fully solid
     subject = subject_ellipse_mask(
-        sharp.size, cx=0.50, cy=0.52, rx=0.62, ry=0.72, soft=0.48
+        sharp.size, cx=0.50, cy=0.55, rx=0.72, ry=0.78, soft=0.66
     )
     out = sharp.copy()
     out.putalpha(subject)
     return out
 
 
-def family_plane(fam_src: Image.Image, tw: int, th: int, scale_boost: float = 1.12) -> Image.Image:
+def family_plane(
+    fam_src: Image.Image,
+    tw: int,
+    th: int,
+    scale_boost: float = 1.12,
+    *,
+    anchor_x: float = 0.5,
+    anchor_y: float = 0.48,
+    allow_overflow: bool = False,
+) -> Image.Image:
+    """Compose family faces into a plane.
+
+    When allow_overflow is False (default), scale never exceeds the plane so
+    chin / beanie / elder faces aren't clipped by the canvas edge.
+    """
     faces = polish_family_faces(family_five(fam_src))
     sw, sh = faces.size
-    # Fit inside plane (contain) so bearded chin / cap aren't clipped by crop
     scale = min(tw / sw, th / sh) * scale_boost
     nw, nh = max(1, int(sw * scale + 0.5)), max(1, int(sh * scale + 0.5))
-    if nw > tw:
-        scale = tw / sw
-        nw, nh = tw, max(1, int(sh * scale + 0.5))
-    if nh > th:
-        scale = th / sh
-        nw, nh = max(1, int(sw * scale + 0.5)), th
+    if not allow_overflow:
+        if nw > tw:
+            scale = tw / sw
+            nw, nh = tw, max(1, int(sh * scale + 0.5))
+        if nh > th:
+            scale = th / sh
+            nw, nh = max(1, int(sw * scale + 0.5)), th
     resized = faces.resize((nw, nh), Image.Resampling.LANCZOS)
     canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-    ox = (tw - nw) // 2
-    # Bias slightly up so bottom faces (cap) stay inside + soft fade doesn't eat chin
-    oy = max(0, (th - nh) // 2 - int(th * 0.02))
+    ox = int((tw - nw) * anchor_x)
+    oy = int((th - nh) * anchor_y)
+    # Clamp so paste never clips faces off the plane
+    if not allow_overflow:
+        ox = max(0, min(ox, tw - nw))
+        oy = max(0, min(oy, th - nh))
     canvas.paste(resized, (ox, oy), resized)
     return canvas
 
@@ -277,21 +295,22 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     canvas = city_atmosphere(fam_src, W, H)
     mist_right(canvas)
 
-    # Larger family plane — 5 faces read clearer on fullscreen PC
-    fw, fh = 1080, H
-    family = family_plane(fam_src, fw, fh, scale_boost=1.08)
+    # Wider plane — slightly contained so soft mask doesn't eat chin / elder
+    fw, fh = 1240, H
+    family = family_plane(
+        fam_src, fw, fh, scale_boost=1.04, anchor_x=0.34, anchor_y=0.50
+    )
     family = ImageEnhance.Brightness(family).enhance(1.05)
     family = ImageEnhance.Color(family).enhance(1.0)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.78)
-    paste_masked(canvas, family, (0, 0), fam_mask, 1.0)
+    fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
+    paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Baby — larger than polish (was 500×545)
+    # Baby — largest inset
     baby = night_grade(
         cover_crop(load("04-baby.png"), 560, 610, bias=(0.5, 0.16)), strength=0.34
     )
     paste_masked(canvas, baby, (1045, -15), radial_mask((560, 610), soft=0.52), 0.98)
 
-    # Dog / cat — a bit larger, still below baby
     dog = night_grade(
         cover_crop(load("02-dog.png"), 470, 470, bias=(0.5, 0.36)), strength=0.36
     )
@@ -312,7 +331,7 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
         bd.line([(x, 0), (x, H)], fill=(30, 50, 55, a))
     canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=16)))
 
-    calm_wash(canvas, left_w=460, bottom_h=150)
+    calm_wash(canvas, left_w=420, bottom_h=150)
     return canvas.convert("RGB")
 
 
@@ -321,23 +340,24 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
     canvas = city_atmosphere(fam_src, W, H)
     mist_right(canvas)
 
-    # Family left — contain-fit so all 5 faces (incl. beard/cap) stay solid
-    fw, fh = 900, 720
-    family = family_plane(fam_src, fw, fh, scale_boost=1.05)
+    # Large family blob — fit height so all 5 faces stay solid; shift LEFT on canvas
+    fw, fh = 980, H - 16
+    family = family_plane(
+        fam_src, fw, fh, scale_boost=1.0, anchor_x=0.08, anchor_y=0.55
+    )
     family = ImageEnhance.Brightness(family).enhance(1.06)
     family = ImageEnhance.Color(family).enhance(1.02)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.82)
-    bot = soft_bottom_fade((fw, fh), fade_start=0.97)
+    fam_mask = soft_right_fade((fw, fh), fade_start=0.90)
+    bot = soft_bottom_fade((fw, fh), fade_start=0.995)
     combined = ImageChops.multiply(fam_mask, bot)
-    paste_masked(canvas, family, (4, 50), combined, 1.0)
+    # Negative x fills empty dark left; positive y keeps chin above bottom fade
+    paste_masked(canvas, family, (-96, 12), combined, 1.0)
 
-    # Baby — noticeably larger for father on phone (polish 345×380 → 470×515)
     baby = night_grade(
         cover_crop(load("04-baby.png"), 470, 515, bias=(0.5, 0.14)), strength=0.30
     )
     paste_masked(canvas, baby, (695, 12), radial_mask((470, 515), soft=0.54), 0.98)
 
-    # Dog / cat — larger than polish; still under baby
     dog = night_grade(
         cover_crop(load("02-dog.png"), 385, 385, bias=(0.5, 0.36)), strength=0.32
     )
@@ -358,8 +378,20 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
         bd.line([(x, 0), (x, H)], fill=(30, 50, 55, a))
     canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=14)))
 
-    calm_wash(canvas, left_w=300, bottom_h=130)
+    # Narrower left wash — family now occupies left edge
+    calm_wash(canvas, left_w=160, bottom_h=130)
     return canvas.convert("RGB")
+
+
+def compose_grandson_cheer_face() -> Image.Image:
+    """Circular-friendly grandson face for daily cheer overlay (real photo base)."""
+    baby = cover_crop(load("04-baby.png"), 640, 640, bias=(0.50, 0.14))
+    baby = ImageEnhance.Contrast(baby).enhance(1.08)
+    baby = ImageEnhance.Brightness(baby).enhance(1.04)
+    baby = unsharp(baby, percent=130, radius=1.3)
+    mask = radial_mask((640, 640), soft=0.72)
+    baby.putalpha(mask)
+    return baby
 
 
 def save_jpeg(im: Image.Image, path: Path) -> None:
@@ -368,18 +400,27 @@ def save_jpeg(im: Image.Image, path: Path) -> None:
     print(f"wrote {path} ({im.size[0]}x{im.size[1]})")
 
 
+def save_png(im: Image.Image, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    im.save(path, "PNG", optimize=True)
+    print(f"wrote {path} ({im.size[0]}x{im.size[1]})")
+
+
 def main() -> None:
     fam_src = load("05-family.jpg")
     pc = compose_pc(fam_src)
     mobile = compose_mobile(fam_src)
+    cheer = compose_grandson_cheer_face()
 
     save_jpeg(pc, OUT_PUBLIC / "ilbiseo-family-banner-pc.jpg")
     save_jpeg(mobile, OUT_PUBLIC / "ilbiseo-family-banner-mobile.jpg")
     save_jpeg(pc, OUT_PUBLIC / "ilbiseo-family-banner.jpg")
+    save_png(cheer, OUT_PUBLIC / "ilbiseo-grandson-cheer.png")
 
     save_jpeg(pc, OUT_MEDIA / "ilbiseo-family-banner-pc.jpg")
     save_jpeg(mobile, OUT_MEDIA / "ilbiseo-family-banner-mobile.jpg")
     save_jpeg(pc, OUT_MEDIA / "ilbiseo-family-banner.jpg")
+    save_png(cheer, OUT_MEDIA / "ilbiseo-grandson-cheer.png")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import { FamilyBanner } from "@/components/family-banner";
 import { SideListSection } from "@/components/side-list-section";
 import { CalendarPanel } from "@/components/calendar-panel";
 import { DailyBriefingPanel } from "@/components/daily-briefing";
+import { DailyCheerOverlay } from "@/components/daily-cheer-overlay";
 import { ExcelLinker } from "@/components/excel-linker";
 import { DeviceSyncPanel } from "@/components/device-sync-panel";
 import { InstallHint } from "@/components/install-hint";
@@ -209,6 +210,7 @@ export function AssistantApp() {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
+      <DailyCheerOverlay />
       <PullToRefreshIndicator
         pullPx={pullPx}
         refreshing={refreshing}

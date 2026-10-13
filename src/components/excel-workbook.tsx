@@ -354,6 +354,46 @@ export function ExcelWorkbook({
     [setSelectPaint],
   );
 
+  /**
+   * Scroll chaining for PC mouse wheel over the excel table:
+   * - If table does not overflow → scroll the page
+   * - If at top / bottom edge → continue scrolling the page
+   * - Otherwise let the table scroll normally
+   * Touch / trackpad overscroll on mobile is left alone (passive where possible).
+   */
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return; // pinch-zoom
+      const dy = e.deltaY;
+      if (dy === 0) return;
+      // Prefer vertical intent; ignore mostly-horizontal pans
+      if (Math.abs(e.deltaX) > Math.abs(dy) * 1.25) return;
+
+      const canScrollY = el.scrollHeight > el.clientHeight + 2;
+      if (!canScrollY) {
+        // Table short — never trap the wheel; move the document
+        e.preventDefault();
+        window.scrollBy({ top: dy, left: 0, behavior: "auto" });
+        return;
+      }
+
+      const atTop = el.scrollTop <= 0;
+      const atBottom =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+      if ((dy < 0 && atTop) || (dy > 0 && atBottom)) {
+        e.preventDefault();
+        window.scrollBy({ top: dy, left: 0, behavior: "auto" });
+      }
+      // else: native overflow scroll handles the table
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   useEffect(() => {
     const endPaint = () => {
       paintRef.current.active = false;
@@ -940,7 +980,7 @@ export function ExcelWorkbook({
       <div className="excel-scroll-wrap excel-fit-mobile-wrap">
       <div
         ref={tableScrollRef}
-        className="relative max-h-[min(58dvh,640px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(68dvh,820px)] sm:min-h-[320px] sm:overflow-auto sm:overscroll-x-contain lg:max-h-[min(72dvh,920px)] xl:max-h-[min(76dvh,1040px)]"
+        className="relative max-h-[min(58dvh,640px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-auto bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(68dvh,820px)] sm:min-h-[320px] sm:overflow-auto sm:overscroll-x-contain sm:overscroll-y-auto lg:max-h-[min(72dvh,920px)] xl:max-h-[min(76dvh,1040px)]"
         data-excel-scroll
       >
         <table className="excel-fit-mobile w-full min-w-0 table-fixed border-collapse text-[13.5px] text-black sm:min-w-[860px] sm:table-auto sm:text-[16px]">

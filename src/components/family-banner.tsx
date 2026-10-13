@@ -28,21 +28,23 @@ export function FamilyBanner({
       <div className="relative aspect-[1170/780] w-full sm:aspect-[1680/700]">
         {/* Mobile asset */}
         <Image
-          src="/ilbiseo-family-banner-mobile.jpg"
+          src="/ilbiseo-family-banner-mobile.jpg?v=15"
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority
           sizes="100vw"
-          className="object-cover object-center sm:hidden"
+          className="object-cover object-left sm:hidden"
+          unoptimized
         />
         {/* PC asset */}
         <Image
-          src="/ilbiseo-family-banner-pc.jpg"
+          src="/ilbiseo-family-banner-pc.jpg?v=15"
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority
           sizes="(min-width: 640px) min(110rem, 100vw), 100vw"
           className="hidden object-cover object-center sm:block"
+          unoptimized
         />
         {/* Soft scrim — keep motto/stats off faces (left/top calm; right faces stay clear) */}
         <div

@@ -291,6 +291,7 @@ export function AssistantApp() {
                   })
                 }
                 onImport={app.addMany}
+                onReplaceCategory={app.replaceCategoryTasks}
               />
               <SideListSection
                 kind="guideline"

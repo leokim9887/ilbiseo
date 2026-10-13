@@ -62,6 +62,7 @@ import {
 import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
+import { ExcelImport } from "@/components/excel-import";
 import {
   ArrowDown,
   ArrowUp,
@@ -182,6 +183,8 @@ interface ExcelWorkbookProps {
   onRestoreMany?: (ids: string[]) => void;
   onAdd: () => void;
   onImport: (tasks: Task[]) => void;
+  /** 현재 틀 할 일·한 일을 가져온 목록으로 교체 (엑셀 불러오기 명시 확인 후) */
+  onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
   calendarEvents?: CalendarEvent[];
 }
 
@@ -201,6 +204,7 @@ export function ExcelWorkbook({
   onRestoreMany,
   onAdd,
   onImport,
+  onReplaceCategory,
   calendarEvents = [],
 }: ExcelWorkbookProps) {
   const isGcal = frame === "gcal";
@@ -767,6 +771,11 @@ export function ExcelWorkbook({
               <>
                 <MemoImport category={frame} onImport={onImport} />
                 <OcrImport category={frame} onImport={onImport} />
+                <ExcelImport
+                  category={frame}
+                  onImport={onImport}
+                  onReplaceCategory={onReplaceCategory}
+                />
               </>
             ) : null}
           </div>

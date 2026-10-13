@@ -198,6 +198,21 @@ export function useAppState() {
     [persist, state],
   );
 
+  /** Replace all tasks in a category with imported ones (explicit user confirm). */
+  const replaceCategoryTasks = useCallback(
+    (category: TaskCategory, tasks: Task[]) => {
+      const normalized = tasks.map((t) => ({
+        ...t,
+        category: t.category || category,
+        urgency: clampPriority(t.urgency),
+        importance: clampPriority(t.importance),
+      }));
+      const kept = state.tasks.filter((t) => t.category !== category);
+      persist({ ...state, tasks: [...kept, ...normalized] });
+    },
+    [persist, state],
+  );
+
   const updateTask = useCallback(
     (id: string, patch: Partial<Task>) => {
       persist({
@@ -494,6 +509,7 @@ export function useAppState() {
     habits: state.habits,
     addTask,
     addMany,
+    replaceCategoryTasks,
     updateTask,
     completeTask,
     completeTasks,

@@ -207,13 +207,26 @@ function crossFieldSimilarity(
   return best;
 }
 
-function isPlaceholderTitle(title: string): boolean {
+/** Empty or placeholder-only title (「새 할일」, 「할 일」, whitespace…). */
+export function isPlaceholderTitle(title: string): boolean {
   const t = title.trim().toLowerCase().replace(/\s+/g, "");
   if (!t) return true;
   if (PLACEHOLDER_TITLES.has(title.trim()) || PLACEHOLDER_TITLES.has(t)) {
     return true;
   }
   return false;
+}
+
+/**
+ * Meaningful content for briefing / alerts: real title or non-empty memo.
+ * Blank 「행 추가」 shells (empty or placeholder title + empty memo) → false.
+ */
+export function hasMeaningfulTaskContent(
+  task: Pick<Task, "title" | "memo">,
+): boolean {
+  const memo = (task.memo ?? "").trim();
+  if (memo) return true;
+  return !isPlaceholderTitle(task.title ?? "");
 }
 
 /**

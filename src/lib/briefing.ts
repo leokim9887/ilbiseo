@@ -23,6 +23,7 @@ import {
   priorityTag as makePriorityTag,
   urgencyLabel,
 } from "./priority";
+import { hasMeaningfulTaskContent } from "./text-similarity";
 
 export type BriefingLine = {
   title: string;
@@ -100,8 +101,10 @@ function eventOverlapsBriefingWeek(ev: CalendarEvent, today: string): boolean {
  * (startDate ~ targetDate, including multi-day) overlaps **today only** (KST).
  * Future ranges like `2026-10-16 ~ 2026-10-17` must not appear on 10-14.
  * Undated spot / high-priority someday / undated ongoing stay as focus items.
+ * Blank 「행 추가」 shells (no title + no memo / placeholder-only) are excluded.
  */
 function taskInBriefingWindow(t: Task, today: string): boolean {
+  if (!hasMeaningfulTaskContent(t)) return false;
   if (t.startDate || t.targetDate) {
     return overlapsPeriod(t, today, today);
   }

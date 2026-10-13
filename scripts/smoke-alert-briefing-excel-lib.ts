@@ -214,6 +214,68 @@ async function main() {
     );
   }
 
+  // 5b) Blank / placeholder 「행 추가」 shells excluded from briefing
+  {
+    const real = baseTask({
+      id: "real",
+      title: "실제 할 일",
+      kind: "spot",
+      startDate: today,
+      targetDate: today,
+    });
+    const blank = baseTask({
+      id: "blank",
+      title: "",
+      memo: "",
+      kind: "spot",
+      startDate: today,
+      targetDate: today,
+    });
+    const placeholder = baseTask({
+      id: "ph",
+      title: "새 할일",
+      memo: "   ",
+      kind: "spot",
+      startDate: today,
+      targetDate: today,
+    });
+    const memoOnly = baseTask({
+      id: "memo-only",
+      title: "",
+      memo: "메모만 있는 행",
+      kind: "spot",
+      startDate: today,
+      targetDate: today,
+    });
+    const b = buildDailyBriefing(
+      [real, blank, placeholder, memoOnly],
+      [],
+      new Date(),
+      [],
+      [],
+    );
+    const lines = b.sections.flatMap((s) => s.lines);
+    const titles = lines.map((l) => l.title);
+    const memos = lines.map((l) => l.memo);
+    const emptyShells = lines.filter(
+      (l) => !(l.title ?? "").trim() && !(l.memo ?? "").trim(),
+    );
+    ok("blank-shell-excluded", emptyShells.length === 0, {
+      titles,
+      memos,
+      plaintext: b.plaintext,
+    });
+    ok("placeholder-shell-excluded", !titles.includes("새 할일"), titles);
+    ok("real-task-kept", titles.includes("실제 할 일"), titles);
+    ok("memo-only-kept", memos.includes("메모만 있는 행"), memos);
+    ok("briefing-line-count-two", lines.length === 2, lines.length);
+    ok(
+      "blank-not-in-plaintext",
+      !b.plaintext.includes("새 할일") && b.plaintext.includes("실제 할 일"),
+      b.plaintext,
+    );
+  }
+
   // 6) formatCalendarWhen multi-day
   {
     const ev: CalendarEvent = {

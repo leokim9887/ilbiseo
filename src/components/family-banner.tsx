@@ -20,11 +20,11 @@ export function FamilyBanner({
 }: FamilyBannerProps) {
   return (
     <section
-      className="relative -mx-2.5 overflow-hidden sm:mx-0 sm:rounded-xl"
+      className="relative -mx-2 overflow-hidden sm:mx-0 sm:rounded-lg"
       aria-label="가족 응원 배너"
       data-family-banner
     >
-      {/* Phone: taller balanced crop; desktop: wide banner */}
+      {/* Phone: taller balanced crop; desktop: wide banner fills fullscreen width */}
       <div className="relative aspect-[1170/780] w-full sm:aspect-[1680/700]">
         {/* Mobile asset */}
         <Image
@@ -41,17 +41,17 @@ export function FamilyBanner({
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority
-          sizes="(min-width: 640px) min(72rem, 100vw), 100vw"
+          sizes="(min-width: 640px) min(110rem, 100vw), 100vw"
           className="hidden object-cover object-center sm:block"
         />
-        {/* Soft scrim — calm top/left/bottom for motto + stats (same surface) */}
+        {/* Soft scrim — keep motto/stats off faces (left/top calm; right faces stay clear) */}
         <div
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(22,63,57,0.55)_0%,rgba(22,63,57,0.22)_22%,transparent_42%),linear-gradient(100deg,rgba(22,63,57,0.42)_0%,rgba(22,63,57,0.18)_22%,transparent_42%),linear-gradient(to_top,rgba(22,63,57,0.48)_0%,rgba(22,63,57,0.16)_32%,transparent_52%)] sm:bg-[linear-gradient(100deg,rgba(22,63,57,0.55)_0%,rgba(22,63,57,0.28)_24%,rgba(22,63,57,0.08)_44%,transparent_56%),linear-gradient(to_top,rgba(22,63,57,0.5)_0%,rgba(22,63,57,0.18)_34%,transparent_55%)]"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(22,63,57,0.5)_0%,rgba(22,63,57,0.18)_20%,transparent_38%),linear-gradient(100deg,rgba(22,63,57,0.38)_0%,rgba(22,63,57,0.14)_20%,transparent_38%),linear-gradient(to_top,rgba(22,63,57,0.42)_0%,rgba(22,63,57,0.12)_28%,transparent_48%)] sm:bg-[linear-gradient(100deg,rgba(22,63,57,0.52)_0%,rgba(22,63,57,0.24)_22%,rgba(22,63,57,0.06)_40%,transparent_52%),linear-gradient(to_top,rgba(22,63,57,0.45)_0%,rgba(22,63,57,0.14)_30%,transparent_50%)]"
           aria-hidden
         />
 
-        <div className="absolute inset-0 flex flex-col justify-between gap-2 px-3.5 pb-3 pt-3.5 sm:justify-between sm:gap-0 sm:px-8 sm:pb-5 sm:pt-7 lg:px-10">
-          <div className="max-w-[min(22rem,94%)] sm:mt-1 sm:max-w-[min(28rem,46%)]">
+        <div className="absolute inset-0 flex flex-col justify-between gap-2 px-3.5 pb-3 pt-3.5 sm:justify-between sm:gap-0 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 xl:px-10">
+          <div className="max-w-[min(20rem,88%)] sm:mt-1 sm:max-w-[min(26rem,40%)]">
             <p
               className="font-sans text-[1.22rem] font-semibold leading-snug tracking-tight sm:text-[1.7rem] sm:font-bold lg:text-[1.9rem]"
               style={{

@@ -459,6 +459,22 @@ export function useAppState() {
     await syncExcel(state);
   }, [state, syncExcel]);
 
+  /** Soft re-read from local storage (pull-to-refresh / focus recovery). */
+  const reloadFromStorage = useCallback(() => {
+    try {
+      const loaded = loadState();
+      if (loaded) {
+        setState(loaded);
+      }
+      const prefs = loadSyncPrefs();
+      setLocalUpdatedAt(prefs.localUpdatedAt);
+      setError(null);
+      setStatus("ready");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "저장소를 읽지 못했습니다.");
+    }
+  }, []);
+
   const allActive = useMemo(() => sortTasks(state.tasks), [state.tasks]);
   const allCompleted = useMemo(
     () => sortCompleted(state.tasks),
@@ -500,6 +516,7 @@ export function useAppState() {
     excelStatus,
     setExcelLinked,
     forceExcelSync,
+    reloadFromStorage,
     hydrateFromRemote,
     persistEpoch,
     localUpdatedAt,

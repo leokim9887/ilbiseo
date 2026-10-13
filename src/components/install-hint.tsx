@@ -133,7 +133,7 @@ export function InstallHint() {
       className="animate-fade-up sticky top-0 z-40 border-b border-[var(--grid-line)] bg-[var(--brand)]/95 px-3 py-2.5 text-[var(--primary-foreground)] backdrop-blur-sm sm:px-4"
       style={{ paddingTop: "max(0.65rem, env(safe-area-inset-top))" }}
     >
-      <div className="mx-auto flex max-w-6xl items-start gap-3">
+      <div className="mx-auto flex w-full max-w-[110rem] items-start gap-3 px-2 sm:px-4">
         <div className="mt-0.5 rounded-md bg-white/15 p-1.5">
           {platform === "ios" ? (
             <Share className="size-4" />

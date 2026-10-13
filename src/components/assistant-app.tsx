@@ -14,7 +14,9 @@ import { InstallHint } from "@/components/install-hint";
 import { WelcomeBanner } from "@/components/welcome-banner";
 import { AppNav, type MainView } from "@/components/app-nav";
 import { PanelShell } from "@/components/panel-shell";
+import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { Button } from "@/components/ui/button";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import {
   isAllFrame,
   isTaskCategory,
@@ -130,6 +132,35 @@ export function AssistantApp() {
     };
   }, [app.status, runAutoCompleteOverdue]);
 
+  const hardReloadCountRef = useRef(0);
+  const handlePullRefresh = useCallback(async () => {
+    app.reloadFromStorage();
+    runAutoCompleteOverdue();
+    if (sync.prefs.enabled && sync.prefs.code) {
+      try {
+        await sync.syncNow();
+      } catch {
+        /* soft path continues */
+      }
+    }
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      void reg?.update();
+    } catch {
+      /* ignore */
+    }
+    // Every 4th pull: hard reload resources (cache-bust banners / JS)
+    hardReloadCountRef.current += 1;
+    if (hardReloadCountRef.current % 4 === 0) {
+      return true;
+    }
+    return false;
+  }, [app, runAutoCompleteOverdue, sync]);
+
+  const { pullPx, refreshing, threshold } = usePullToRefresh({
+    onRefresh: handlePullRefresh,
+  });
+
   if (app.status === "loading") {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24">
@@ -177,7 +208,12 @@ export function AssistantApp() {
   };
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
+    <div className="flex min-h-dvh flex-1 flex-col">
+      <PullToRefreshIndicator
+        pullPx={pullPx}
+        refreshing={refreshing}
+        threshold={threshold}
+      />
       <InstallHint />
       {sync.toast ? (
         <div
@@ -193,23 +229,28 @@ export function AssistantApp() {
           {sync.toast.text}
         </div>
       ) : null}
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 overflow-x-clip px-2.5 py-4 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:gap-4 sm:px-6 sm:pt-4 sm:pb-10">
-        <FamilyBanner
-          activeCount={app.allActive.length}
-          doneCount={app.allCompleted.length}
-          calendarCount={app.calendarEvents.length}
-        />
+      {/* Fullscreen-first shell: fill viewport width/height; wide screens use near-full width */}
+      <div className="mx-auto flex w-full max-w-none flex-1 flex-col gap-3 overflow-x-clip px-2 pb-[calc(6.25rem+env(safe-area-inset-bottom))] pt-2 sm:gap-3 sm:px-4 sm:pb-6 sm:pt-3 md:px-5 lg:px-6 xl:max-w-[100rem] 2xl:max-w-[110rem]">
+        <header className="shrink-0">
+          <FamilyBanner
+            activeCount={app.allActive.length}
+            doneCount={app.allCompleted.length}
+            calendarCount={app.calendarEvents.length}
+          />
+        </header>
         <WelcomeBanner onStart={() => setView("todo")} />
 
-        <AppNav
-          value={view}
-          onChange={handleViewChange}
-          counts={{
-            todo: app.allActive.length,
-            done: app.allCompleted.length,
-            calendar: app.calendarEvents.length,
-          }}
-        />
+        <div className="shrink-0 sm:sticky sm:top-0 sm:z-30 sm:bg-background/90 sm:py-1 sm:backdrop-blur-sm">
+          <AppNav
+            value={view}
+            onChange={handleViewChange}
+            counts={{
+              todo: app.allActive.length,
+              done: app.allCompleted.length,
+              calendar: app.calendarEvents.length,
+            }}
+          />
+        </div>
 
         {app.error ? (
           <p
@@ -220,7 +261,10 @@ export function AssistantApp() {
           </p>
         ) : null}
 
-        <div className="animate-sheet-in" key={workbookOpen ? "wb" : view}>
+        <div
+          className="animate-sheet-in flex min-h-0 flex-1 flex-col"
+          key={workbookOpen ? "wb" : view}
+        >
           {workbookOpen ? (
             <div className="space-y-4">
               <ExcelWorkbook

@@ -122,12 +122,14 @@
       linear-gradient(180deg, #ebe6df 0%, #e2dbd1 100%);
     background-attachment: fixed;
     min-height: 100dvh;
+    height: 100%;
     overflow-x: clip;
     touch-action: pan-x pan-y;
     /* notch sides; top handled by install-hint / chrome, bottom by nav */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+
   /* Double-tap zoom off on controls; scroll/focus still work */
   input,
   textarea,

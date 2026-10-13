@@ -940,7 +940,7 @@ export function ExcelWorkbook({
       <div className="excel-scroll-wrap excel-fit-mobile-wrap">
       <div
         ref={tableScrollRef}
-        className="relative max-h-[min(62vh,720px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(66vh,720px)] sm:min-h-[300px] sm:overflow-auto sm:overscroll-x-contain"
+        className="relative max-h-[min(58dvh,640px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-contain bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(68dvh,820px)] sm:min-h-[320px] sm:overflow-auto sm:overscroll-x-contain lg:max-h-[min(72dvh,920px)] xl:max-h-[min(76dvh,1040px)]"
         data-excel-scroll
       >
         <table className="excel-fit-mobile w-full min-w-0 table-fixed border-collapse text-[13.5px] text-black sm:min-w-[860px] sm:table-auto sm:text-[16px]">

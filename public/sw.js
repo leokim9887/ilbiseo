@@ -1,5 +1,5 @@
 /* 일비서 service worker — offline shell; prefer network so new deploys reach phones */
-const CACHE = "ilbiseo-shell-v12";
+const CACHE = "ilbiseo-shell-v13";
 const PRECACHE = [
   "/manifest.webmanifest",
   "/icons/icon-192.png",

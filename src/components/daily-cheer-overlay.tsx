@@ -163,12 +163,12 @@ export function DailyCheerOverlay() {
               />
             </div>
 
-            <div className="relative size-[9.5rem] sm:size-[10.5rem]">
+            <div className="relative size-[11.25rem] sm:size-[12.5rem]">
               <div
                 className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_40%_35%,#f0e6c8_0%,#c9b27c_55%,#8a7340_100%)] opacity-90"
                 aria-hidden
               />
-              <div className="absolute inset-[6px] overflow-hidden rounded-full bg-[#163f39]/10 ring-2 ring-white/80">
+              <div className="absolute inset-[7px] overflow-hidden rounded-full bg-[#163f39]/10 ring-2 ring-white/80">
                 <Image
                   src="/ilbiseo-grandson-cheer.png"
                   alt="에이스"

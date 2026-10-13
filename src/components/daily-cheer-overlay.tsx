@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
 const IDX_KEY = "ilbiseo-daily-cheer-idx";
 
+/**
+ * TEMP test toggle — set to `false` to restore once-per-KST-day (localStorage).
+ * When `true`, Ace cheer shows again on every page refresh/load.
+ */
+const FORCE_CHEER_EVERY_LOAD = true;
+
 /** Father-friendly rotating pool — Ace cheering grandpa. */
 export const CHEER_MESSAGES = [
   "할아버지, 오늘도 화이팅이에요!",
@@ -81,8 +87,8 @@ function writeShownDay(day: string) {
 }
 
 /**
- * Once per KST calendar day on first open of this device:
- * warm overlay with Ace face + rotating cheer message.
+ * Ace cheer overlay — rotating message + 시작.
+ * Default: once per KST day. TEMP: FORCE_CHEER_EVERY_LOAD shows on every refresh.
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);
@@ -92,8 +98,10 @@ export function DailyCheerOverlay() {
 
   useEffect(() => {
     if (openedRef.current) return;
-    const dayKey = todayIsoKst();
-    if (readShownDay() === dayKey) return;
+    if (!FORCE_CHEER_EVERY_LOAD) {
+      const dayKey = todayIsoKst();
+      if (readShownDay() === dayKey) return;
+    }
     openedRef.current = true;
     const { message: msg, nextIdx } = peekCheerMessage();
     nextIdxRef.current = nextIdx;
@@ -106,7 +114,10 @@ export function DailyCheerOverlay() {
       commitCheerIndex(nextIdxRef.current);
       nextIdxRef.current = null;
     }
-    writeShownDay(todayIsoKst());
+    // Skip day lock while force-every-load testing is on
+    if (!FORCE_CHEER_EVERY_LOAD) {
+      writeShownDay(todayIsoKst());
+    }
     setOpen(false);
   }, []);
 

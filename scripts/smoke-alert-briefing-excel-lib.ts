@@ -12,6 +12,7 @@ import {
   todayIsoKst,
   addDaysIso,
   cheerDayIsoKst,
+  weekRangeContaining,
 } from "../src/lib/date-range";
 import type { Task, CalendarEvent } from "../src/lib/types";
 
@@ -226,6 +227,71 @@ async function main() {
     };
     const when = formatCalendarWhen(ev);
     ok("calendar-when-range", when === "2026-10-14 ~ 2026-10-21", when);
+  }
+
+  // 6b) Google Calendar in briefing = this week Mon–Sun KST (tasks stay today-only)
+  {
+    // 2026-10-14 = Wednesday → week Mon 10-12 … Sun 10-18
+    const briefDay = new Date("2026-10-14T08:00:00+09:00");
+    const week = weekRangeContaining("2026-10-14");
+    ok(
+      "week-mon-sun-for-1014",
+      week.start === "2026-10-12" && week.end === "2026-10-18",
+      week,
+    );
+    const events: CalendarEvent[] = [
+      {
+        id: "mon",
+        title: "월요일회의",
+        start: "2026-10-12T10:00:00",
+        end: "2026-10-12T11:00:00",
+        allDay: false,
+        notes: "",
+        source: "google",
+      },
+      {
+        id: "sat",
+        title: "토요일일정",
+        start: "2026-10-17",
+        end: "2026-10-18",
+        allDay: true,
+        notes: "",
+        source: "google",
+      },
+      {
+        id: "next-mon",
+        title: "다음주월요일",
+        start: "2026-10-19T09:00:00",
+        end: "2026-10-19T10:00:00",
+        allDay: false,
+        notes: "",
+        source: "google",
+      },
+    ];
+    // Future-dated task must still be excluded from 할 일
+    const futureTask = baseTask({
+      id: "t-future",
+      title: "앱할일-미래기간",
+      kind: "ongoing",
+      startDate: "2026-10-16",
+      targetDate: "2026-10-17",
+    });
+    const b = buildDailyBriefing([futureTask], events, briefDay, [], []);
+    const calTitles = b.calendarLines.map((c) => c.title);
+    ok("gcal-includes-mon", calTitles.includes("월요일회의"), calTitles);
+    ok("gcal-includes-sat", calTitles.includes("토요일일정"), calTitles);
+    ok("gcal-excludes-next-week", !calTitles.includes("다음주월요일"), calTitles);
+    const taskTitles = b.sections.flatMap((s) => s.lines.map((l) => l.title));
+    ok(
+      "tasks-still-today-only",
+      !taskTitles.includes("앱할일-미래기간"),
+      taskTitles,
+    );
+    ok(
+      "briefing-plaintext-gcal-week",
+      b.plaintext.includes("월요일회의") && b.plaintext.includes("토요일일정"),
+      b.plaintext,
+    );
   }
 
   // 7) Excel 구글캘린더 sheet rules

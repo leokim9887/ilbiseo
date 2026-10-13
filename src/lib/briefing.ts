@@ -16,6 +16,7 @@ import {
   formatDeadlineRange,
   overlapsPeriod,
   todayIsoKst,
+  weekRangeContaining,
 } from "./date-range";
 import {
   importanceLabel,
@@ -84,10 +85,14 @@ function formatKoDate(iso: string): string {
   });
 }
 
-/** Calendar event overlaps the briefing day (today KST) only. */
-function eventOverlapsBriefingDay(ev: CalendarEvent, today: string): boolean {
+/**
+ * Google Calendar in briefing: 「이번 주」= Mon–Sun week containing
+ * the briefing day (KST calendar date). App 할 일 stay today-only.
+ */
+function eventOverlapsBriefingWeek(ev: CalendarEvent, today: string): boolean {
+  const { start, end } = weekRangeContaining(today);
   const { startDay, endDay } = eventInclusiveDayRange(ev);
-  return startDay <= today && endDay >= today;
+  return startDay <= end && endDay >= start;
 }
 
 /**
@@ -278,7 +283,7 @@ export function buildDailyBriefing(
     });
 
   const calendarLines = calendarEvents
-    .filter((e) => eventOverlapsBriefingDay(e, date))
+    .filter((e) => eventOverlapsBriefingWeek(e, date))
     .sort((a, b) => a.start.localeCompare(b.start))
     .map((e) => ({
       when: formatCalendarWhen(e),

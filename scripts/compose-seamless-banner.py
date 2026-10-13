@@ -309,24 +309,43 @@ def soften_blob_edge(layer: Image.Image, radius: int = 16) -> Image.Image:
 
 
 def city_atmosphere_pc(fam_src: Image.Image, w: int, h: int) -> Image.Image:
-    """PC-only background polish — slightly calmer / deeper blur (no family change)."""
+    """PC-only background — deeper blur / calmer grade so family edge melts in."""
     sky = box_crop_frac(fam_src, 0.0, 0.0, 1.0, 0.52)
     atm = fit_cover(sky, w, h)
-    atm = ImageEnhance.Brightness(atm).enhance(0.58)
-    atm = ImageEnhance.Color(atm).enhance(0.76)
-    atm = atm.filter(ImageFilter.GaussianBlur(radius=28))
-    # Soft teal veil so family edge blends into atmosphere
-    veil = Image.new("RGBA", (w, h), (*TEAL, 28))
+    atm = ImageEnhance.Brightness(atm).enhance(0.54)
+    atm = ImageEnhance.Color(atm).enhance(0.70)
+    atm = atm.filter(ImageFilter.GaussianBlur(radius=36))
+    # Soft teal veil so family border blends into atmosphere
+    veil = Image.new("RGBA", (w, h), (*TEAL, 36))
     out = atm.convert("RGBA")
     out.alpha_composite(veil)
     return out
+
+
+def soft_vertical_fade(size: tuple[int, int], top: float = 0.08, bottom: float = 0.92) -> Image.Image:
+    """Gentle top/bottom alpha fade for a more natural photo border."""
+    w, h = size
+    mask = Image.new("L", (w, h), 255)
+    px = mask.load()
+    for y in range(h):
+        t = y / max(1, h - 1)
+        if t < top:
+            a = int(255 * (t / max(1e-6, top)) ** 1.2)
+        elif t > bottom:
+            u = (t - bottom) / max(1e-6, 1 - bottom)
+            a = int(255 * (1 - u) ** 1.2)
+        else:
+            a = 255
+        for x in range(w):
+            px[x, y] = a
+    return mask.filter(ImageFilter.GaussianBlur(radius=14))
 
 
 def compose_pc(fam_src: Image.Image) -> Image.Image:
     """PC banner — family crop/scale/placement frozen; only bg + edge blend polish."""
     W, H = PC
     canvas = city_atmosphere_pc(fam_src, W, H)
-    mist_right(canvas, strength=1.15)
+    mist_right(canvas, strength=1.35)
 
     # LOCKED family geometry (do not change scale/crop/anchor/paste — faces stay as shipped)
     fw, fh = 1240, H
@@ -335,10 +354,11 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     )
     family = ImageEnhance.Brightness(family).enhance(1.05)
     family = ImageEnhance.Color(family).enhance(1.0)
-    # Edge-only: softer blob vignette + longer right fade into background
-    family = soften_blob_edge(family, radius=18)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.78)
-    fam_mask = fam_mask.filter(ImageFilter.GaussianBlur(radius=10))
+    # Edge-only: wider feather + longer right/vertical fade into background
+    family = soften_blob_edge(family, radius=28)
+    fam_mask = soft_right_fade((fw, fh), fade_start=0.70)
+    fam_mask = ImageChops.multiply(fam_mask, soft_vertical_fade((fw, fh), 0.06, 0.94))
+    fam_mask = fam_mask.filter(ImageFilter.GaussianBlur(radius=18))
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
     # Baby / pets — placement unchanged (family-edge polish only)
@@ -359,16 +379,16 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)
-    for x in range(780, 1140):
+    for x in range(760, 1160):
         mid = 960
-        dist = abs(x - mid) / 200
+        dist = abs(x - mid) / 220
         peak = max(0.0, 1.0 - dist)
-        a = int(14 * peak * peak)
+        a = int(16 * peak * peak)
         bd.line([(x, 0), (x, H)], fill=(30, 50, 55, a))
-    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=22)))
+    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=28)))
 
-    # Gentler wash — keep motto readable without hard edge against family
-    calm_wash(canvas, left_w=400, bottom_h=140)
+    # Softer wash — motto readable, no hard wall against family fringe
+    calm_wash(canvas, left_w=380, bottom_h=130)
     return canvas.convert("RGB")
 
 

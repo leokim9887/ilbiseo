@@ -308,17 +308,82 @@ def soften_blob_edge(layer: Image.Image, radius: int = 16) -> Image.Image:
     return out
 
 
+def dissolve_oval_seam(
+    layer: Image.Image,
+    *,
+    radii: tuple[int, ...] = (16, 36, 64),
+    bg: tuple[int, int, int] = TEAL,
+    core_blur: int = 36,
+) -> Image.Image:
+    """Kill hard oval/circle rim: multi-pass alpha dissolve + RGB→bg fringe.
+
+    Face/body geometry (crop/scale) unchanged. Core restore is *soft-blurred*
+    so we never reintroduce a hard oval stroke at the protect boundary.
+    """
+    a = layer.getchannel("A")
+    # Face-protect region from solid alpha; expand then blur → seamless protect
+    core_hard = a.point(lambda p: 255 if p >= 250 else 0)
+    core_hard = core_hard.filter(ImageFilter.MaxFilter(size=11))
+    core_soft = core_hard.filter(ImageFilter.GaussianBlur(radius=core_blur))
+
+    soft = a
+    for r in radii:
+        blurred = soft.filter(ImageFilter.GaussianBlur(radius=r))
+        soft = ImageChops.darker(soft, blurred)
+    # Soft lerp: 255 in face core → dissolved fringe outside (no hard step)
+    full = Image.new("L", a.size, 255)
+    a_out = Image.composite(full, soft, core_soft)
+
+    # Fringe RGB → banner teal (kills bright rim / stroke on dark bg)
+    rgb = layer.convert("RGBA")
+    br, bgc, bb = bg
+    mix = a_out.point(lambda p: 255 - p)
+    bg_layer = Image.new("RGBA", layer.size, (br, bgc, bb, 255))
+    out = Image.composite(bg_layer, rgb, mix)
+    # Soft-restore original face RGB (same soft core — no oval line)
+    face = Image.composite(rgb, out, core_soft)
+    face.putalpha(a_out)
+    return face
+
+
+def seamless_right_fade(size: tuple[int, int], fade_start: float = 0.52) -> Image.Image:
+    """Very long, smooth right dissolve — no vertical partition seam."""
+    w, h = size
+    mask = Image.new("L", (w, h), 255)
+    px = mask.load()
+    for x in range(w):
+        t = x / max(1, w - 1)
+        if t <= fade_start:
+            a = 255
+        else:
+            u = (t - fade_start) / max(1e-6, 1 - fade_start)
+            # smoothstep² — long soft tail
+            u = u * u * (3 - 2 * u)
+            u = u * u
+            a = int(255 * (1 - u))
+        for y in range(h):
+            px[x, y] = a
+    return mask.filter(ImageFilter.GaussianBlur(radius=28))
+
+
 def city_atmosphere_pc(fam_src: Image.Image, w: int, h: int) -> Image.Image:
-    """PC-only background — deeper blur / calmer grade so family edge melts in."""
+    """PC-only background — deep blur, teal-matched so family edge vanishes."""
     sky = box_crop_frac(fam_src, 0.0, 0.0, 1.0, 0.52)
     atm = fit_cover(sky, w, h)
-    atm = ImageEnhance.Brightness(atm).enhance(0.54)
-    atm = ImageEnhance.Color(atm).enhance(0.70)
-    atm = atm.filter(ImageFilter.GaussianBlur(radius=36))
-    # Soft teal veil so family border blends into atmosphere
-    veil = Image.new("RGBA", (w, h), (*TEAL, 36))
+    atm = ImageEnhance.Brightness(atm).enhance(0.48)
+    atm = ImageEnhance.Color(atm).enhance(0.62)
+    atm = atm.filter(ImageFilter.GaussianBlur(radius=42))
+    veil = Image.new("RGBA", (w, h), (*TEAL, 48))
     out = atm.convert("RGBA")
     out.alpha_composite(veil)
+    # Extra dark mist so oval fringe has nowhere to "ring"
+    mist = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    md = ImageDraw.Draw(mist)
+    for y in range(h):
+        t = y / max(1, h - 1)
+        a = int(18 * (0.35 + 0.65 * t))
+        md.line([(0, y), (w, y)], fill=(*TEAL, a))
+    out.alpha_composite(mist.filter(ImageFilter.GaussianBlur(radius=20)))
     return out
 
 
@@ -330,38 +395,158 @@ def soft_vertical_fade(size: tuple[int, int], top: float = 0.08, bottom: float =
     for y in range(h):
         t = y / max(1, h - 1)
         if t < top:
-            a = int(255 * (t / max(1e-6, top)) ** 1.2)
+            a = int(255 * (t / max(1e-6, top)) ** 1.35)
         elif t > bottom:
             u = (t - bottom) / max(1e-6, 1 - bottom)
-            a = int(255 * (1 - u) ** 1.2)
+            a = int(255 * (1 - u) ** 1.35)
         else:
             a = 255
         for x in range(w):
             px[x, y] = a
-    return mask.filter(ImageFilter.GaussianBlur(radius=14))
+    return mask.filter(ImageFilter.GaussianBlur(radius=22))
+
+
+def polish_family_faces_no_oval(faces: Image.Image) -> Image.Image:
+    """Same face polish as polish_family_faces but NO hard subject ellipse.
+
+    PC seamless path: rectangular crop keeps faces/bodies/scale; soft radial
+    feather is applied later so there is no oval stroke.
+    """
+    w, h = faces.size
+    sharp = ImageEnhance.Contrast(faces).enhance(1.18)
+    sharp = ImageEnhance.Brightness(sharp).enhance(1.10)
+    sharp = ImageEnhance.Color(sharp).enhance(1.04)
+    sharp = unsharp(sharp, percent=155, radius=1.55)
+    top_dim = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    td = ImageDraw.Draw(top_dim)
+    band = int(h * 0.22)
+    for y in range(0, band):
+        t = 1.0 - y / max(1, band)
+        a = int(110 * (t**1.35))
+        td.line([(0, y), (w, y)], fill=(*TEAL, a))
+    sharp = Image.alpha_composite(sharp, top_dim.filter(ImageFilter.GaussianBlur(radius=6)))
+    # Full opacity — edge shape comes only from soft radial / fades below
+    sharp.putalpha(255)
+    return sharp
+
+
+def family_plane_pc_seamless(
+    fam_src: Image.Image,
+    tw: int,
+    th: int,
+) -> Image.Image:
+    """LOCKED PC geometry (same crop/scale/anchor as prior family_plane call)."""
+    faces = polish_family_faces_no_oval(family_five(fam_src))
+    sw, sh = faces.size
+    scale_boost = 1.04
+    anchor_x, anchor_y = 0.34, 0.50
+    scale = min(tw / sw, th / sh) * scale_boost
+    nw, nh = max(1, int(sw * scale + 0.5)), max(1, int(sh * scale + 0.5))
+    if nw > tw:
+        scale = tw / sw
+        nw, nh = tw, max(1, int(sh * scale + 0.5))
+    if nh > th:
+        scale = th / sh
+        nw, nh = max(1, int(sw * scale + 0.5)), th
+    resized = faces.resize((nw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+    ox = max(0, min(int((tw - nw) * anchor_x), tw - nw))
+    oy = max(0, min(int((th - nh) * anchor_y), th - nh))
+    canvas.paste(resized, (ox, oy), resized)
+    return canvas
+
+
+def crush_peripheral_glow(
+    layer: Image.Image,
+    *,
+    cx: float = 0.50,
+    cy: float = 0.55,
+    inner: float = 0.48,
+    bg: tuple[int, int, int] = TEAL,
+) -> Image.Image:
+    """Darken beach/sky/city lights at the fringe so no luminous oval halo.
+
+    Wide face-protect ellipse keeps all 5 faces full strength; only outer
+    sand/sky/city lerps toward banner teal.
+    """
+    w, h = layer.size
+    glow = Image.new("L", (w, h), 0)
+    px = glow.load()
+    rx, ry = 0.70, 0.74
+    for y in range(h):
+        for x in range(w):
+            nx = (x / max(1, w - 1) - cx) / rx
+            ny = (y / max(1, h - 1) - cy) / ry
+            d = (nx * nx + ny * ny) ** 0.5
+            if d <= inner:
+                g = 0
+            elif d >= 1.0:
+                g = 255
+            else:
+                u = (d - inner) / max(1e-6, 1.0 - inner)
+                u = u * u * (3 - 2 * u)
+                g = int(255 * (0.55 + 0.45 * u))  # strong crush even mid-fringe
+            px[x, y] = g
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=28))
+    rgb = layer.convert("RGBA")
+    bg_layer = Image.new("RGBA", (w, h), (*bg, 255))
+    mixed = Image.composite(bg_layer, rgb, glow)
+    mixed.putalpha(layer.getchannel("A"))
+    return mixed
+
+
+def force_dark_fringe(
+    layer: Image.Image,
+    *,
+    bg: tuple[int, int, int] = TEAL,
+    solid: int = 245,
+) -> Image.Image:
+    """Kill light/white halo strokes: semi-transparent fringe RGB → banner teal.
+
+    Bright beach/sky pixels at soft edges otherwise read as an oval aura.
+    """
+    a = layer.getchannel("A")
+    rgb = layer.convert("RGB")
+    # mix=1 (use bg) when transparent; mix=0 when solid face core
+    mix = a.point(
+        lambda p: 0 if p >= solid else int(255 * ((solid - p) / solid) ** 0.55)
+    )
+    mix = mix.filter(ImageFilter.GaussianBlur(radius=8))
+    bg_layer = Image.new("RGB", layer.size, bg)
+    out_rgb = Image.composite(bg_layer, rgb, mix)
+    out = out_rgb.convert("RGBA")
+    out.putalpha(a)
+    return out
 
 
 def compose_pc(fam_src: Image.Image) -> Image.Image:
-    """PC banner — family crop/scale/placement frozen; only bg + edge blend polish."""
+    """PC banner — family crop/scale/placement frozen; seamless edge into bg only."""
     W, H = PC
     canvas = city_atmosphere_pc(fam_src, W, H)
-    mist_right(canvas, strength=1.35)
+    mist_right(canvas, strength=1.55)
 
-    # LOCKED family geometry (do not change scale/crop/anchor/paste — faces stay as shipped)
+    # LOCKED family geometry — face-cluster soft matte (hide beach/city oval glow)
     fw, fh = 1240, H
-    family = family_plane(
-        fam_src, fw, fh, scale_boost=1.04, anchor_x=0.34, anchor_y=0.50
+    family = family_plane_pc_seamless(fam_src, fw, fh)
+    family = ImageEnhance.Brightness(family).enhance(1.04)
+    family = ImageEnhance.Color(family).enhance(0.96)
+    # Tight soft matte around the 5 faces only — scenery fringe dissolves to bg
+    # (same crop/scale; alpha shape only). soft start early + heavy blur = no stroke
+    face_matte = subject_ellipse_mask(
+        (fw, fh), cx=0.46, cy=0.60, rx=0.52, ry=0.60, soft=0.45
     )
-    family = ImageEnhance.Brightness(family).enhance(1.05)
-    family = ImageEnhance.Color(family).enhance(1.0)
-    # Edge-only: wider feather + longer right/vertical fade into background
-    family = soften_blob_edge(family, radius=28)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.70)
-    fam_mask = ImageChops.multiply(fam_mask, soft_vertical_fade((fw, fh), 0.06, 0.94))
-    fam_mask = fam_mask.filter(ImageFilter.GaussianBlur(radius=18))
-    paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
+    face_matte = face_matte.filter(ImageFilter.GaussianBlur(radius=38))
+    family.putalpha(ImageChops.multiply(family.getchannel("A"), face_matte))
+    family = crush_peripheral_glow(family, cx=0.46, cy=0.60, inner=0.42, bg=TEAL)
+    family = dissolve_oval_seam(family, radii=(24, 52, 88), bg=TEAL, core_blur=40)
+    # Critical: no light fringe / white oval aura against dark banner
+    family = force_dark_fringe(family, bg=TEAL, solid=245)
+    fam_mask = seamless_right_fade((fw, fh), fade_start=0.50)
+    fam_mask = ImageChops.multiply(fam_mask, soft_vertical_fade((fw, fh), 0.02, 0.98))
+    fam_mask = fam_mask.filter(ImageFilter.GaussianBlur(radius=32))
+    paste_masked(canvas, family, (-48, 0), fam_mask, 0.98)
 
-    # Baby / pets — placement unchanged (family-edge polish only)
+    # Baby / pets — placement unchanged
     baby = night_grade(
         cover_crop(load("04-baby.png"), 560, 610, bias=(0.5, 0.16)), strength=0.34
     )
@@ -377,18 +562,18 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     )
     paste_masked(canvas, cat, (1310, 255), radial_mask((450, 450), soft=0.48), 0.97)
 
+    # No hard bridge band — only a whisper of atmosphere (avoids partition seam)
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)
-    for x in range(760, 1160):
-        mid = 960
-        dist = abs(x - mid) / 220
+    for x in range(820, 1120):
+        mid = 970
+        dist = abs(x - mid) / 200
         peak = max(0.0, 1.0 - dist)
-        a = int(16 * peak * peak)
-        bd.line([(x, 0), (x, H)], fill=(30, 50, 55, a))
-    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=28)))
+        a = int(6 * peak * peak)
+        bd.line([(x, 0), (x, H)], fill=(*TEAL, a))
+    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=36)))
 
-    # Softer wash — motto readable, no hard wall against family fringe
-    calm_wash(canvas, left_w=380, bottom_h=130)
+    calm_wash(canvas, left_w=360, bottom_h=120)
     return canvas.convert("RGB")
 
 

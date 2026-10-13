@@ -163,16 +163,21 @@ export function autoMapHeaders(headers: string[]): ColumnMapping {
   return mapping;
 }
 
-/** True when headers look like 일비서 template (title + most core cols). */
+/** True when headers look like 일비서 export/template (exact classic names). */
 export function isIlbiseoTemplate(headers: string[]): boolean {
-  const mapping = autoMapHeaders(headers);
-  const fields = new Set(Object.values(mapping));
-  const hasTitle = fields.has("title");
-  const coreHits = ["deadline", "importance", "urgency", "done"].filter((f) =>
-    fields.has(f as ImportField),
-  ).length;
-  // 할일 LIST UP + at least 2 of the classic columns, or title+deadline+importance
-  return hasTitle && coreHits >= 2;
+  const norms = headers.map(normalizeHeader);
+  const hasListUp = norms.some(
+    (n) =>
+      n === "할일 list up" ||
+      n === "할일list up" ||
+      n === "할일 listup" ||
+      n === "할일listup",
+  );
+  const hasDeadline = norms.some((n) => n === "마감목표");
+  const hasImportance = norms.some((n) => n === "중요도");
+  const hasUrgency = norms.some((n) => n === "시급성");
+  // Classic father columns — not merely "any title-like + 기한"
+  return hasListUp && hasDeadline && (hasImportance || hasUrgency);
 }
 
 export function loadSavedMapping(): ColumnMapping | null {

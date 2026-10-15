@@ -316,10 +316,23 @@
 }
 .dark .excel-input {
   color: #e8ece9;
+  background: transparent;
 }
 .dark .excel-input:focus {
   background: #24302a;
   box-shadow: inset 0 0 0 1px #3d8f82;
+}
+/* Deadline display button / soft surfaces — never light cell + pale text */
+.dark .excel-wb [data-excel-deadline-display] {
+  color: #e8ece9 !important;
+  background: transparent !important;
+}
+.dark .excel-wb td {
+  background-color: inherit;
+}
+.dark .excel-wb .excel-textarea,
+.dark .excel-wb .excel-textarea-memo {
+  background: transparent;
 }
 .excel-wb select.excel-input {
   cursor: pointer;
@@ -520,6 +533,21 @@ tr[data-similarity-focus="1"] {
   outline-offset: -2px;
   background: #d4edda !important;
   transition: background 0.2s ease;
+}
+.dark tr[data-similarity-focus="1"] {
+  outline-color: #3d8f82;
+  background: #1e332d !important;
+}
+
+/* Kill leftover light cells / pure-white bars in dark excel */
+.dark .excel-wb td.bg-white,
+.dark .excel-wb .bg-white {
+  background-color: #1a221e !important;
+}
+.dark .excel-wb [class*="bg-[#eef2ef]"],
+.dark .excel-wb [class*="bg-[#eef7f1]"],
+.dark .excel-wb [class*="bg-[#e8ecef]"] {
+  background-color: #222c27 !important;
 }
 
 .excel-textarea:disabled,

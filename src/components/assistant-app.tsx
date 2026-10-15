@@ -296,7 +296,7 @@ export function AssistantApp() {
               />
               {/* PC: 지침 | 습관 side-by-side · 모바일: 세로 스택 */}
               <div
-                className="mx-auto grid w-full max-w-[72rem] grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4"
+                className="grid w-full grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4"
                 data-side-lists-pair
               >
                 <SideListSection
@@ -361,7 +361,7 @@ export function AssistantApp() {
                   onPrefsChange={sync.writePrefs}
                   onSyncNow={() => void sync.syncNow()}
                   onEnabledPull={(code) =>
-                    void sync.runPull({ silent: false, code })
+                    void sync.runPull({ code })
                   }
                 />
                 <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">

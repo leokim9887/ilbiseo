@@ -30,11 +30,17 @@ type UseDeviceSyncArgs = {
   hydrateFromRemote: (state: AppState, updatedAt: string) => void;
 };
 
+/**
+ * PC↔폰 동기화 — 수동 우선.
+ * - 페이지 로드 시 1회 pull(토스트 없음)
+ * - 「지금 동기화」클릭 시에만 push/pull + 「동기화됨」토스트
+ * - 편집·저장마다 자동 push / 탭 전환 auto-pull 없음
+ */
 export function useDeviceSync({
   ready,
   state,
   localUpdatedAt,
-  persistEpoch,
+  persistEpoch: _persistEpoch,
   skipRemotePushRef,
   hydrateFromRemote,
 }: UseDeviceSyncArgs) {
@@ -51,7 +57,6 @@ export function useDeviceSync({
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<SyncToast>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef(state);
   const localUpdatedAtRef = useRef(localUpdatedAt);
   const prefsRef = useRef(prefs);
@@ -75,8 +80,9 @@ export function useDeviceSync({
     saveSyncPrefs(next);
   }, []);
 
+  /** Background / load pull — never shows 「동기화됨」 toast. */
   const runPull = useCallback(
-    async (opts?: { silent?: boolean; code?: string }) => {
+    async (opts?: { code?: string }) => {
       const current = prefsRef.current;
       const code = opts?.code ?? current.code;
       if (!code) return;
@@ -89,19 +95,13 @@ export function useDeviceSync({
         );
         if (result.status === "applied") {
           hydrateFromRemote(result.state, result.updatedAt);
-          const next = {
+          writePrefs({
             ...prefsRef.current,
             lastSyncedAt: result.updatedAt,
             localUpdatedAt: result.updatedAt,
-          };
-          writePrefs(next);
-          if (!opts?.silent) {
-            showToast({ kind: "ok", text: "동기화됨 · 다른 기기 내용을 가져왔습니다" });
-          } else {
-            showToast({ kind: "ok", text: "동기화됨" });
-          }
+          });
         } else if (result.status === "empty") {
-          // First device: push local workbook up.
+          // First device: quietly seed remote with local workbook.
           const updatedAt =
             localUpdatedAtRef.current ?? new Date().toISOString();
           const push = await pushLocalState(
@@ -115,73 +115,17 @@ export function useDeviceSync({
               lastSyncedAt: push.updatedAt,
               localUpdatedAt: push.updatedAt,
             });
-            showToast({ kind: "ok", text: "동기화됨 · 이 기기 내용을 올렸습니다" });
-          } else if (push.status === "error") {
-            showToast({ kind: "error", text: push.message });
           }
-        } else if (result.status === "same" || result.status === "skipped-local-newer") {
-          if (!opts?.silent) {
-            showToast({ kind: "ok", text: "동기화됨" });
-          }
-        } else if (result.status === "error") {
-          showToast({ kind: "error", text: result.message });
         }
+        // same / skipped-local-newer / error — silent on background pull
       } finally {
         setBusy(false);
       }
     },
-    [hydrateFromRemote, showToast, writePrefs],
+    [hydrateFromRemote, writePrefs],
   );
 
-  const runPush = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      const current = prefsRef.current;
-      if (!current.enabled || !current.code) return;
-      if (skipRemotePushRef.current) {
-        skipRemotePushRef.current = false;
-        return;
-      }
-      setBusy(true);
-      try {
-        const updatedAt =
-          localUpdatedAtRef.current ?? new Date().toISOString();
-        const result = await pushLocalState(
-          current.code,
-          stateRef.current,
-          updatedAt,
-        );
-        if (result.status === "ok") {
-          writePrefs({
-            ...prefsRef.current,
-            lastSyncedAt: result.updatedAt,
-            localUpdatedAt: result.updatedAt,
-          });
-          if (!opts?.silent) {
-            showToast({ kind: "ok", text: "동기화됨" });
-          } else {
-            showToast({ kind: "ok", text: "동기화됨" });
-          }
-        } else if (result.status === "conflict") {
-          hydrateFromRemote(result.state, result.updatedAt);
-          writePrefs({
-            ...prefsRef.current,
-            lastSyncedAt: result.updatedAt,
-            localUpdatedAt: result.updatedAt,
-          });
-          showToast({
-            kind: "info",
-            text: "동기화됨 · 서버의 최신 내용을 반영했습니다",
-          });
-        } else {
-          showToast({ kind: "error", text: result.message });
-        }
-      } finally {
-        setBusy(false);
-      }
-    },
-    [hydrateFromRemote, showToast, skipRemotePushRef, writePrefs],
-  );
-
+  /** Explicit 「지금 동기화」— toast only here. */
   const syncNow = useCallback(async () => {
     const current = prefsRef.current;
     if (!current.enabled || !current.code) {
@@ -191,7 +135,9 @@ export function useDeviceSync({
       });
       return;
     }
-    // Pull first (may apply remote), then push if local is still newer / empty handled in pull.
+    if (skipRemotePushRef.current) {
+      skipRemotePushRef.current = false;
+    }
     setBusy(true);
     try {
       const pull = await pullRemoteState(
@@ -205,7 +151,10 @@ export function useDeviceSync({
           lastSyncedAt: pull.updatedAt,
           localUpdatedAt: pull.updatedAt,
         });
-        showToast({ kind: "ok", text: "동기화됨" });
+        showToast({
+          kind: "ok",
+          text: "동기화됨 · 다른 기기 내용을 가져왔습니다",
+        });
         return;
       }
       if (pull.status === "error") {
@@ -233,47 +182,30 @@ export function useDeviceSync({
           lastSyncedAt: push.updatedAt,
           localUpdatedAt: push.updatedAt,
         });
-        showToast({ kind: "ok", text: "동기화됨" });
+        showToast({
+          kind: "ok",
+          text: "동기화됨 · 서버의 최신 내용을 반영했습니다",
+        });
       } else {
         showToast({ kind: "error", text: push.message });
       }
     } finally {
       setBusy(false);
     }
-  }, [hydrateFromRemote, showToast, writePrefs]);
+  }, [hydrateFromRemote, showToast, skipRemotePushRef, writePrefs]);
 
-  // Initial pull when sync is enabled
+  // Initial pull on load / when sync first enabled — no toast
   useEffect(() => {
     if (!ready || !prefs.enabled || !prefs.code) return;
     if (pulledOnceRef.current) return;
     pulledOnceRef.current = true;
-    void runPull({ silent: true });
+    void runPull();
   }, [ready, prefs.enabled, prefs.code, runPull]);
 
-  // Debounced push after local saves
+  // Reset pulledOnce when sync turned off so next enable pulls again
   useEffect(() => {
-    if (!ready || !prefs.enabled || !prefs.code) return;
-    if (persistEpoch === 0) return;
-    if (pushTimer.current) clearTimeout(pushTimer.current);
-    pushTimer.current = setTimeout(() => {
-      void runPush({ silent: true });
-    }, 900);
-    return () => {
-      if (pushTimer.current) clearTimeout(pushTimer.current);
-    };
-  }, [persistEpoch, ready, prefs.enabled, prefs.code, runPush]);
-
-  // Re-pull when tab becomes visible
-  useEffect(() => {
-    if (!ready || !prefs.enabled || !prefs.code) return;
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        void runPull({ silent: true });
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [ready, prefs.enabled, prefs.code, runPull]);
+    if (!prefs.enabled) pulledOnceRef.current = false;
+  }, [prefs.enabled]);
 
   return {
     prefs,
@@ -283,6 +215,5 @@ export function useDeviceSync({
     showToast,
     syncNow,
     runPull,
-    runPush,
   };
 }

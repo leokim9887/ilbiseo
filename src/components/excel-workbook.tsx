@@ -1345,7 +1345,7 @@ export function ExcelWorkbook({
                           placeholder="할 일 제목"
                         />
                         <label className="flex flex-col gap-0">
-                          <span className="text-[12px] font-medium leading-tight text-[#454d48]">
+                          <span className="rounded-sm bg-[#e8ecef]/80 px-1 py-0.5 text-[12px] font-medium leading-tight text-[#454d48] dark:bg-[#24302a] dark:text-[#a8b3ad]">
                             메모
                           </span>
                           <AutoGrowTextarea
@@ -1525,8 +1525,10 @@ export function ExcelWorkbook({
                       ) : (
                         <button
                           type="button"
-                          className={`min-h-8 w-full px-0.5 text-center text-[12px] leading-snug break-words sm:min-h-9 sm:px-1 sm:text-[14px] ${
-                            someday ? "font-semibold text-[#217346]" : ""
+                          className={`min-h-8 w-full px-0.5 text-center text-[12px] leading-snug break-words text-[#1a2420] dark:text-[#e8ece9] sm:min-h-9 sm:px-1 sm:text-[14px] ${
+                            someday
+                              ? "font-semibold text-[#217346] dark:text-[#5bb8a8]"
+                              : ""
                           }`}
                           onClick={() => {
                             setActiveRow(task.id);
@@ -1545,7 +1547,7 @@ export function ExcelWorkbook({
                               </span>
                             </>
                           ) : (
-                            <span className="text-[#5a635e]">
+                            <span className="text-[#5a635e] dark:text-[#a8b3ad]">
                               <span className="sm:hidden">날짜</span>
                               <span className="hidden sm:inline">
                                 시작 ~ 종료
@@ -1694,12 +1696,12 @@ function EditCell({
 }) {
   return (
     <td
-      className={`border border-black p-0 align-middle ${
+      className={`border border-black p-0 align-middle dark:border-[#4a5c52] ${
         active
-          ? "bg-[#eef7f1] outline outline-2 outline-[#217346] outline-offset-[-2px]"
+          ? "bg-[#eef7f1] outline outline-2 outline-[#217346] outline-offset-[-2px] dark:bg-[#1e332d] dark:outline-[#3d8f82]"
           : locked
-            ? "bg-[#eef2ef]"
-            : ""
+            ? "bg-[#eef2ef] dark:bg-[#222c27]"
+            : "dark:bg-[#1a221e]"
       } ${center ? "text-center" : ""}`}
       onClick={onFocusCell}
       onKeyDown={locked ? undefined : onKeyNav}

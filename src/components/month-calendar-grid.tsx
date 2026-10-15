@@ -391,7 +391,7 @@ export function MonthCalendarGrid({
                         : "bg-white dark:bg-[#1a221e]"
                     } ${
                       canOpen
-                        ? "cursor-pointer transition-colors hover:bg-[#f3f7f4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#217346]/35"
+                        ? "cursor-pointer transition-colors hover:bg-[#f3f7f4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#217346]/35 dark:hover:bg-[#24302a]"
                         : ""
                     }`}
                   >
@@ -425,7 +425,7 @@ export function MonthCalendarGrid({
                       {dayEvents.slice(0, CHIP_LIMIT).map((ev) => (
                         <li
                           key={ev.id}
-                          className="truncate rounded-sm border-l-2 border-l-[#3b6ea5] bg-[#eef3fa] px-1 py-0.5 text-[10px] leading-snug text-[var(--ink)] sm:px-1.5 sm:py-1 sm:text-[13px]"
+                          className="truncate rounded-sm border-l-2 border-l-[#3b6ea5] bg-[#eef3fa] px-1 py-0.5 text-[10px] leading-snug text-[#1a2420] dark:border-l-[#6a9bc4] dark:bg-[#1e2a38] dark:text-[#e8ece9] sm:px-1.5 sm:py-1 sm:text-[13px]"
                           title={`${ev.title} · ${formatCalendarWhen(ev)}`}
                           data-cal-event={ev.id}
                           data-cal-single="1"

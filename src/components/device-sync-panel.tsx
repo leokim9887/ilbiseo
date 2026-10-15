@@ -96,7 +96,12 @@ export function DeviceSyncPanel({
               <strong className="font-semibold text-[var(--ink)]">
                 동기화 코드
               </strong>
-              로 맞춥니다. Google 캘린더 연동과는 별개입니다.
+              로 맞춥니다. 글자를 고칠 때마다 올라가지 않습니다.{" "}
+              <strong className="font-semibold text-[var(--ink)]">
+                「지금 동기화」
+              </strong>
+              를 누를 때(또는 페이지를 새로 열 때)만 맞춥니다. Google 캘린더와는
+              별개입니다.
             </p>
           </div>
 

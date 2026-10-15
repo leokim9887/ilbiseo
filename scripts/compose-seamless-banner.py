@@ -25,11 +25,13 @@ MOBILE = (1170, 780)
 BG = (235, 230, 223)
 TEAL = (22, 63, 57)
 
-# Single Ace/baby source for banner insets + cheer overlay
+# Banner insets use the new Ace (tan-cap) photo; cheer overlay keeps original baby face
 BABY_SRC = "04-baby-ace-new.png"
+CHEER_SRC = "04-baby.png"
 # Face + tan cap framing (slight right bias away from holder's black sleeve)
 BABY_BIAS = (0.52, 0.30)
-CHEER_BIAS = (0.52, 0.28)
+# Original cheer crop bias (pre Ace-cap replace)
+CHEER_BIAS = (0.50, 0.14)
 
 
 def load(name: str) -> Image.Image:
@@ -390,8 +392,8 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
 
 
 def compose_grandson_cheer_face() -> Image.Image:
-    """Circular Ace face for daily cheer overlay — same BABY_SRC as banner."""
-    baby = cover_crop(load(BABY_SRC), 640, 640, bias=CHEER_BIAS)
+    """Circular Ace face for daily cheer overlay — original baby (not banner Ace-cap)."""
+    baby = cover_crop(load(CHEER_SRC), 640, 640, bias=CHEER_BIAS)
     baby = ImageEnhance.Contrast(baby).enhance(1.08)
     baby = ImageEnhance.Brightness(baby).enhance(1.04)
     baby = unsharp(baby, percent=130, radius=1.3)

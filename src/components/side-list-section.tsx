@@ -30,7 +30,7 @@ export function SideListSection({
   mode = "active",
   onAdd,
   onUpdate,
-  onDelete,
+  onDelete: _onDelete,
   onDeleteMany,
   onCompleteMany,
 }: SideListSectionProps) {
@@ -457,7 +457,7 @@ export function SideListSection({
                       }}
                       disabled={locked}
                       readOnly={locked}
-                      className={`h-9 w-full rounded-sm border px-2 text-[14px] outline-none ${
+                      className={`h-7 w-full rounded-sm border px-2 text-[12.5px] outline-none ${
                         locked
                           ? "cursor-default border-[#c5d0c9] bg-[#e8eee9] text-[#7a8680]"
                           : "border-[#d0d5d9] bg-white text-[#2a3230] focus:border-[#8a939a]"
@@ -467,9 +467,10 @@ export function SideListSection({
                       data-side-memo={item.id}
                     />
                   </div>
-                  <div className="flex shrink-0 flex-row gap-1.5 self-end sm:flex-col sm:self-start">
-                    {item.done ? (
-                      locked ? (
+                  {/* 삭제는 선택 후 「선택 삭제」만 — 행마다 삭제 버튼 없음 */}
+                  {item.done ? (
+                    <div className="flex shrink-0 flex-row gap-1.5 self-end sm:flex-col sm:self-start">
+                      {locked ? (
                         <button
                           type="button"
                           className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#217346]/45 bg-white px-2 text-[13px] font-medium text-[#217346] hover:bg-[#e8f5ee]"
@@ -496,18 +497,9 @@ export function SideListSection({
                           <Check className="size-3.5" />
                           수정 끝
                         </button>
-                      )
-                    ) : null}
-                    <button
-                      type="button"
-                      className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#8a939a] bg-white px-2 text-[13px] text-[#454d48] hover:bg-[#f0f2f4]"
-                      onClick={() => onDelete(item.id)}
-                      aria-label={`${label} 삭제`}
-                    >
-                      <Trash2 className="size-3.5" />
-                      삭제
-                    </button>
-                  </div>
+                      )}
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

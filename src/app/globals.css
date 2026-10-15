@@ -98,6 +98,53 @@
   --accent-someday: #5a635e;
 }
 
+/* Dark — deep teal/stone, same brand family (not purple) */
+.dark {
+  --background: #121916;
+  --foreground: #e8ece9;
+  --card: #1a221e;
+  --card-foreground: #e8ece9;
+  --popover: #1e2823;
+  --popover-foreground: #e8ece9;
+  --primary: #3d8f82;
+  --primary-foreground: #f4faf8;
+  --secondary: #24302a;
+  --secondary-foreground: #e8ece9;
+  --muted: #1e2823;
+  --muted-foreground: #a8b3ad;
+  --accent: #243a34;
+  --accent-foreground: #c5e4dc;
+  --destructive: #e05a4f;
+  --border: #2f3d36;
+  --input: #2f3d36;
+  --ring: #3d8f82;
+  --chart-1: #3d8f82;
+  --chart-2: #d4924a;
+  --chart-3: #6a9bc4;
+  --chart-4: #8a9490;
+  --chart-5: #5a8a7e;
+  --sidebar: #1a221e;
+  --sidebar-foreground: #e8ece9;
+  --sidebar-primary: #3d8f82;
+  --sidebar-primary-foreground: #f4faf8;
+  --sidebar-accent: #24302a;
+  --sidebar-accent-foreground: #e8ece9;
+  --sidebar-border: #2f3d36;
+  --sidebar-ring: #3d8f82;
+
+  --brand: #2a6b60;
+  --ink: #e8ece9;
+  --ink-muted: #a8b3ad;
+  --sheet: #1a221e;
+  --sheet-header: #222c27;
+  --grid-line: #3a4a42;
+  --row-hover: #24302a;
+  --group-bg: #1e332d;
+  --accent-spot: #d4924a;
+  --accent-ongoing: #3d8f82;
+  --accent-someday: #8a9490;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -105,8 +152,8 @@
   html {
     @apply font-sans;
     height: 100%;
-    /* Modest bump for Korean readability; keeps UI proportions */
-    font-size: 16.5px;
+    /* Modest bump for Korean readability (father-friendly) */
+    font-size: 17.5px;
     /* Phone: never let wide tables push the page sideways */
     overflow-x: clip;
     /* App-like: pan only — no page pinch-zoom */
@@ -128,6 +175,12 @@
     /* notch sides; top handled by install-hint / chrome, bottom by nav */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+  .dark body {
+    background-image:
+      radial-gradient(ellipse 100% 70% at 0% 0%, rgba(61, 143, 130, 0.14), transparent 55%),
+      radial-gradient(ellipse 80% 50% at 100% 0%, rgba(212, 146, 74, 0.08), transparent 50%),
+      linear-gradient(180deg, #121916 0%, #0e1411 100%);
   }
 
   /* Double-tap zoom off on controls; scroll/focus still work */
@@ -163,11 +216,16 @@
 .excel-hscroll-hint {
   display: block;
   padding: 0.3rem 0.55rem 0.4rem;
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.35;
   color: #454d48;
   background: #eef1f3;
   border-bottom: 1px solid #9aa5ad;
+}
+.dark .excel-hscroll-hint {
+  color: #a8b3ad;
+  background: #1e2823;
+  border-bottom-color: #2f3d36;
 }
 @media (min-width: 640px) {
   .excel-hscroll-hint {
@@ -187,22 +245,27 @@
     overflow-wrap: anywhere;
   }
   .excel-fit-mobile .excel-textarea {
-    font-size: 14.5px;
+    font-size: 15px;
     line-height: 1.35;
     padding: 0.08rem 0.1rem;
     min-height: 1.55rem;
   }
   .excel-fit-mobile .excel-textarea-memo {
-    font-size: 12.5px;
+    font-size: 13px;
     min-height: 1.35rem;
   }
   .excel-fit-mobile .excel-input {
-    font-size: 13px;
+    font-size: 13.5px;
     min-height: 1.75rem;
     padding: 0.12rem 0.15rem;
   }
   .excel-fit-mobile select.excel-input {
     padding-inline: 0;
+  }
+  /* Mobile 할 일: hide per-row 완료; give space to 마감목표 */
+  .excel-hide-done-mobile th.excel-col-done,
+  .excel-hide-done-mobile td.excel-col-done {
+    display: none;
   }
 }
 
@@ -243,11 +306,11 @@
 /* Excel workbook cell controls — readable first, still denser than card UI */
 .excel-input {
   width: 100%;
-  min-height: 2.05rem;
+  min-height: 2.15rem;
   border: none;
   background: transparent;
   padding: 0.22rem 0.4rem;
-  font-size: 16px;
+  font-size: 16.5px;
   line-height: 1.35;
   color: #1a2420;
   outline: none;
@@ -255,6 +318,13 @@
 .excel-input:focus {
   background: #fff;
   box-shadow: inset 0 0 0 1px #217346;
+}
+.dark .excel-input {
+  color: #e8ece9;
+}
+.dark .excel-input:focus {
+  background: #24302a;
+  box-shadow: inset 0 0 0 1px #3d8f82;
 }
 .excel-wb select.excel-input {
   cursor: pointer;
@@ -277,14 +347,14 @@
 }
 .excel-textarea {
   width: 100%;
-  min-height: 1.85rem;
+  min-height: 1.95rem;
   resize: none;
   overflow: hidden;
   field-sizing: content;
   border: none;
   background: transparent;
   padding: 0.12rem 0.15rem;
-  font-size: 16px;
+  font-size: 16.5px;
   line-height: 1.4;
   color: #1a2420;
   outline: none;
@@ -292,13 +362,44 @@
 }
 .excel-textarea-memo {
   min-height: 1.55rem;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.4;
   color: #2a3230;
 }
 .excel-textarea:focus {
   background: #fff;
   box-shadow: inset 0 0 0 1px #217346;
+}
+.dark .excel-textarea {
+  color: #e8ece9;
+}
+.dark .excel-textarea-memo {
+  color: #c5cec9;
+}
+.dark .excel-textarea:focus {
+  background: #24302a;
+  box-shadow: inset 0 0 0 1px #3d8f82;
+}
+
+/* Dark excel chrome — keep sheet readable, brand teal intact */
+.dark .excel-wb {
+  border-color: #3a4a42;
+  background: #1a221e;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.dark .excel-wb table {
+  color: #e8ece9;
+}
+.dark .excel-wb th {
+  background: #24302a !important;
+  color: #e8ece9 !important;
+  border-color: #4a5c52 !important;
+}
+.dark .excel-wb td {
+  border-color: #3a4a42 !important;
+}
+.dark .excel-wb [data-excel-scroll] {
+  background: #1a221e;
 }
 /* Similar-task alert: peer row flash so father sees which one overlaps */
 tr[data-similarity-focus="1"] {

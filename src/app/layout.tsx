@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_KR, Nanum_Myeongjo } from "next/font/google";
 import { PwaRegister } from "@/components/pwa-register";
+import {
+  ThemeProvider,
+  THEME_BOOT_SCRIPT,
+} from "@/components/theme-provider";
 import "./globals.css";
 
 const sans = IBM_Plex_Sans_KR({
@@ -40,25 +44,33 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#163f39" },
-    { media: "(prefers-color-scheme: dark)", color: "#163f39" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1411" },
   ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  colorScheme: "light",
+  colorScheme: "light dark",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="ko"
       className={`${sans.variable} ${display.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="flex min-h-dvh flex-col font-sans">
-        <PwaRegister />
-        {children}
+        <ThemeProvider>
+          <PwaRegister />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

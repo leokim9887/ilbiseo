@@ -116,7 +116,7 @@ const COLS_TODO: {
     key: "deadline",
     label: "마감목표",
     shortLabel: "마감",
-    width: "168px",
+    width: "200px",
   },
   {
     key: "importance",
@@ -145,7 +145,7 @@ const COLS_DONE: {
     key: "deadline",
     label: "마감목표",
     shortLabel: "마감",
-    width: "168px",
+    width: "200px",
   },
   {
     key: "importance",
@@ -154,6 +154,28 @@ const COLS_DONE: {
     width: "72px",
   },
   { key: "edit", label: "수정", shortLabel: "수정", width: "84px" },
+];
+
+/** Google Calendar list: no 중요도 / 완료여부 */
+const COLS_GCAL: {
+  key: ColKey;
+  label: string;
+  shortLabel: string;
+  width: string;
+}[] = [
+  { key: "order", label: "순서", shortLabel: "순", width: "56px" },
+  {
+    key: "listup",
+    label: "할일 LIST UP",
+    shortLabel: "일정",
+    width: "55%",
+  },
+  {
+    key: "deadline",
+    label: "마감목표",
+    shortLabel: "마감",
+    width: "220px",
+  },
 ];
 
 const EDITABLE: ColKey[] = ["listup", "deadline", "importance"];
@@ -205,7 +227,10 @@ export function ExcelWorkbook({
   const isGcal = frame === "gcal";
   const isAll = isAllFrame(frame);
   const isDoneSheet = sheet === "done";
-  const COLS = isDoneSheet ? COLS_DONE : COLS_TODO;
+  const COLS = isGcal ? COLS_GCAL : isDoneSheet ? COLS_DONE : COLS_TODO;
+  /** Mobile 할 일: hide per-row 완료 column (bulk 완료 remains in toolbar) */
+  const hideDoneOnMobile = !isGcal && sheet === "todo";
+  const emptyColSpan = isGcal ? 3 : 6;
   const [focus, setFocus] = useState<FocusCell | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
@@ -747,14 +772,17 @@ export function ExcelWorkbook({
             )}
           </select>
         </label>
-        {!isGcal && sheet === "todo" ? (
-          <div className="flex flex-wrap items-center gap-2">
+        {!isGcal ? (
+          <div
+            className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center"
+            data-excel-toolbar-actions
+          >
             {/* 「전체」 집계 틀: 행 추가 불가 (개별 틀에서만) */}
-            {!isAll ? (
+            {sheet === "todo" && !isAll ? (
               <Button
                 type="button"
                 size="sm"
-                className="h-11 min-h-11 touch-manipulation rounded-sm bg-[#217346] px-3 text-white hover:bg-[#1a5c38] sm:h-9 sm:min-h-9"
+                className="h-11 min-h-11 w-fit touch-manipulation rounded-sm bg-[#217346] px-3 text-white hover:bg-[#1a5c38] sm:h-9 sm:min-h-9"
                 onClick={onAdd}
                 data-excel-add-row
               >
@@ -762,56 +790,60 @@ export function ExcelWorkbook({
                 행 추가
               </Button>
             ) : null}
-            {isTaskCategory(frame) ? (
-              <ToolbarExtras
-                category={frame}
-                onImport={onImport}
-                onReplaceCategory={onReplaceCategory}
-              />
-            ) : null}
-          </div>
-        ) : null}
-        {!isGcal && selectedCount > 0 ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 할 일 / 한 일: 완료·삭제·복원 가로 배치 */}
-            {sheet === "todo" ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-11 min-h-11 touch-manipulation rounded-sm border-[#217346]/50 px-3 text-[14px] text-[#217346] sm:h-9 sm:min-h-9"
-                onClick={bulkComplete}
-                data-excel-bulk-complete
+            {/* 「추가 기능」+ 일괄 완료/삭제 — 같은 가로줄 (모바일도 nowrap) */}
+            {(sheet === "todo" && isTaskCategory(frame)) ||
+            selectedCount > 0 ? (
+              <div
+                className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                data-excel-bulk-row
               >
-                <Check className="size-3.5" />
-                완료
-              </Button>
-            ) : null}
-            {selectedDeletableIds.length > 0 ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-11 min-h-11 touch-manipulation rounded-sm border-[#b42318]/40 px-3 text-[14px] text-[#b42318] sm:h-9 sm:min-h-9"
-                onClick={bulkDelete}
-                data-excel-bulk-delete
-              >
-                <Trash2 className="size-3.5" />
-                선택 삭제
-              </Button>
-            ) : null}
-            {sheet === "done" ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-11 min-h-11 touch-manipulation rounded-sm px-3 text-[14px] sm:h-9 sm:min-h-9"
-                onClick={bulkRestore}
-                data-excel-bulk-restore
-              >
-                <RotateCcw className="size-3.5" />
-                선택 복원
-              </Button>
+                {sheet === "todo" && isTaskCategory(frame) ? (
+                  <ToolbarExtras
+                    category={frame}
+                    onImport={onImport}
+                    onReplaceCategory={onReplaceCategory}
+                  />
+                ) : null}
+                {selectedCount > 0 && sheet === "todo" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-11 min-h-11 shrink-0 touch-manipulation rounded-sm border-[#217346]/50 px-2.5 text-[13px] text-[#217346] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                    onClick={bulkComplete}
+                    data-excel-bulk-complete
+                  >
+                    <Check className="size-3.5" />
+                    완료
+                  </Button>
+                ) : null}
+                {selectedCount > 0 && selectedDeletableIds.length > 0 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-11 min-h-11 shrink-0 touch-manipulation rounded-sm border-[#b42318]/40 px-2.5 text-[13px] text-[#b42318] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                    onClick={bulkDelete}
+                    data-excel-bulk-delete
+                  >
+                    <Trash2 className="size-3.5" />
+                    선택 삭제
+                  </Button>
+                ) : null}
+                {selectedCount > 0 && sheet === "done" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-11 min-h-11 shrink-0 touch-manipulation rounded-sm px-2.5 text-[13px] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                    onClick={bulkRestore}
+                    data-excel-bulk-restore
+                  >
+                    <RotateCcw className="size-3.5" />
+                    선택 복원
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -983,14 +1015,35 @@ export function ExcelWorkbook({
         className="relative max-h-[min(58dvh,640px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-auto bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(68dvh,820px)] sm:min-h-[320px] sm:overflow-auto sm:overscroll-x-contain sm:overscroll-y-auto lg:max-h-[min(72dvh,920px)] xl:max-h-[min(76dvh,1040px)]"
         data-excel-scroll
       >
-        <table className="excel-fit-mobile w-full min-w-0 table-fixed border-collapse text-[13.5px] text-black sm:min-w-[860px] sm:table-auto sm:text-[16px]">
+        <table
+          className={`excel-fit-mobile w-full min-w-0 table-fixed border-collapse text-[14px] text-black sm:min-w-[900px] sm:table-auto sm:text-[16.5px] ${
+            hideDoneOnMobile ? "excel-hide-done-mobile" : ""
+          }`}
+        >
           <colgroup>
             {!isGcal ? <col className="w-8 sm:w-10" /> : null}
             <col className="w-7 sm:w-14" />
             <col />
-            <col className="w-[4.75rem] sm:w-[10.5rem]" />
-            <col className="w-9 sm:w-[4.5rem]" />
-            <col className="w-10 sm:w-[5.25rem]" />
+            {/* PC: wider 마감목표 · Mobile 할 일: extra width after hiding 완료 */}
+            <col
+              className={
+                isGcal
+                  ? "w-[7.5rem] sm:w-[13.75rem]"
+                  : hideDoneOnMobile
+                    ? "w-[7rem] sm:w-[12.5rem]"
+                    : "w-[5.5rem] sm:w-[12.5rem]"
+              }
+            />
+            {!isGcal ? <col className="w-9 sm:w-[4.5rem]" /> : null}
+            {!isGcal ? (
+              <col
+                className={
+                  hideDoneOnMobile
+                    ? "excel-col-done w-10 sm:w-[5.25rem]"
+                    : "w-10 sm:w-[5.25rem]"
+                }
+              />
+            ) : null}
           </colgroup>
           <thead className="sticky top-0 z-20">
             <tr>
@@ -1019,6 +1072,7 @@ export function ExcelWorkbook({
                 const sortable = isSortableCol(c.key);
                 const active =
                   sortable && columnSort?.key === c.key ? columnSort : null;
+                const isDoneCol = c.key === "done" || c.key === "edit";
                 const labelNode = (
                   <>
                     <span className="sm:hidden">{c.shortLabel}</span>
@@ -1028,9 +1082,9 @@ export function ExcelWorkbook({
                 return (
                   <th
                     key={`H-${c.key}`}
-                    className={`border border-black bg-[#f3f3f3] text-center text-[12.5px] font-bold leading-tight text-black sm:text-[16px] ${
+                    className={`border border-black bg-[#f3f3f3] text-center text-[13px] font-bold leading-tight text-black sm:text-[16.5px] ${
                       sortable ? "p-0" : "px-0.5 py-1.5 sm:px-2 sm:py-3"
-                    }`}
+                    } ${hideDoneOnMobile && isDoneCol ? "excel-col-done" : ""}`}
                   >
                     {sortable ? (
                       <button
@@ -1076,7 +1130,7 @@ export function ExcelWorkbook({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={isGcal ? 5 : 6}
+                  colSpan={emptyColSpan}
                   className="border border-black px-4 py-16 text-center text-[16px] text-[#3d4641]"
                 >
                   {filterActive && !isGcal && sheet === "todo" ? (
@@ -1125,17 +1179,8 @@ export function ExcelWorkbook({
                           </p>
                         ) : null}
                       </td>
-                      <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[11.5px] leading-snug break-words text-[#1a2420] sm:px-1 sm:py-2 sm:text-[14px]">
+                      <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[12px] leading-snug break-words text-[#1a2420] sm:px-1 sm:py-2 sm:text-[14.5px]">
                         {formatEventDeadline(ev)}
-                      </td>
-                      <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[#5a635e] sm:px-1 sm:py-2">
-                        —
-                      </td>
-                      <td
-                        className="border border-black px-0.5 py-1.5 text-center align-middle text-[11px] text-[#454d48] sm:px-1 sm:py-2 sm:text-[13px]"
-                        title="캘린더 일정은 완료 체크 불가"
-                      >
-                        —
                       </td>
                     </tr>
                   );
@@ -1543,7 +1588,11 @@ export function ExcelWorkbook({
                       />
                     </EditCell>
 
-                    <td className="border border-black px-0.5 py-0.5 text-center align-middle sm:px-1">
+                    <td
+                      className={`border border-black px-0.5 py-0.5 text-center align-middle sm:px-1 ${
+                        hideDoneOnMobile ? "excel-col-done" : ""
+                      }`}
+                    >
                       {sheet === "todo" ? (
                         <input
                           type="checkbox"

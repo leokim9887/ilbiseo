@@ -16,6 +16,7 @@ import { WelcomeBanner } from "@/components/welcome-banner";
 import { AppNav, type MainView } from "@/components/app-nav";
 import { PanelShell } from "@/components/panel-shell";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import {
@@ -347,6 +348,7 @@ export function AssistantApp() {
           {view === "settings" ? (
             <PanelShell title="설정 · 엑셀">
               <div className="space-y-5">
+                <ThemeToggle />
                 <DeviceSyncPanel
                   prefs={sync.prefs}
                   busy={sync.busy}

@@ -294,36 +294,42 @@ export function AssistantApp() {
                 onImport={app.addMany}
                 onReplaceCategory={app.replaceCategoryTasks}
               />
-              <SideListSection
-                kind="guideline"
-                items={app.guidelines}
-                mode={view === "done" ? "done" : "active"}
-                onAdd={() => app.addSideItem("guideline")}
-                onUpdate={(id, patch) =>
-                  app.updateSideItem("guideline", id, patch)
-                }
-                onDelete={(id) => app.deleteSideItem("guideline", id)}
-                onDeleteMany={(ids) =>
-                  app.deleteSideItems("guideline", ids)
-                }
-                onCompleteMany={(ids) =>
-                  app.completeSideItems("guideline", ids)
-                }
-              />
-              <SideListSection
-                kind="habit"
-                items={app.habits}
-                mode={view === "done" ? "done" : "active"}
-                onAdd={() => app.addSideItem("habit")}
-                onUpdate={(id, patch) =>
-                  app.updateSideItem("habit", id, patch)
-                }
-                onDelete={(id) => app.deleteSideItem("habit", id)}
-                onDeleteMany={(ids) => app.deleteSideItems("habit", ids)}
-                onCompleteMany={(ids) =>
-                  app.completeSideItems("habit", ids)
-                }
-              />
+              {/* PC: 지침 | 습관 side-by-side · 모바일: 세로 스택 */}
+              <div
+                className="mx-auto grid w-full max-w-[72rem] grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4"
+                data-side-lists-pair
+              >
+                <SideListSection
+                  kind="guideline"
+                  items={app.guidelines}
+                  mode={view === "done" ? "done" : "active"}
+                  onAdd={() => app.addSideItem("guideline")}
+                  onUpdate={(id, patch) =>
+                    app.updateSideItem("guideline", id, patch)
+                  }
+                  onDelete={(id) => app.deleteSideItem("guideline", id)}
+                  onDeleteMany={(ids) =>
+                    app.deleteSideItems("guideline", ids)
+                  }
+                  onCompleteMany={(ids) =>
+                    app.completeSideItems("guideline", ids)
+                  }
+                />
+                <SideListSection
+                  kind="habit"
+                  items={app.habits}
+                  mode={view === "done" ? "done" : "active"}
+                  onAdd={() => app.addSideItem("habit")}
+                  onUpdate={(id, patch) =>
+                    app.updateSideItem("habit", id, patch)
+                  }
+                  onDelete={(id) => app.deleteSideItem("habit", id)}
+                  onDeleteMany={(ids) => app.deleteSideItems("habit", ids)}
+                  onCompleteMany={(ids) =>
+                    app.completeSideItems("habit", ids)
+                  }
+                />
+              </div>
             </div>
           ) : null}
 

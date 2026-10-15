@@ -21,8 +21,9 @@ interface SideListSectionProps {
   onCompleteMany: (ids: string[]) => void;
 }
 
-/** ~5 checklist rows visible before the list scrolls. */
-const LIST_MAX_HEIGHT_CLASS = "max-h-[min(28rem,calc(5*5.6rem))]";
+/** Compact so PC side-by-side pair fits; ~4 rows before scroll. */
+const LIST_MAX_HEIGHT_CLASS =
+  "max-h-[min(18rem,calc(4*4.4rem))] lg:max-h-[min(20rem,calc(4*4.6rem))]";
 
 export function SideListSection({
   kind,
@@ -235,13 +236,13 @@ export function SideListSection({
 
   return (
     <section
-      className={`overflow-hidden rounded-sm border ${accent.border} bg-[#f4f6f7] shadow-[0_1px_6px_rgba(26,43,54,0.08)]`}
+      className={`min-w-0 overflow-hidden rounded-sm border ${accent.border} bg-[#f4f6f7] shadow-[0_1px_6px_rgba(26,43,54,0.08)]`}
       aria-label={label}
       data-side-kind={kind}
       data-side-mode={mode}
     >
       <div
-        className={`flex flex-col gap-2 border-b border-[#9aa5ad]/60 bg-gradient-to-b ${accent.head} px-2.5 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-3`}
+        className={`flex flex-col gap-1.5 border-b border-[#9aa5ad]/60 bg-gradient-to-b ${accent.head} px-2 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-2.5 sm:py-2`}
       >
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -303,7 +304,7 @@ export function SideListSection({
           <Button
             type="button"
             size="sm"
-            className={`h-11 min-h-11 w-full touch-manipulation rounded-sm px-3 text-white sm:h-8 sm:min-h-8 sm:w-auto ${
+            className={`h-10 min-h-10 w-full touch-manipulation rounded-sm px-2.5 text-[13px] text-white sm:h-8 sm:min-h-8 sm:w-auto ${
               kind === "guideline"
                 ? "bg-[#3b6ea5] hover:bg-[#2f5a88]"
                 : "bg-[#2d7a4f] hover:bg-[#246340]"
@@ -319,18 +320,18 @@ export function SideListSection({
 
       <div
         ref={listScrollRef}
-        className={`bg-white px-2 py-2 sm:px-3 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
+        className={`bg-white px-1.5 py-1.5 sm:px-2 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
         data-side-list-scroll={kind}
         data-side-list-mode={mode}
       >
         {ordered.length === 0 ? (
-          <p className="px-2 py-8 text-center text-[14px] text-[#666]">
+          <p className="px-2 py-6 text-center text-[13px] text-[#666]">
             {mode === "done"
               ? `완료한 ${label}이 없습니다.`
               : `${label}이 비어 있습니다. 「항목 추가」로 적으세요.`}
           </p>
         ) : (
-          <ul ref={listRef} className="space-y-2">
+          <ul ref={listRef} className="space-y-1.5">
             {ordered.map((item) => {
               const checked = selectedIds.has(item.id);
               const editingDone = editingDoneIds.has(item.id);
@@ -342,7 +343,7 @@ export function SideListSection({
                   data-side-item-selected={checked ? "1" : "0"}
                   data-side-item-done={item.done ? "1" : "0"}
                   data-side-item-locked={locked ? "1" : "0"}
-                  className={`flex flex-col gap-1.5 rounded-sm border px-2.5 py-2 sm:flex-row sm:items-start ${
+                  className={`flex flex-col gap-1 rounded-sm border px-2 py-1.5 sm:flex-row sm:items-start ${
                     checked
                       ? "border-[#217346]/50 bg-[#e8f5ee]"
                       : item.done

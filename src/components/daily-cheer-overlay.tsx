@@ -159,7 +159,7 @@ export function DailyCheerOverlay() {
               />
               <div className="absolute inset-[7px] overflow-hidden rounded-full bg-[#163f39]/10 ring-2 ring-white/80">
                 <Image
-                  src="/ilbiseo-grandson-cheer.png"
+                  src="/ilbiseo-grandson-cheer.png?v=25"
                   alt="에이스"
                   width={640}
                   height={640}

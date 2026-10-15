@@ -25,6 +25,12 @@ MOBILE = (1170, 780)
 BG = (235, 230, 223)
 TEAL = (22, 63, 57)
 
+# Single Ace/baby source for banner insets + cheer overlay
+BABY_SRC = "04-baby-ace-new.png"
+# Face + tan cap framing (slight right bias away from holder's black sleeve)
+BABY_BIAS = (0.52, 0.30)
+CHEER_BIAS = (0.52, 0.28)
+
 
 def load(name: str) -> Image.Image:
     return ImageOps.exif_transpose(Image.open(SRC / name)).convert("RGBA")
@@ -305,9 +311,9 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Baby — largest inset
+    # Baby/Ace — largest inset (shared new photo)
     baby = night_grade(
-        cover_crop(load("04-baby.png"), 560, 610, bias=(0.5, 0.16)), strength=0.34
+        cover_crop(load(BABY_SRC), 560, 610, bias=BABY_BIAS), strength=0.34
     )
     paste_masked(canvas, baby, (1045, -15), radial_mask((560, 610), soft=0.52), 0.98)
 
@@ -354,7 +360,7 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
     paste_masked(canvas, family, (-96, 12), combined, 1.0)
 
     baby = night_grade(
-        cover_crop(load("04-baby.png"), 470, 515, bias=(0.5, 0.14)), strength=0.30
+        cover_crop(load(BABY_SRC), 470, 515, bias=BABY_BIAS), strength=0.30
     )
     paste_masked(canvas, baby, (695, 12), radial_mask((470, 515), soft=0.54), 0.98)
 
@@ -384,8 +390,8 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
 
 
 def compose_grandson_cheer_face() -> Image.Image:
-    """Circular-friendly grandson face for daily cheer overlay (real photo base)."""
-    baby = cover_crop(load("04-baby.png"), 640, 640, bias=(0.50, 0.14))
+    """Circular Ace face for daily cheer overlay — same BABY_SRC as banner."""
+    baby = cover_crop(load(BABY_SRC), 640, 640, bias=CHEER_BIAS)
     baby = ImageEnhance.Contrast(baby).enhance(1.08)
     baby = ImageEnhance.Brightness(baby).enhance(1.04)
     baby = unsharp(baby, percent=130, radius=1.3)

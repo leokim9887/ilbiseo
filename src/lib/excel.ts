@@ -87,7 +87,8 @@ export async function buildWorkbook(
   wb.creator = "일비서";
   wb.created = new Date();
 
-  // Father TO DO LIST headers (exact): 순서 · 할일 LIST UP · 마감목표 · 중요도 · 시급성 · 완료여부
+  // Father TO DO LIST headers: 순서 · 할일 LIST UP · 마감목표 · 중요도 · 완료여부
+  // (시급성 열은 제거 — 기존 파일 불러오기는 excel-import에서 선택 매핑)
   const todo = wb.addWorksheet("할 일", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
@@ -97,7 +98,6 @@ export async function buildWorkbook(
     { header: "할일 LIST UP", key: "listup", width: 48 },
     { header: "마감목표", key: "deadline", width: 22 },
     { header: "중요도", key: "importance", width: 10 },
-    { header: "시급성", key: "urgency", width: 10 },
     { header: "완료여부", key: "done", width: 10 },
   ];
   styleHeader(todo.getRow(1));
@@ -109,7 +109,6 @@ export async function buildWorkbook(
       listup,
       deadline: formatDeadlineRange(t),
       importance: t.importance,
-      urgency: t.urgency,
       done: "",
     });
   });
@@ -133,7 +132,6 @@ export async function buildWorkbook(
     { header: "할일 LIST UP", key: "listup", width: 48 },
     { header: "마감목표", key: "deadline", width: 22 },
     { header: "중요도", key: "importance", width: 10 },
-    { header: "시급성", key: "urgency", width: 10 },
     { header: "완료여부", key: "done", width: 10 },
   ];
   styleHeader(done.getRow(1));
@@ -145,7 +143,6 @@ export async function buildWorkbook(
       listup,
       deadline: formatDeadlineRange(t),
       importance: t.importance,
-      urgency: t.urgency,
       done: "완료",
     });
   });

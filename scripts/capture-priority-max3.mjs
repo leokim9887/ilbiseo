@@ -30,7 +30,6 @@ async function main() {
   await desktop.waitForTimeout(400);
 
   await desktop.getByLabel("중요도").first().selectOption("3");
-  await desktop.getByLabel("시급성").first().selectOption("2");
   await shot(desktop, "desktop");
 
   // open select options visible via native select — capture grid focus

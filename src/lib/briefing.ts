@@ -21,7 +21,6 @@ import {
 import {
   importanceLabel,
   priorityTag as makePriorityTag,
-  urgencyLabel,
 } from "./priority";
 import { hasMeaningfulTaskContent } from "./text-similarity";
 
@@ -35,9 +34,7 @@ export type BriefingLine = {
   /** Display 마감목표 — single day or `YYYY-MM-DD ~ YYYY-MM-DD` */
   deadlineLabel: string;
   importance: number;
-  urgency: number;
   importanceLabel: string;
-  urgencyLabel: string;
   groupKey: string;
   memo: string;
   priorityTag: string;
@@ -73,7 +70,7 @@ export type DailyBriefing = {
 const SECTION_TITLE: Record<TaskKind, string> = {
   spot: "① 스팟 — 오늘 마무리",
   ongoing: "② 지속 — 목표기일까지",
-  someday: "③ 언젠가 — 시급·중요 순",
+  someday: "③ 언젠가 — 중요도 순",
 };
 
 function formatKoDate(iso: string): string {
@@ -109,7 +106,7 @@ function taskInBriefingWindow(t: Task, today: string): boolean {
     return overlapsPeriod(t, today, today);
   }
   if (t.kind === "spot") return true;
-  if (t.kind === "someday") return t.importance >= 3 || t.urgency >= 3;
+  if (t.kind === "someday") return t.importance >= 3;
   return true;
 }
 
@@ -270,12 +267,10 @@ export function buildDailyBriefing(
         targetDate: t.targetDate,
         deadlineLabel: formatDeadlineRange(t),
         importance: t.importance,
-        urgency: t.urgency,
         importanceLabel: importanceLabel(t.importance),
-        urgencyLabel: urgencyLabel(t.urgency),
         groupKey: t.groupKey,
         memo: t.memo,
-        priorityTag: makePriorityTag(t.importance, t.urgency),
+        priorityTag: makePriorityTag(t.importance),
       }));
       return {
         kind,

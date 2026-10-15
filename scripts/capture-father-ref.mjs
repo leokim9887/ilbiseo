@@ -36,7 +36,6 @@ async function main() {
     "할일 LIST UP",
     "마감목표",
     "중요도",
-    "시급성",
     "완료여부",
   ]) {
     await desktop.getByRole("columnheader", { name: h }).waitFor({ timeout: 5000 });

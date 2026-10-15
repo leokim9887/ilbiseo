@@ -89,7 +89,6 @@ export function TodoGrid({
               <th className="w-[140px] px-3 py-3">종류</th>
               <th className="w-[130px] px-3 py-3">목표기일</th>
               <th className="w-[72px] px-3 py-3 text-center">중요</th>
-              <th className="w-[72px] px-3 py-3 text-center">시급</th>
               {!hideCategory ? (
                 <th className="w-[100px] px-3 py-3">틀</th>
               ) : null}
@@ -106,7 +105,7 @@ export function TodoGrid({
                     className="bg-[var(--sheet-header)]"
                   >
                     <td
-                      colSpan={hideCategory ? 8 : 9}
+                      colSpan={hideCategory ? 7 : 8}
                       className="border-b border-[var(--grid-line)] px-3 py-2 text-[13px] font-semibold tracking-wide text-[var(--brand)]"
                     >
                       {row.label}
@@ -183,13 +182,6 @@ export function TodoGrid({
                       value={task.importance}
                       onChange={(n) => onUpdate(task.id, { importance: n })}
                       label="중요"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 align-middle">
-                    <ScoreSelect
-                      value={task.urgency}
-                      onChange={(n) => onUpdate(task.id, { urgency: n })}
-                      label="시급"
                     />
                   </td>
                   {!hideCategory ? (

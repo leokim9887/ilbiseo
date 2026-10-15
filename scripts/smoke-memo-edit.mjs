@@ -63,8 +63,6 @@ for (const frame of frames) {
 
   const imp = page.locator('select[aria-label="중요도"]').first();
   if (await imp.count()) await imp.selectOption("3");
-  const urg = page.locator('select[aria-label="시급성"]').first();
-  if (await urg.count()) await urg.selectOption("2");
 
   // Persist check BEFORE complete (complete moves row off 할 일 sheet)
   let stored = await page.evaluate(() => {
@@ -75,7 +73,6 @@ for (const frame of frames) {
       category: t.category,
       status: t.status,
       importance: t.importance,
-      urgency: t.urgency,
       targetDate: t.targetDate,
     }));
   });
@@ -98,7 +95,6 @@ for (const frame of frames) {
       category: t.category,
       status: t.status,
       importance: t.importance,
-      urgency: t.urgency,
       targetDate: t.targetDate,
     }));
   });
@@ -111,7 +107,6 @@ for (const frame of frames) {
     memoPersisted,
     completed: hit?.status === "completed",
     importance: hit?.importance,
-    urgency: hit?.urgency,
     targetDate: hit?.targetDate,
   });
 }

@@ -76,7 +76,6 @@ function taskToItem(task: Task): UnifiedItem {
       CATEGORY_LABEL[task.category],
       KIND_LABEL[task.kind],
       `중요 ${task.importance}`,
-      `시급 ${task.urgency}`,
     ].join(" · "),
     readOnly: false,
     importance: task.importance,
@@ -146,8 +145,8 @@ export function buildUnifiedItems(
 
   items.sort((a, b) => {
     if (opts.sort === "importance") {
-      const ai = a.source === "task" ? (a.importance ?? 0) * 10 + (a.urgency ?? 0) : 0;
-      const bi = b.source === "task" ? (b.importance ?? 0) * 10 + (b.urgency ?? 0) : 0;
+      const ai = a.source === "task" ? (a.importance ?? 0) : 0;
+      const bi = b.source === "task" ? (b.importance ?? 0) : 0;
       // tasks by importance first, then calendar by time; calendar after same-score tasks
       if (ai !== bi) return bi - ai;
     }

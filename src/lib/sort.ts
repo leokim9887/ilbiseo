@@ -7,7 +7,8 @@ const KIND_ORDER: Record<TaskKind, number> = {
 };
 
 function score(task: Task): number {
-  return task.urgency * 10 + task.importance;
+  // 중요도만 (시급성 열 제거 후)
+  return task.importance;
 }
 
 export function sortTasks(tasks: Task[], category?: TaskCategory): Task[] {

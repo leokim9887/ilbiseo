@@ -535,8 +535,7 @@ export function DailyBriefingPanel({
                             {line.title}
                           </p>
                           <p className="text-[13px] text-[var(--ink-muted)]">
-                            {line.categoryLabel} · {line.importanceLabel} ·{" "}
-                            {line.urgencyLabel}
+                            {line.categoryLabel} · {line.importanceLabel}
                             {line.targetDate ? ` · 기한 ${line.targetDate}` : ""}
                           </p>
                           {line.memo ? (

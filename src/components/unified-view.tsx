@@ -164,7 +164,7 @@ export function UnifiedView({
               onChange={(e) => setSort(e.target.value as UnifiedSort)}
             >
               <option value="time">시간순</option>
-              <option value="importance">중요·시급 우선 (할 일)</option>
+              <option value="importance">중요도 우선 (할 일)</option>
             </select>
           </div>
         </div>

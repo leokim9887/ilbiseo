@@ -1,8 +1,8 @@
 import type { SheetRow } from "./sheet-rows";
 import { isSomedayDeadline, taskDateRange } from "./date-range";
 
-/** Sortable Excel columns (마감목표 · 중요도 · 시급성). */
-export type ColumnSortKey = "deadline" | "importance" | "urgency";
+/** Sortable Excel columns (마감목표 · 중요도). */
+export type ColumnSortKey = "deadline" | "importance";
 export type ColumnSortDir = "asc" | "desc";
 
 export type ColumnSort = {
@@ -13,7 +13,6 @@ export type ColumnSort = {
 export const SORTABLE_COL_KEYS: ColumnSortKey[] = [
   "deadline",
   "importance",
-  "urgency",
 ];
 
 export function isSortableCol(key: string): key is ColumnSortKey {
@@ -32,7 +31,7 @@ export function cycleColumnSort(
 
 /**
  * Empty / missing / 「언젠가」 values always sort **last** (both asc and desc),
- * so blank·언젠가 마감·중요·시급 rows sink to the bottom consistently.
+ * so blank·언젠가 마감·중요 rows sink to the bottom consistently.
  */
 function cmpEmptyLast(
   aEmpty: boolean,
@@ -61,14 +60,11 @@ function deadlineKey(row: SheetRow): { empty: boolean; value: string } {
   return { empty: !v, value: v };
 }
 
-function numberKey(
-  row: SheetRow,
-  field: "importance" | "urgency",
-): { empty: boolean; value: number } {
+function importanceKey(row: SheetRow): { empty: boolean; value: number } {
   if (row.kind === "calendar") {
     return { empty: true, value: 0 };
   }
-  const v = row.task[field];
+  const v = row.task.importance;
   // 1–3 scale; treat missing/0 as empty
   if (v == null || Number.isNaN(v) || v <= 0) {
     return { empty: true, value: 0 };
@@ -87,8 +83,8 @@ export function compareSheetRows(
     const raw = ka.value.localeCompare(kb.value);
     return cmpEmptyLast(ka.empty, kb.empty, raw, sort.dir);
   }
-  const ka = numberKey(a, sort.key);
-  const kb = numberKey(b, sort.key);
+  const ka = importanceKey(a);
+  const kb = importanceKey(b);
   const raw = ka.value - kb.value;
   return cmpEmptyLast(ka.empty, kb.empty, raw, sort.dir);
 }
@@ -109,11 +105,6 @@ export function applyColumnSort(
 
 export function columnSortLabel(sort: ColumnSort | null): string {
   if (!sort) return "기본(추가순)";
-  const name =
-    sort.key === "deadline"
-      ? "마감목표"
-      : sort.key === "importance"
-        ? "중요도"
-        : "시급성";
+  const name = sort.key === "deadline" ? "마감목표" : "중요도";
   return `${name} ${sort.dir === "asc" ? "오름차순▲" : "내림차순▼"}`;
 }

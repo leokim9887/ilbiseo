@@ -353,9 +353,6 @@ export function ExcelImport({
                         <th className="border-b border-[#9aa5ad] px-2 py-1">
                           중요
                         </th>
-                        <th className="border-b border-[#9aa5ad] px-2 py-1">
-                          시급
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -374,7 +371,6 @@ export function ExcelImport({
                               {r.deadlineLabel}
                             </td>
                             <td className="px-2 py-1">{r.importance}</td>
-                            <td className="px-2 py-1">{r.urgency}</td>
                           </tr>
                         ))}
                     </tbody>

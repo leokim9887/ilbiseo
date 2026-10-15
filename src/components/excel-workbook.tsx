@@ -96,7 +96,6 @@ type ColKey =
   | "listup"
   | "deadline"
   | "importance"
-  | "urgency"
   | "done"
   | "edit";
 
@@ -125,7 +124,6 @@ const COLS_TODO: {
     shortLabel: "중요",
     width: "72px",
   },
-  { key: "urgency", label: "시급성", shortLabel: "시급", width: "72px" },
   { key: "done", label: "완료여부", shortLabel: "완료", width: "84px" },
 ];
 
@@ -155,11 +153,10 @@ const COLS_DONE: {
     shortLabel: "중요",
     width: "72px",
   },
-  { key: "urgency", label: "시급성", shortLabel: "시급", width: "72px" },
   { key: "edit", label: "수정", shortLabel: "수정", width: "84px" },
 ];
 
-const EDITABLE: ColKey[] = ["listup", "deadline", "importance", "urgency"];
+const EDITABLE: ColKey[] = ["listup", "deadline", "importance"];
 
 type FocusCell = { rowId: string; col: ColKey };
 
@@ -221,7 +218,7 @@ export function ExcelWorkbook({
   const [activeRow, setActiveRow] = useState<string | null>(null);
   const [filterStart, setFilterStart] = useState<string>("");
   const [filterEnd, setFilterEnd] = useState<string>("");
-  /** Excel header column sort (click 마감목표·중요도·시급성) */
+  /** Excel header column sort (click 마감목표·중요도) */
   const [columnSort, setColumnSort] = useState<ColumnSort | null>(null);
   const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
   const [gcalRangeStart, setGcalRangeStart] = useState("");
@@ -993,7 +990,6 @@ export function ExcelWorkbook({
             <col />
             <col className="w-[4.75rem] sm:w-[10.5rem]" />
             <col className="w-9 sm:w-[4.5rem]" />
-            <col className="w-9 sm:w-[4.5rem]" />
             <col className="w-10 sm:w-[5.25rem]" />
           </colgroup>
           <thead className="sticky top-0 z-20">
@@ -1080,7 +1076,7 @@ export function ExcelWorkbook({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={isGcal ? 6 : 7}
+                  colSpan={isGcal ? 5 : 6}
                   className="border border-black px-4 py-16 text-center text-[16px] text-[#3d4641]"
                 >
                   {filterActive && !isGcal && sheet === "todo" ? (
@@ -1131,9 +1127,6 @@ export function ExcelWorkbook({
                       </td>
                       <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[11.5px] leading-snug break-words text-[#1a2420] sm:px-1 sm:py-2 sm:text-[14px]">
                         {formatEventDeadline(ev)}
-                      </td>
-                      <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[#5a635e] sm:px-1 sm:py-2">
-                        —
                       </td>
                       <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[#5a635e] sm:px-1 sm:py-2">
                         —
@@ -1546,33 +1539,6 @@ export function ExcelWorkbook({
                         }
                         onBlur={relockIfLeavingRow}
                         label="중요도"
-                        disabled={locked}
-                      />
-                    </EditCell>
-
-                    <EditCell
-                      active={
-                        !locked &&
-                        focus?.rowId === task.id &&
-                        focus.col === "urgency"
-                      }
-                      center
-                      locked={locked}
-                      onFocusCell={() => {
-                        if (locked) return;
-                        setActiveRow(task.id);
-                        setFocus({ rowId: task.id, col: "urgency" });
-                      }}
-                      onKeyNav={(e) =>
-                        handleNav(e, task.id, "urgency", moveFocus)
-                      }
-                    >
-                      <ScoreSelect
-                        cellId={`${task.id}:urgency`}
-                        value={task.urgency}
-                        onChange={(n) => onUpdate(task.id, { urgency: n })}
-                        onBlur={relockIfLeavingRow}
-                        label="시급성"
                         disabled={locked}
                       />
                     </EditCell>

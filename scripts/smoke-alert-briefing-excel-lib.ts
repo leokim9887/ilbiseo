@@ -403,13 +403,57 @@ async function main() {
         calendarName: "Work",
       },
     ];
+    const sampleTask = baseTask({
+      id: "xu",
+      title: "엑셀열확인용",
+      kind: "spot",
+      startDate: saveDay,
+      targetDate: saveDay,
+      importance: 3,
+      urgency: 3,
+    });
     const buf = await buildWorkbook({
-      tasks: [],
+      tasks: [sampleTask],
       calendarEvents: events,
-      briefing: buildDailyBriefing([], events, new Date(), [], []),
+      briefing: buildDailyBriefing([sampleTask], events, new Date(), [], []),
     });
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+    for (const name of ["할 일", "한 일"] as const) {
+      const sh = wb.getWorksheet(name);
+      const hdrs: string[] = [];
+      sh?.getRow(1).eachCell((c) => hdrs.push(String(c.value)));
+      ok(`excel-${name}-no-urgency`, !hdrs.includes("시급성"), hdrs.join(","));
+      ok(
+        `excel-${name}-has-importance`,
+        hdrs.includes("중요도"),
+        hdrs.join(","),
+      );
+    }
+    const briefingSheet = wb.getWorksheet("브리핑요약");
+    let briefingText = "";
+    briefingSheet?.eachRow((row) => {
+      briefingText += String(row.getCell(1).value ?? "") + "\n";
+    });
+    // urgencyLabel used to emit "시급" / "여유"; section title had "시급·중요"
+    ok(
+      "excel-briefing-no-urgency-label",
+      !/시급성|시급·|· 시급\b|\b시급\b/.test(briefingText),
+      briefingText.slice(0, 400),
+    );
+    const liveBrief = buildDailyBriefing(
+      [sampleTask],
+      [],
+      new Date(`${saveDay}T08:00:00+09:00`),
+      [],
+      [],
+    );
+    ok(
+      "briefing-plaintext-no-urgency",
+      !/시급성|시급·|· 시급\b|\b시급\b/.test(liveBrief.plaintext) &&
+        !/시급성|시급·|· 시급\b|\b시급\b/.test(liveBrief.html),
+      { plaintext: liveBrief.plaintext, html: liveBrief.html.slice(0, 400) },
+    );
     const sheet = wb.getWorksheet("구글캘린더");
     ok("excel-cal-sheet", Boolean(sheet), null);
     const headers: string[] = [];

@@ -247,8 +247,16 @@ async function main() {
       startDate: today,
       targetDate: today,
     });
+    const placeholderWithMemo = baseTask({
+      id: "ph-memo",
+      title: "새 할일",
+      memo: "메모만으로는 부족",
+      kind: "spot",
+      startDate: today,
+      targetDate: today,
+    });
     const b = buildDailyBriefing(
-      [real, blank, placeholder, memoOnly],
+      [real, blank, placeholder, memoOnly, placeholderWithMemo],
       [],
       new Date(),
       [],
@@ -257,21 +265,25 @@ async function main() {
     const lines = b.sections.flatMap((s) => s.lines);
     const titles = lines.map((l) => l.title);
     const memos = lines.map((l) => l.memo);
-    const emptyShells = lines.filter(
-      (l) => !(l.title ?? "").trim() && !(l.memo ?? "").trim(),
-    );
-    ok("blank-shell-excluded", emptyShells.length === 0, {
+    ok("blank-shell-excluded", !titles.some((t) => !(t ?? "").trim()), {
       titles,
       memos,
       plaintext: b.plaintext,
     });
     ok("placeholder-shell-excluded", !titles.includes("새 할일"), titles);
     ok("real-task-kept", titles.includes("실제 할 일"), titles);
-    ok("memo-only-kept", memos.includes("메모만 있는 행"), memos);
-    ok("briefing-line-count-two", lines.length === 2, lines.length);
+    ok("memo-only-excluded", !memos.includes("메모만 있는 행"), memos);
+    ok(
+      "placeholder-with-memo-excluded",
+      !memos.includes("메모만으로는 부족"),
+      memos,
+    );
+    ok("briefing-line-count-one", lines.length === 1, lines.length);
     ok(
       "blank-not-in-plaintext",
-      !b.plaintext.includes("새 할일") && b.plaintext.includes("실제 할 일"),
+      !b.plaintext.includes("새 할일") &&
+        !b.plaintext.includes("메모만 있는 행") &&
+        b.plaintext.includes("실제 할 일"),
       b.plaintext,
     );
   }

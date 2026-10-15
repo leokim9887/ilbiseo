@@ -218,14 +218,12 @@ export function isPlaceholderTitle(title: string): boolean {
 }
 
 /**
- * Meaningful content for briefing / alerts: real title or non-empty memo.
- * Blank 「행 추가」 shells (empty or placeholder title + empty memo) → false.
+ * Meaningful 할 일 for briefing (email + Excel 「브리핑요약」):
+ * requires a real title. Empty / placeholder title → false even if memo has text.
  */
 export function hasMeaningfulTaskContent(
   task: Pick<Task, "title" | "memo">,
 ): boolean {
-  const memo = (task.memo ?? "").trim();
-  if (memo) return true;
   return !isPlaceholderTitle(task.title ?? "");
 }
 

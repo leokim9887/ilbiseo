@@ -16,6 +16,7 @@ import {
   buildPreviewRows,
   IMPORT_FIELD_LABEL,
   IMPORT_TARGET_FIELDS,
+  isImportTargetField,
   isIlbiseoTemplate,
   loadSavedMapping,
   mappingHasTitle,
@@ -136,9 +137,7 @@ export function ExcelImport({
   const setFieldMapping = (header: string, field: ImportField) => {
     // 시급성은 매핑 UI에 없음 — 들어오면 skip
     const resolved: ImportField =
-      field !== "skip" && !IMPORT_TARGET_FIELDS.includes(field)
-        ? "skip"
-        : field;
+      field !== "skip" && !isImportTargetField(field) ? "skip" : field;
     setMapping((prev) => {
       const next = { ...prev };
       if (resolved !== "skip") {

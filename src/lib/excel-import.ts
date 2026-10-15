@@ -33,7 +33,9 @@ export const IMPORT_FIELD_LABEL: Record<ImportField, string> = {
 };
 
 /** 매핑 UI「우리 칸」옵션 (시급성 제외 — 예전 파일 열은 자동 skip) */
-export const IMPORT_TARGET_FIELDS: ImportField[] = [
+export type ImportTargetField = Exclude<ImportField, "skip" | "urgency">;
+
+export const IMPORT_TARGET_FIELDS: ImportTargetField[] = [
   "title",
   "memo",
   "deadline",
@@ -42,13 +44,16 @@ export const IMPORT_TARGET_FIELDS: ImportField[] = [
   "category",
 ];
 
+export function isImportTargetField(
+  field: ImportField,
+): field is ImportTargetField {
+  return (IMPORT_TARGET_FIELDS as readonly string[]).includes(field);
+}
+
 /** 예전 엑셀「시급성」열 별칭 — 자동 매핑 시 무시(skip) */
 const URGENCY_HEADER_ALIASES = ["시급성", "시급", "urgency", "긴급"];
 
-const HEADER_ALIASES: Record<
-  Exclude<ImportField, "skip" | "urgency">,
-  string[]
-> = {
+const HEADER_ALIASES: Record<ImportTargetField, string[]> = {
   title: [
     "할일 list up",
     "할일list up",
@@ -154,7 +159,6 @@ export function suggestFieldForHeader(header: string): ImportField {
     return "skip";
   }
   for (const field of IMPORT_TARGET_FIELDS) {
-    if (field === "skip") continue;
     const aliases = HEADER_ALIASES[field];
     if (
       aliases.some(
@@ -247,7 +251,7 @@ export function applySavedOrAuto(
     if (
       fromSaved &&
       fromSaved !== "skip" &&
-      IMPORT_TARGET_FIELDS.includes(fromSaved) &&
+      isImportTargetField(fromSaved) &&
       !used.has(fromSaved)
     ) {
       out[h] = fromSaved;

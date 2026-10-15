@@ -15,6 +15,7 @@ export type ImportField =
   | "memo"
   | "deadline"
   | "importance"
+  /** @deprecated 시급성 UI 제거 — 예전 저장 매핑·타입 호환만 */
   | "urgency"
   | "done"
   | "category"
@@ -31,18 +32,23 @@ export const IMPORT_FIELD_LABEL: Record<ImportField, string> = {
   skip: "(사용 안 함)",
 };
 
-/** 매핑 UI에 보이는 대상 칸 (skip 제외) */
+/** 매핑 UI「우리 칸」옵션 (시급성 제외 — 예전 파일 열은 자동 skip) */
 export const IMPORT_TARGET_FIELDS: ImportField[] = [
   "title",
   "memo",
   "deadline",
   "importance",
-  "urgency",
   "done",
   "category",
 ];
 
-const HEADER_ALIASES: Record<Exclude<ImportField, "skip">, string[]> = {
+/** 예전 엑셀「시급성」열 별칭 — 자동 매핑 시 무시(skip) */
+const URGENCY_HEADER_ALIASES = ["시급성", "시급", "urgency", "긴급"];
+
+const HEADER_ALIASES: Record<
+  Exclude<ImportField, "skip" | "urgency">,
+  string[]
+> = {
   title: [
     "할일 list up",
     "할일list up",
@@ -77,10 +83,18 @@ const HEADER_ALIASES: Record<Exclude<ImportField, "skip">, string[]> = {
     "기간",
   ],
   importance: ["중요도", "중요", "importance", "priority"],
-  urgency: ["시급성", "시급", "urgency", "긴급"],
   done: ["완료여부", "완료", "done", "status", "상태", "끝", "끝?"],
   category: ["틀", "분류", "category", "frame", "카테고리"],
 };
+
+/** Coerce deprecated urgency mappings to skip (saved localStorage / old flows). */
+export function sanitizeMapping(mapping: ColumnMapping): ColumnMapping {
+  const out: ColumnMapping = {};
+  for (const [h, f] of Object.entries(mapping)) {
+    out[h] = f === "urgency" ? "skip" : f;
+  }
+  return out;
+}
 
 export const MAPPING_STORAGE_KEY = "ilbiseo-excel-column-map-v1";
 
@@ -103,7 +117,6 @@ export type MappedPreviewRow = {
   memo: string;
   deadlineLabel: string;
   importance: number;
-  urgency: number;
   done: boolean;
   category: TaskCategory;
   /** empty title / unusable */
@@ -131,6 +144,14 @@ export function suggestFieldForHeader(header: string): ImportField {
   // Prefer exact template match for title
   if (TEMPLATE_TITLE_HEADERS.has(n) || n === "할 일" || n === "할일") {
     return "title";
+  }
+  // 시급성 열은 조용히 무시 (예전 파일 호환)
+  if (
+    URGENCY_HEADER_ALIASES.some(
+      (a) => n === a || n.includes(a) || a.includes(n),
+    )
+  ) {
+    return "skip";
   }
   for (const field of IMPORT_TARGET_FIELDS) {
     if (field === "skip") continue;
@@ -160,7 +181,7 @@ export function autoMapHeaders(headers: string[]): ColumnMapping {
     if (suggested !== "skip") used.add(suggested);
     mapping[h] = suggested;
   }
-  return mapping;
+  return sanitizeMapping(mapping);
 }
 
 /** True when headers look like 일비서 export/template (exact classic names). */
@@ -175,9 +196,8 @@ export function isIlbiseoTemplate(headers: string[]): boolean {
   );
   const hasDeadline = norms.some((n) => n === "마감목표");
   const hasImportance = norms.some((n) => n === "중요도");
-  const hasUrgency = norms.some((n) => n === "시급성");
-  // Classic father columns — not merely "any title-like + 기한"
-  return hasListUp && hasDeadline && (hasImportance || hasUrgency);
+  // 시급성 불필요 — 새 양식·예전 양식(시급성 있어도 중요도만으로 일치)
+  return hasListUp && hasDeadline && hasImportance;
 }
 
 export function loadSavedMapping(): ColumnMapping | null {
@@ -196,7 +216,10 @@ export function loadSavedMapping(): ColumnMapping | null {
 export function saveMapping(mapping: ColumnMapping): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(MAPPING_STORAGE_KEY, JSON.stringify(mapping));
+    localStorage.setItem(
+      MAPPING_STORAGE_KEY,
+      JSON.stringify(sanitizeMapping(mapping)),
+    );
   } catch {
     /* ignore quota */
   }
@@ -212,8 +235,9 @@ export function applySavedOrAuto(
 ): ColumnMapping {
   const auto = autoMapHeaders(headers);
   if (!saved) return auto;
+  const cleaned = sanitizeMapping(saved);
   const byNorm = new Map<string, ImportField>();
-  for (const [k, v] of Object.entries(saved)) {
+  for (const [k, v] of Object.entries(cleaned)) {
     byNorm.set(normalizeHeader(k), v);
   }
   const used = new Set<ImportField>();
@@ -240,7 +264,7 @@ export function applySavedOrAuto(
       }
     }
   }
-  return out;
+  return sanitizeMapping(out);
 }
 
 function cellToString(v: unknown): string {
@@ -325,15 +349,15 @@ export function buildPreviewRows(
   mapping: ColumnMapping,
   defaultCategory: TaskCategory,
 ): MappedPreviewRow[] {
+  const clean = sanitizeMapping(mapping);
   const fieldOf = (field: ImportField): string | null => {
-    const entry = Object.entries(mapping).find(([, f]) => f === field);
+    const entry = Object.entries(clean).find(([, f]) => f === field);
     return entry ? entry[0] : null;
   };
   const titleCol = fieldOf("title");
   const memoCol = fieldOf("memo");
   const deadlineCol = fieldOf("deadline");
   const importanceCol = fieldOf("importance");
-  const urgencyCol = fieldOf("urgency");
   const doneCol = fieldOf("done");
   const categoryCol = fieldOf("category");
 
@@ -349,10 +373,6 @@ export function buildPreviewRows(
       importanceCol ? cellToString(row[importanceCol]) : 2,
       2,
     );
-    const urgency = clampPriority(
-      urgencyCol ? cellToString(row[urgencyCol]) : 1,
-      1,
-    );
     const done = doneCol ? parseDone(cellToString(row[doneCol])) : false;
     const category = categoryCol
       ? parseTaskCategory(cellToString(row[categoryCol]))
@@ -363,7 +383,6 @@ export function buildPreviewRows(
       memo,
       deadlineLabel: dl.label,
       importance,
-      urgency,
       done,
       category,
       skip: !title,
@@ -377,8 +396,9 @@ export function sheetToTasks(
   mapping: ColumnMapping,
   defaultCategory: TaskCategory,
 ): Task[] {
+  const clean = sanitizeMapping(mapping);
   const fieldOf = (field: ImportField): string | null => {
-    const entry = Object.entries(mapping).find(([, f]) => f === field);
+    const entry = Object.entries(clean).find(([, f]) => f === field);
     return entry ? entry[0] : null;
   };
   const titleCol = fieldOf("title");
@@ -387,7 +407,6 @@ export function sheetToTasks(
   const memoCol = fieldOf("memo");
   const deadlineCol = fieldOf("deadline");
   const importanceCol = fieldOf("importance");
-  const urgencyCol = fieldOf("urgency");
   const doneCol = fieldOf("done");
   const categoryCol = fieldOf("category");
   const now = new Date().toISOString();
@@ -407,10 +426,6 @@ export function sheetToTasks(
         importanceCol ? cellToString(row[importanceCol]) : 2,
         2,
       );
-      const urgency = clampPriority(
-        urgencyCol ? cellToString(row[urgencyCol]) : 1,
-        1,
-      );
       const done = doneCol ? parseDone(cellToString(row[doneCol])) : false;
       const category = categoryCol
         ? parseTaskCategory(cellToString(row[categoryCol]))
@@ -423,7 +438,8 @@ export function sheetToTasks(
         kind: dl.kind,
         startDate: dl.startDate,
         targetDate: dl.targetDate,
-        urgency,
+        // 시급성 열은 무시 — 기본값만 저장 (JSON 호환)
+        urgency: 1,
         importance,
         groupKey: inferGroupKey(title),
         memo,

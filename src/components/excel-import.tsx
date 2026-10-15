@@ -134,14 +134,19 @@ export function ExcelImport({
   };
 
   const setFieldMapping = (header: string, field: ImportField) => {
+    // 시급성은 매핑 UI에 없음 — 들어오면 skip
+    const resolved: ImportField =
+      field !== "skip" && !IMPORT_TARGET_FIELDS.includes(field)
+        ? "skip"
+        : field;
     setMapping((prev) => {
       const next = { ...prev };
-      if (field !== "skip") {
+      if (resolved !== "skip") {
         for (const [h, f] of Object.entries(next)) {
-          if (f === field && h !== header) next[h] = "skip";
+          if (f === resolved && h !== header) next[h] = "skip";
         }
       }
-      next[header] = field;
+      next[header] = resolved;
       return next;
     });
   };
@@ -285,7 +290,11 @@ export function ExcelImport({
                         <td className="px-2 py-1.5 align-middle">{h}</td>
                         <td className="px-2 py-1.5">
                           <select
-                            value={mapping[h] ?? "skip"}
+                            value={
+                              mapping[h] === "urgency"
+                                ? "skip"
+                                : (mapping[h] ?? "skip")
+                            }
                             onChange={(e) =>
                               setFieldMapping(
                                 h,

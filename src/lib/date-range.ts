@@ -147,7 +147,10 @@ export function formatDeadlineRange(
   return `${r.start} ~ ${r.end}`;
 }
 
-/** Compact M/D for phone table — avoids wide YYYY-MM-DD cells. */
+/**
+ * Compact phone 마감 — keep year visible (YY.M.D), not MM/DD alone.
+ * e.g. `26.10.16` or `26.10.1~26.10.30`
+ */
 export function formatDeadlineRangeCompact(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
 ): string {
@@ -155,8 +158,9 @@ export function formatDeadlineRangeCompact(
   const r = taskDateRange(task);
   if (!r) return "";
   const short = (iso: string) => {
-    const [, m, d] = iso.split("-");
-    return `${Number(m)}/${Number(d)}`;
+    const [y, m, d] = iso.split("-");
+    const yy = y.length === 4 ? y.slice(2) : y;
+    return `${yy}.${Number(m)}.${Number(d)}`;
   };
   if (r.start === r.end) return short(r.start);
   return `${short(r.start)}~${short(r.end)}`;

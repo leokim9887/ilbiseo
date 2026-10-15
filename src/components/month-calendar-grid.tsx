@@ -386,7 +386,9 @@ export function MonthCalendarGrid({
                       }
                     }}
                     className={`min-h-[4.75rem] border-r border-[var(--grid-line)] p-1 touch-manipulation sm:min-h-[7rem] sm:p-2 ${
-                      isToday ? "bg-[#e8f5ee]" : "bg-white"
+                      isToday
+                        ? "bg-[#e8f5ee] dark:bg-[#1e332d]"
+                        : "bg-white dark:bg-[#1a221e]"
                     } ${
                       canOpen
                         ? "cursor-pointer transition-colors hover:bg-[#f3f7f4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#217346]/35"

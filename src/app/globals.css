@@ -262,11 +262,6 @@
   .excel-fit-mobile select.excel-input {
     padding-inline: 0;
   }
-  /* Mobile 할 일: hide per-row 완료; give space to 마감목표 */
-  .excel-hide-done-mobile th.excel-col-done,
-  .excel-hide-done-mobile td.excel-col-done {
-    display: none;
-  }
 }
 
 @keyframes fade-up {
@@ -381,11 +376,30 @@
   box-shadow: inset 0 0 0 1px #3d8f82;
 }
 
-/* Dark excel chrome — keep sheet readable, brand teal intact */
+/* ── Dark mode: finish unfinished light patches ── */
 .dark .excel-wb {
   border-color: #3a4a42;
   background: #1a221e;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.dark .excel-wb > div:first-child,
+.dark .excel-wb .bg-gradient-to-b {
+  background: linear-gradient(to bottom, #24302a, #1e2823) !important;
+  border-color: #3a4a42 !important;
+  color: #e8ece9 !important;
+}
+.dark .excel-wb [class*="bg-[#f0f2f4]"],
+.dark .excel-wb [class*="bg-[#e8ecef]"],
+.dark .excel-wb [class*="bg-[#dfe3e6]"] {
+  background-color: #1e2823 !important;
+}
+.dark .excel-wb input,
+.dark .excel-wb select,
+.dark .excel-wb textarea,
+.dark .excel-wb button[class*="bg-white"] {
+  background-color: #24302a !important;
+  color: #e8ece9 !important;
+  border-color: #4a5c52 !important;
 }
 .dark .excel-wb table {
   color: #e8ece9;
@@ -397,9 +411,108 @@
 }
 .dark .excel-wb td {
   border-color: #3a4a42 !important;
+  color: #e8ece9;
 }
 .dark .excel-wb [data-excel-scroll] {
-  background: #1a221e;
+  background: #1a221e !important;
+}
+.dark .excel-wb tr.bg-white,
+.dark .excel-wb tr[class*="bg-[#fafafa]"],
+.dark .excel-wb tr[class*="bg-[#f7faf8]"],
+.dark .excel-wb tr[class*="bg-[#f2f6f3]"] {
+  background-color: #1a221e !important;
+}
+.dark .excel-wb tr[class*="bg-[#e8f5ee]"],
+.dark .excel-wb tr[class*="bg-[#dcefe3]"] {
+  background-color: #1e332d !important;
+}
+.dark .excel-wb tr[class*="bg-[#eef3fa]"] {
+  background-color: #1a2836 !important;
+}
+.dark .excel-wb .text-black,
+.dark .excel-wb [class*="text-[#1a2420]"],
+.dark .excel-wb [class*="text-[#3d4641]"],
+.dark .excel-wb [class*="text-[#3a4540]"] {
+  color: #e8ece9 !important;
+}
+.dark .excel-wb [class*="text-[#454d48]"],
+.dark .excel-wb [class*="text-[#5a635e]"] {
+  color: #a8b3ad !important;
+}
+.dark .excel-hscroll-hint {
+  color: #a8b3ad;
+  background: #1e2823;
+  border-bottom-color: #2f3d36;
+}
+
+/* Side lists (지침·습관) */
+.dark [data-side-kind] {
+  background: #1a221e !important;
+  border-color: #3a4a42 !important;
+  box-shadow: none;
+}
+.dark [data-side-kind] [class*="from-[#e8"],
+.dark [data-side-kind] [class*="from-[#e8f"] {
+  --tw-gradient-from: #1e2830 !important;
+  --tw-gradient-to: #1a221e !important;
+}
+.dark [data-side-kind="guideline"] > div:first-child {
+  background: linear-gradient(to bottom, #1e2a38, #1a2430) !important;
+  border-color: #3a4a42 !important;
+}
+.dark [data-side-kind="habit"] > div:first-child {
+  background: linear-gradient(to bottom, #1e3028, #1a2620) !important;
+  border-color: #3a4a42 !important;
+}
+.dark [data-side-list-scroll] {
+  background: #1a221e !important;
+}
+.dark [data-side-item] {
+  background: #222c27 !important;
+  border-color: #3a4a42 !important;
+}
+.dark [data-side-item][data-side-item-selected="1"] {
+  background: #1e332d !important;
+  border-color: #3d8f82 !important;
+}
+.dark [data-side-item] input {
+  background: #1a221e !important;
+  color: #e8ece9 !important;
+  border-color: #4a5c52 !important;
+}
+.dark [data-side-kind] [class*="text-[#454d48]"],
+.dark [data-side-kind] [class*="text-[#666]"] {
+  color: #a8b3ad !important;
+}
+
+/* Toolbar extras / dropdowns */
+.dark [data-toolbar-extras],
+.dark [data-slot="dropdown-menu-content"],
+.dark [data-slot="popover-content"] {
+  background-color: #1e2823 !important;
+  color: #e8ece9 !important;
+  border-color: #3a4a42 !important;
+}
+
+/* Install hint / misc light bars */
+.dark .pwa-browser-only,
+.dark [data-install-hint] {
+  background: #1e2823 !important;
+  color: #c5cec9 !important;
+  border-color: #3a4a42 !important;
+}
+
+/* Month calendar / briefing light leftovers */
+.dark [data-month-grid],
+.dark [data-briefing-panel] {
+  color: #e8ece9;
+}
+.dark input[type="date"],
+.dark input[type="text"],
+.dark input[type="password"],
+.dark select,
+.dark textarea {
+  color-scheme: dark;
 }
 /* Similar-task alert: peer row flash so father sees which one overlaps */
 tr[data-similarity-focus="1"] {

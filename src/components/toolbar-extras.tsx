@@ -39,7 +39,7 @@ export function ToolbarExtras({
               type="button"
               variant="outline"
               size="sm"
-              className="h-11 min-h-11 touch-manipulation rounded-sm border-[#8a939a] bg-white px-2.5 text-[14px] text-[#454d48] sm:h-9 sm:min-h-9 sm:px-2 sm:text-[13px]"
+              className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#8a939a] bg-white px-2 text-[12.5px] text-[#454d48] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#c5cec9] sm:h-9 sm:min-h-9 sm:px-2 sm:text-[13px]"
               data-toolbar-extras
               aria-label="추가 기능"
             >

@@ -236,7 +236,7 @@ export function SideListSection({
 
   return (
     <section
-      className={`min-w-0 overflow-hidden rounded-sm border ${accent.border} bg-[#f4f6f7] shadow-[0_1px_6px_rgba(26,43,54,0.08)]`}
+      className={`min-w-0 overflow-hidden rounded-sm border ${accent.border} bg-[#f4f6f7] shadow-[0_1px_6px_rgba(26,43,54,0.08)] dark:bg-[#1a221e] dark:shadow-none`}
       aria-label={label}
       data-side-kind={kind}
       data-side-mode={mode}
@@ -320,12 +320,12 @@ export function SideListSection({
 
       <div
         ref={listScrollRef}
-        className={`bg-white px-1.5 py-1.5 sm:px-2 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
+        className={`bg-white px-1.5 py-1.5 dark:bg-[#1a221e] sm:px-2 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
         data-side-list-scroll={kind}
         data-side-list-mode={mode}
       >
         {ordered.length === 0 ? (
-          <p className="px-2 py-6 text-center text-[13px] text-[#666]">
+          <p className="px-2 py-6 text-center text-[13px] text-[#666] dark:text-[#a8b3ad]">
             {mode === "done"
               ? `완료한 ${label}이 없습니다.`
               : `${label}이 비어 있습니다. 「항목 추가」로 적으세요.`}
@@ -345,10 +345,10 @@ export function SideListSection({
                   data-side-item-locked={locked ? "1" : "0"}
                   className={`flex flex-col gap-1 rounded-sm border px-2 py-1.5 sm:flex-row sm:items-start ${
                     checked
-                      ? "border-[#217346]/50 bg-[#e8f5ee]"
+                      ? "border-[#217346]/50 bg-[#e8f5ee] dark:border-[#3d8f82]/50 dark:bg-[#1e332d]"
                       : item.done
-                        ? "border-[#217346]/35 bg-[#eef6f1]"
-                        : "border-[#c5ccd2] bg-[#fafbfc]"
+                        ? "border-[#217346]/35 bg-[#eef6f1] dark:border-[#3d8f82]/35 dark:bg-[#1c2822]"
+                        : "border-[#c5ccd2] bg-[#fafbfc] dark:border-[#3a4a42] dark:bg-[#222c27]"
                   }`}
                 >
                   <div
@@ -430,12 +430,12 @@ export function SideListSection({
                       }}
                       disabled={locked}
                       readOnly={locked}
-                      className={`h-9 w-full rounded-sm border px-2 text-[15px] outline-none ${
+                      className={`h-9 w-full rounded-sm border px-2 text-[15px] outline-none dark:border-[#4a5c52] ${
                         locked
-                          ? "cursor-default border-[#b7c4bc] bg-[#e4ebe6] text-[#6a7670] opacity-90"
+                          ? "cursor-default border-[#b7c4bc] bg-[#e4ebe6] text-[#6a7670] opacity-90 dark:bg-[#24302a] dark:text-[#8a9490]"
                           : item.done
-                            ? `border-[#8a939a] bg-white text-[#3a4540] ${accent.focus}`
-                            : `border-[#8a939a] bg-white text-[#1a2420] ${accent.focus}`
+                            ? `border-[#8a939a] bg-white text-[#3a4540] dark:bg-[#1a221e] dark:text-[#c5cec9] ${accent.focus}`
+                            : `border-[#8a939a] bg-white text-[#1a2420] dark:bg-[#1a221e] dark:text-[#e8ece9] ${accent.focus}`
                       }`}
                       aria-label={`${label} 제목`}
                       placeholder={`${label} 내용`}
@@ -458,10 +458,10 @@ export function SideListSection({
                       }}
                       disabled={locked}
                       readOnly={locked}
-                      className={`h-7 w-full rounded-sm border px-2 text-[12.5px] outline-none ${
+                      className={`h-7 w-full rounded-sm border px-2 text-[12.5px] outline-none dark:border-[#4a5c52] ${
                         locked
-                          ? "cursor-default border-[#c5d0c9] bg-[#e8eee9] text-[#7a8680]"
-                          : "border-[#d0d5d9] bg-white text-[#2a3230] focus:border-[#8a939a]"
+                          ? "cursor-default border-[#c5d0c9] bg-[#e8eee9] text-[#7a8680] dark:bg-[#24302a] dark:text-[#8a9490]"
+                          : "border-[#d0d5d9] bg-white text-[#2a3230] focus:border-[#8a939a] dark:bg-[#1a221e] dark:text-[#c5cec9]"
                       }`}
                       aria-label={`${label} 메모`}
                       placeholder="메모 (선택)"

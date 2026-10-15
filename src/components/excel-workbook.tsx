@@ -99,24 +99,25 @@ type ColKey =
   | "done"
   | "edit";
 
+/** 할 일: no per-row 완료여부 — bulk 완료 only */
 const COLS_TODO: {
   key: ColKey;
   label: string;
   shortLabel: string;
   width: string;
 }[] = [
-  { key: "order", label: "순서", shortLabel: "순", width: "56px" },
+  { key: "order", label: "순서", shortLabel: "순", width: "48px" },
   {
     key: "listup",
     label: "할일 LIST UP",
     shortLabel: "할일",
-    width: "42%",
+    width: "48%",
   },
   {
     key: "deadline",
     label: "마감목표",
     shortLabel: "마감",
-    width: "200px",
+    width: "220px",
   },
   {
     key: "importance",
@@ -124,28 +125,27 @@ const COLS_TODO: {
     shortLabel: "중요",
     width: "72px",
   },
-  { key: "done", label: "완료여부", shortLabel: "완료", width: "84px" },
 ];
 
-/** 한 일: 완료여부 대신 잠금 해제용 「수정」 */
+/** 한 일: 잠금 해제용 「수정」열 유지 */
 const COLS_DONE: {
   key: ColKey;
   label: string;
   shortLabel: string;
   width: string;
 }[] = [
-  { key: "order", label: "순서", shortLabel: "순", width: "56px" },
+  { key: "order", label: "순서", shortLabel: "순", width: "48px" },
   {
     key: "listup",
     label: "할일 LIST UP",
     shortLabel: "할일",
-    width: "42%",
+    width: "46%",
   },
   {
     key: "deadline",
     label: "마감목표",
     shortLabel: "마감",
-    width: "200px",
+    width: "220px",
   },
   {
     key: "importance",
@@ -228,9 +228,8 @@ export function ExcelWorkbook({
   const isAll = isAllFrame(frame);
   const isDoneSheet = sheet === "done";
   const COLS = isGcal ? COLS_GCAL : isDoneSheet ? COLS_DONE : COLS_TODO;
-  /** Mobile 할 일: hide per-row 완료 column (bulk 완료 remains in toolbar) */
-  const hideDoneOnMobile = !isGcal && sheet === "todo";
-  const emptyColSpan = isGcal ? 3 : 6;
+  /** select + COLS length (할 일 has no 완료열; 한 일 keeps 수정) */
+  const emptyColSpan = isGcal ? COLS.length : COLS.length + 1;
   const [focus, setFocus] = useState<FocusCell | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
@@ -701,7 +700,7 @@ export function ExcelWorkbook({
     `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border ${
       chip === c
         ? "border-[#217346] bg-[#217346] text-white"
-        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1]"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#2a3a32]"
     }`;
 
   const applyGcalChip = (c: "today" | "week" | "month" | "all") => {
@@ -738,29 +737,31 @@ export function ExcelWorkbook({
     `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border ${
       gcalChip === c
         ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
-        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa]"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#1e2a38]"
     }`;
 
   return (
-    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2">
-        <p className="truncate text-[16px] font-semibold text-[#1a2420]">
+    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)] dark:border-[#3a4a42] dark:bg-[#1a221e]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2 dark:border-[#3a4a42] dark:from-[#24302a] dark:to-[#1e2823]">
+        <p className="truncate text-[16px] font-semibold text-[#1a2420] dark:text-[#e8ece9]">
           일비서.xlsx
-          <span className="ml-2 text-[13px] font-normal text-[#454d48]">
+          <span className="ml-2 text-[13px] font-normal text-[#454d48] dark:text-[#a8b3ad]">
             — TO DO LIST
           </span>
         </p>
-        <p className="text-[14px] tabular-nums text-[#454d48]">{todayLabel}</p>
+        <p className="text-[14px] tabular-nums text-[#454d48] dark:text-[#a8b3ad]">
+          {todayLabel}
+        </p>
       </div>
 
       {/* Ribbon — stack on phone so 틀 + actions stay tappable */}
-      <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#f0f2f4] px-2.5 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-3 sm:py-2">
-        <label className="flex w-full min-w-0 items-center gap-2 text-[14px] text-[#1a2420] sm:w-auto sm:flex-initial">
+      <div className="flex flex-col gap-2 border-b border-[#9aa5ad] bg-[#f0f2f4] px-2.5 py-2.5 dark:border-[#3a4a42] dark:bg-[#1e2823] sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-3 sm:py-2">
+        <label className="flex w-full min-w-0 items-center gap-2 text-[14px] text-[#1a2420] dark:text-[#e8ece9] sm:w-auto sm:flex-initial">
           <span className="shrink-0 font-semibold">틀</span>
           <select
             value={frame}
             onChange={(e) => onFrameChange(e.target.value as FrameId)}
-            className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2.5 text-[15px] font-medium outline-none focus:border-[#217346] sm:h-9 sm:min-h-9 sm:w-auto sm:min-w-[8.5rem]"
+            className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2.5 text-[15px] font-medium outline-none focus:border-[#217346] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] sm:h-9 sm:min-h-9 sm:w-auto sm:min-w-[8.5rem]"
             aria-label="틀"
           >
             {FRAME_ORDER.filter((c) => sheet === "todo" || c !== "gcal").map(
@@ -774,15 +775,16 @@ export function ExcelWorkbook({
         </label>
         {!isGcal ? (
           <div
-            className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center"
+            className="flex w-full min-w-0 flex-nowrap items-center gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:w-auto sm:gap-1.5 sm:overflow-visible [&::-webkit-scrollbar]:hidden"
             data-excel-toolbar-actions
+            data-excel-bulk-row
           >
-            {/* 「전체」 집계 틀: 행 추가 불가 (개별 틀에서만) */}
+            {/* 한 줄: 행 추가 | 추가 기능 | 완료 | 선택 삭제 */}
             {sheet === "todo" && !isAll ? (
               <Button
                 type="button"
                 size="sm"
-                className="h-11 min-h-11 w-fit touch-manipulation rounded-sm bg-[#217346] px-3 text-white hover:bg-[#1a5c38] sm:h-9 sm:min-h-9"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[#217346] px-2 text-[12.5px] text-white hover:bg-[#1a5c38] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
                 onClick={onAdd}
                 data-excel-add-row
               >
@@ -790,64 +792,55 @@ export function ExcelWorkbook({
                 행 추가
               </Button>
             ) : null}
-            {/* 「추가 기능」+ 일괄 완료/삭제 — 같은 가로줄 (모바일도 nowrap) */}
-            {(sheet === "todo" && isTaskCategory(frame)) ||
-            selectedCount > 0 ? (
-              <div
-                className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                data-excel-bulk-row
+            {sheet === "todo" && isTaskCategory(frame) ? (
+              <ToolbarExtras
+                category={frame}
+                onImport={onImport}
+                onReplaceCategory={onReplaceCategory}
+              />
+            ) : null}
+            {selectedCount > 0 && sheet === "todo" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#217346]/50 px-2 text-[12.5px] text-[#217346] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                onClick={bulkComplete}
+                data-excel-bulk-complete
               >
-                {sheet === "todo" && isTaskCategory(frame) ? (
-                  <ToolbarExtras
-                    category={frame}
-                    onImport={onImport}
-                    onReplaceCategory={onReplaceCategory}
-                  />
-                ) : null}
-                {selectedCount > 0 && sheet === "todo" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-11 min-h-11 shrink-0 touch-manipulation rounded-sm border-[#217346]/50 px-2.5 text-[13px] text-[#217346] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
-                    onClick={bulkComplete}
-                    data-excel-bulk-complete
-                  >
-                    <Check className="size-3.5" />
-                    완료
-                  </Button>
-                ) : null}
-                {selectedCount > 0 && selectedDeletableIds.length > 0 ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-11 min-h-11 shrink-0 touch-manipulation rounded-sm border-[#b42318]/40 px-2.5 text-[13px] text-[#b42318] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
-                    onClick={bulkDelete}
-                    data-excel-bulk-delete
-                  >
-                    <Trash2 className="size-3.5" />
-                    선택 삭제
-                  </Button>
-                ) : null}
-                {selectedCount > 0 && sheet === "done" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-11 min-h-11 shrink-0 touch-manipulation rounded-sm px-2.5 text-[13px] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
-                    onClick={bulkRestore}
-                    data-excel-bulk-restore
-                  >
-                    <RotateCcw className="size-3.5" />
-                    선택 복원
-                  </Button>
-                ) : null}
-              </div>
+                <Check className="size-3.5" />
+                완료
+              </Button>
+            ) : null}
+            {selectedCount > 0 && selectedDeletableIds.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#b42318]/40 px-2 text-[12.5px] text-[#b42318] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                onClick={bulkDelete}
+                data-excel-bulk-delete
+              >
+                <Trash2 className="size-3.5" />
+                선택 삭제
+              </Button>
+            ) : null}
+            {selectedCount > 0 && sheet === "done" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm px-2 text-[12.5px] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                onClick={bulkRestore}
+                data-excel-bulk-restore
+              >
+                <RotateCcw className="size-3.5" />
+                선택 복원
+              </Button>
             ) : null}
           </div>
         ) : null}
-        <span className="text-[13px] leading-snug text-[#454d48] sm:ml-auto">
+        <span className="text-[13px] leading-snug text-[#454d48] dark:text-[#a8b3ad] sm:ml-auto">
           {FRAME_LABEL[frame]} · {rows.length}행
           {isGcal && calCount > 0 ? ` (캘린더)` : ""}
           {!isGcal && filterActive ? ` · 필터 적용` : ""}
@@ -868,10 +861,12 @@ export function ExcelWorkbook({
 
       {/* Period filter OR Google calendar picker */}
       {isGcal && sheet === "todo" ? (
-        <div className="flex flex-col gap-2.5 border-b border-[#9aa5ad] bg-[#e8ecef] px-2.5 py-2.5 sm:px-3">
-          <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
+        <div className="flex flex-col gap-2.5 border-b border-[#9aa5ad] bg-[#e8ecef] px-2.5 py-2.5 dark:border-[#3a4a42] dark:bg-[#1e2823] sm:px-3">
+          <span className="text-[14px] font-semibold text-[#1a2420] dark:text-[#e8ece9]">
+            기간
+          </span>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] dark:text-[#a8b3ad] sm:flex-initial">
               <span className="w-12 shrink-0 sm:w-auto">시작일</span>
               <input
                 type="date"
@@ -880,12 +875,14 @@ export function ExcelWorkbook({
                   setGcalRangeStart(e.target.value);
                   setGcalChip("none");
                 }}
-                className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
+                className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
                 aria-label="캘린더 기간 시작일"
               />
             </label>
-            <span className="hidden text-[#454d48] sm:inline">~</span>
-            <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+            <span className="hidden text-[#454d48] dark:text-[#a8b3ad] sm:inline">
+              ~
+            </span>
+            <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] dark:text-[#a8b3ad] sm:flex-initial">
               <span className="w-12 shrink-0 sm:w-auto">종료일</span>
               <input
                 type="date"
@@ -894,7 +891,7 @@ export function ExcelWorkbook({
                   setGcalRangeEnd(e.target.value);
                   setGcalChip("none");
                 }}
-                className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
+                className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
                 aria-label="캘린더 기간 종료일"
               />
             </label>
@@ -941,10 +938,12 @@ export function ExcelWorkbook({
           </div>
         </div>
       ) : !isGcal ? (
-      <div className="flex flex-col gap-2.5 border-b border-[#9aa5ad] bg-[#e8ecef] px-2.5 py-2.5 sm:px-3">
-        <span className="text-[14px] font-semibold text-[#1a2420]">기간</span>
+      <div className="flex flex-col gap-2.5 border-b border-[#9aa5ad] bg-[#e8ecef] px-2.5 py-2.5 dark:border-[#3a4a42] dark:bg-[#1e2823] sm:px-3">
+        <span className="text-[14px] font-semibold text-[#1a2420] dark:text-[#e8ece9]">
+          기간
+        </span>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] dark:text-[#a8b3ad] sm:flex-initial">
             <span className="w-12 shrink-0 sm:w-auto">시작일</span>
             <input
               type="date"
@@ -953,12 +952,14 @@ export function ExcelWorkbook({
                 setFilterStart(e.target.value);
                 setChip("all");
               }}
-              className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
+              className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
               aria-label="기간 시작일"
             />
           </label>
-          <span className="hidden text-[#454d48] sm:inline">~</span>
-          <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] sm:flex-initial">
+          <span className="hidden text-[#454d48] dark:text-[#a8b3ad] sm:inline">
+            ~
+          </span>
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-[#454d48] dark:text-[#a8b3ad] sm:flex-initial">
             <span className="w-12 shrink-0 sm:w-auto">종료일</span>
             <input
               type="date"
@@ -967,7 +968,7 @@ export function ExcelWorkbook({
                 setFilterEnd(e.target.value);
                 setChip("all");
               }}
-              className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
+              className="h-11 min-h-11 w-full min-w-0 touch-manipulation rounded-sm border border-[#8a939a] bg-white px-2 text-[15px] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] sm:h-9 sm:min-h-9 sm:w-auto sm:text-[14px]"
               aria-label="기간 종료일"
             />
           </label>
@@ -1012,44 +1013,41 @@ export function ExcelWorkbook({
       <div className="excel-scroll-wrap excel-fit-mobile-wrap">
       <div
         ref={tableScrollRef}
-        className="relative max-h-[min(58dvh,640px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-auto bg-white [-webkit-overflow-scrolling:touch] sm:max-h-[min(68dvh,820px)] sm:min-h-[320px] sm:overflow-auto sm:overscroll-x-contain sm:overscroll-y-auto lg:max-h-[min(72dvh,920px)] xl:max-h-[min(76dvh,1040px)]"
+        className="relative max-h-[min(58dvh,640px)] min-h-[280px] overflow-y-auto overflow-x-hidden overscroll-y-auto bg-white [-webkit-overflow-scrolling:touch] dark:bg-[#1a221e] sm:max-h-[min(68dvh,820px)] sm:min-h-[320px] sm:overflow-auto sm:overscroll-x-contain sm:overscroll-y-auto lg:max-h-[min(72dvh,920px)] xl:max-h-[min(76dvh,1040px)]"
         data-excel-scroll
       >
-        <table
-          className={`excel-fit-mobile w-full min-w-0 table-fixed border-collapse text-[14px] text-black sm:min-w-[900px] sm:table-auto sm:text-[16.5px] ${
-            hideDoneOnMobile ? "excel-hide-done-mobile" : ""
-          }`}
-        >
+        <table className="excel-fit-mobile w-full min-w-0 table-fixed border-collapse text-[14px] text-black dark:text-[#e8ece9] sm:text-[16.5px]">
           <colgroup>
-            {!isGcal ? <col className="w-8 sm:w-10" /> : null}
-            <col className="w-7 sm:w-14" />
-            <col />
-            {/* PC: wider 마감목표 · Mobile 할 일: extra width after hiding 완료 */}
-            <col
-              className={
-                isGcal
-                  ? "w-[7.5rem] sm:w-[13.75rem]"
-                  : hideDoneOnMobile
-                    ? "w-[7rem] sm:w-[12.5rem]"
-                    : "w-[5.5rem] sm:w-[12.5rem]"
-              }
-            />
-            {!isGcal ? <col className="w-9 sm:w-[4.5rem]" /> : null}
-            {!isGcal ? (
-              <col
-                className={
-                  hideDoneOnMobile
-                    ? "excel-col-done w-10 sm:w-[5.25rem]"
-                    : "w-10 sm:w-[5.25rem]"
-                }
-              />
-            ) : null}
+            {isGcal ? (
+              <>
+                <col style={{ width: "6%" }} />
+                <col style={{ width: "62%" }} />
+                <col style={{ width: "32%" }} />
+              </>
+            ) : isDoneSheet ? (
+              <>
+                <col style={{ width: "5%" }} />
+                <col style={{ width: "5%" }} />
+                <col style={{ width: "46%" }} />
+                <col style={{ width: "26%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "10%" }} />
+              </>
+            ) : (
+              <>
+                <col style={{ width: "6%" }} />
+                <col style={{ width: "5%" }} />
+                <col style={{ width: "50%" }} />
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "11%" }} />
+              </>
+            )}
           </colgroup>
           <thead className="sticky top-0 z-20">
             <tr>
               {!isGcal ? (
                 <th
-                  className="border border-black bg-[#f3f3f3] px-0.5 py-1.5 text-center sm:px-1 sm:py-2"
+                  className="border border-black bg-[#f3f3f3] px-0.5 py-1.5 text-center dark:border-[#4a5c52] dark:bg-[#24302a] sm:px-1 sm:py-2"
                   title="여러 행 선택"
                 >
                   <input
@@ -1072,7 +1070,6 @@ export function ExcelWorkbook({
                 const sortable = isSortableCol(c.key);
                 const active =
                   sortable && columnSort?.key === c.key ? columnSort : null;
-                const isDoneCol = c.key === "done" || c.key === "edit";
                 const labelNode = (
                   <>
                     <span className="sm:hidden">{c.shortLabel}</span>
@@ -1082,16 +1079,16 @@ export function ExcelWorkbook({
                 return (
                   <th
                     key={`H-${c.key}`}
-                    className={`border border-black bg-[#f3f3f3] text-center text-[13px] font-bold leading-tight text-black sm:text-[16.5px] ${
+                    className={`border border-black bg-[#f3f3f3] text-center text-[13px] font-bold leading-tight text-black dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] sm:text-[16.5px] ${
                       sortable ? "p-0" : "px-0.5 py-1.5 sm:px-2 sm:py-3"
-                    } ${hideDoneOnMobile && isDoneCol ? "excel-col-done" : ""}`}
+                    }`}
                   >
                     {sortable ? (
                       <button
                         type="button"
                         onClick={() => onHeaderSort(c.key)}
-                        className={`flex min-h-9 w-full items-center justify-center gap-0.5 px-0.5 py-1.5 text-[12.5px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] sm:min-h-11 sm:px-1 sm:py-2 sm:text-[16px] ${
-                          active ? "bg-[#e4efe6]" : ""
+                        className={`flex min-h-9 w-full items-center justify-center gap-0.5 px-0.5 py-1.5 text-[12.5px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] dark:text-[#e8ece9] dark:hover:bg-[#2a3a32] dark:active:bg-[#31443a] sm:min-h-11 sm:px-1 sm:py-2 sm:text-[16px] ${
+                          active ? "bg-[#e4efe6] dark:bg-[#2a3a32]" : ""
                         }`}
                         aria-label={`${c.label} 정렬 (${
                           !active
@@ -1240,16 +1237,16 @@ export function ExcelWorkbook({
                     }
                     className={
                       checked
-                        ? "bg-[#dcefe3]"
+                        ? "bg-[#dcefe3] dark:bg-[#1e332d]"
                         : locked
                           ? zebra
-                            ? "bg-[#f2f6f3]"
-                            : "bg-[#f7faf8]"
+                            ? "bg-[#f2f6f3] dark:bg-[#1c2621]"
+                            : "bg-[#f7faf8] dark:bg-[#1a221e]"
                           : active
-                            ? "bg-[#e8f5ee]"
+                            ? "bg-[#e8f5ee] dark:bg-[#1e332d]"
                             : zebra
-                              ? "bg-[#fafafa]"
-                              : "bg-white"
+                              ? "bg-[#fafafa] dark:bg-[#1c2621]"
+                              : "bg-white dark:bg-[#1a221e]"
                     }
                   >
                     <td
@@ -1588,57 +1585,46 @@ export function ExcelWorkbook({
                       />
                     </EditCell>
 
-                    <td
-                      className={`border border-black px-0.5 py-0.5 text-center align-middle sm:px-1 ${
-                        hideDoneOnMobile ? "excel-col-done" : ""
-                      }`}
-                    >
-                      {sheet === "todo" ? (
-                        <input
-                          type="checkbox"
-                          className="size-4 accent-[#217346] sm:size-[18px]"
-                          aria-label={`${task.title} 완료여부`}
-                          onChange={() => onComplete(task.id)}
-                        />
-                      ) : locked ? (
-                        <button
-                          type="button"
-                          className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346]/40 bg-white px-1.5 text-[12px] font-medium text-[#217346] hover:bg-[#e8f5ee] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            beginEditDone(task.id);
-                            setActiveRow(task.id);
-                            setFocus({ rowId: task.id, col: "listup" });
-                          }}
-                          aria-label={`${task.title || "할 일"} 수정`}
-                          data-excel-edit={task.id}
-                          title="수정하려면 누르세요"
-                        >
-                          <Pencil className="size-3 sm:size-3.5" aria-hidden />
-                          수정
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346] bg-[#217346] px-1.5 text-[12px] font-medium text-white hover:bg-[#1a5c38] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
-                          onMouseDown={(e) => {
-                            // Keep focus in the row so blur does not re-lock
-                            // before this click runs.
-                            e.preventDefault();
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            endEditDone(task.id);
-                          }}
-                          aria-label={`${task.title || "할 일"} 수정 끝내기`}
-                          data-excel-edit-done={task.id}
-                          title="수정 끝 — 다시 잠금"
-                        >
-                          <Check className="size-3 sm:size-3.5" aria-hidden />
-                          수정 끝
-                        </button>
-                      )}
-                    </td>
+                    {isDoneSheet ? (
+                      <td className="border border-black px-0.5 py-0.5 text-center align-middle sm:px-1">
+                        {locked ? (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346]/40 bg-white px-1.5 text-[12px] font-medium text-[#217346] hover:bg-[#e8f5ee] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              beginEditDone(task.id);
+                              setActiveRow(task.id);
+                              setFocus({ rowId: task.id, col: "listup" });
+                            }}
+                            aria-label={`${task.title || "할 일"} 수정`}
+                            data-excel-edit={task.id}
+                            title="수정하려면 누르세요"
+                          >
+                            <Pencil className="size-3 sm:size-3.5" aria-hidden />
+                            수정
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346] bg-[#217346] px-1.5 text-[12px] font-medium text-white hover:bg-[#1a5c38] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              endEditDone(task.id);
+                            }}
+                            aria-label={`${task.title || "할 일"} 수정 끝내기`}
+                            data-excel-edit-done={task.id}
+                            title="수정 끝 — 다시 잠금"
+                          >
+                            <Check className="size-3 sm:size-3.5" aria-hidden />
+                            수정 끝
+                          </button>
+                        )}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })

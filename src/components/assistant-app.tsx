@@ -341,7 +341,7 @@ export function AssistantApp() {
               calendarEvents={app.calendarEvents}
               guidelines={app.guidelines}
               habits={app.habits}
-              onAfterExport={() => void app.forceExcelSync()}
+              onExcelLinkedChange={app.setExcelLinked}
             />
           ) : null}
 

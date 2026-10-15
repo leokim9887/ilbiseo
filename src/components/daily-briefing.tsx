@@ -205,6 +205,12 @@ export function DailyBriefingPanel({
       if (result.mode === "overwrite" || result.mode === "created") {
         setExcelLinked(true);
         onExcelLinkedChange?.(true);
+      } else if (result.mode === "error" && result.kind === "not_found") {
+        setExcelLinked(false);
+        onExcelLinkedChange?.(false);
+      }
+      if (result.mode === "error") {
+        setError(result.message);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "엑셀 내보내기 실패");
@@ -357,7 +363,7 @@ export function DailyBriefingPanel({
         <p className="text-[14px] leading-relaxed text-[var(--ink-muted)]">
           {fsOk
             ? excelLinked
-              ? "「엑셀 파일 저장」을 누르면 예전에 고른 파일에 덮어씁니다. 새 위치는 「다른 이름으로 저장」."
+              ? "「엑셀 파일 저장」은 예전에 고른 파일에만 덮어씁니다. 파일이 열려 있으면 닫은 뒤 다시 눌러 주세요. 새 위치는 「다른 이름으로 저장」."
               : "처음에는 저장 위치와 이름을 고릅니다. 그다음부터는 같은 파일에 덮어씁니다. (Chrome·Edge PC)"
             : "이 브라우저에서는 매번 다운로드로 저장됩니다. 같은 파일에 덮어쓰려면 PC Chrome·Edge를 사용해 주세요."}
         </p>

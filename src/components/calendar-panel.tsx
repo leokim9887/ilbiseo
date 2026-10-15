@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
-import { createMockCalendarEvents } from "@/lib/calendar-data";
 import { PanelShell, EmptyState } from "@/components/panel-shell";
 import { MonthCalendarGrid } from "@/components/month-calendar-grid";
 import { Button } from "@/components/ui/button";
@@ -65,7 +64,7 @@ export function CalendarPanel({
           "GOOGLE_CLIENT_SECRET",
           "GOOGLE_REDIRECT_URI",
         ],
-        setupHint: "상태 확인에 실패했습니다. 샘플로 확인할 수 있습니다.",
+        setupHint: "연결 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
       });
     } finally {
       setStatusLoading(false);
@@ -135,11 +134,6 @@ export function CalendarPanel({
     } finally {
       setBusy(null);
     }
-  };
-
-  const loadMock = () => {
-    onReplace(createMockCalendarEvents());
-    setGoogleError(null);
   };
 
   const goPrevMonth = () => {
@@ -236,20 +230,7 @@ export function CalendarPanel({
               <Link2 className="size-4" />
               Google 캘린더 연결
             </a>
-          ) : (
-            <Button type="button" size="lg" variant="ghost" className="min-h-12 w-full sm:min-h-11 sm:w-auto" disabled>
-              OAuth 미설정
-            </Button>
-          )}
-          <Button
-            type="button"
-            size="lg"
-            variant="secondary"
-            className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
-            onClick={loadMock}
-          >
-            샘플
-          </Button>
+          ) : null}
         </>
       }
     >
@@ -284,11 +265,7 @@ export function CalendarPanel({
             <p className="text-[var(--ink)]">연결을 누르면 Google 로그인합니다.</p>
           ) : (
             <p className="text-[var(--ink-muted)]">
-              Google 키가 없습니다
-              {status?.missing?.length
-                ? ` (${status.missing.join(", ")})`
-                : ""}
-              . 「샘플」로 달력 모양을 확인할 수 있습니다.
+              Google 캘린더 연결을 준비 중입니다. 잠시 후 다시 확인해 주세요.
             </p>
           )}
           {busy === "refresh" ? (
@@ -307,11 +284,21 @@ export function CalendarPanel({
         {events.length === 0 ? (
           <EmptyState
             title="캘린더 일정이 없습니다"
-            description="Google을 연결하거나 「샘플」로 달력을 확인해 보세요."
+            description={
+              configured
+                ? "Google 캘린더를 연결하면 일정이 여기에 표시됩니다."
+                : "연결이 준비되면 Google 캘린더 일정을 볼 수 있습니다."
+            }
             action={
-              <Button type="button" size="lg" onClick={loadMock}>
-                샘플 넣기
-              </Button>
+              configured && !connected ? (
+                <a
+                  href="/api/google/auth"
+                  className="inline-flex h-11 min-h-11 touch-manipulation items-center justify-center gap-1.5 rounded-lg bg-[#217346] px-4 text-sm font-medium text-white hover:bg-[#1a5c38]"
+                >
+                  <Link2 className="size-4" />
+                  Google 캘린더 연결
+                </a>
+              ) : undefined
             }
           />
         ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CalendarEvent, SideListItem, Task } from "@/lib/types";
 import {
   buildDailyBriefing,
@@ -9,14 +9,6 @@ import {
   type AppSettings,
   type DailyBriefing,
 } from "@/lib/briefing";
-import { buildWorkbook, briefingFilename } from "@/lib/excel";
-import {
-  DEFAULT_EXCEL_NAME,
-  excelSaveToastMessage,
-  loadExcelHandle,
-  saveExcelBuffer,
-  supportsFileSystemAccess,
-} from "@/lib/excel-link";
 import {
   formatNextBriefingKo,
   nextBriefingUtc,
@@ -27,12 +19,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  FileSpreadsheet,
   Loader2,
   Mail,
   Newspaper,
-  RefreshCw,
-  Save,
 } from "lucide-react";
 
 interface DailyBriefingPanelProps {
@@ -40,8 +29,6 @@ interface DailyBriefingPanelProps {
   calendarEvents: CalendarEvent[];
   guidelines?: SideListItem[];
   habits?: SideListItem[];
-  /** 파일 핸들이 연결/갱신되면 알림 (설정·자동 동기화용) */
-  onExcelLinkedChange?: (linked: boolean) => void;
 }
 
 async function syncSnapshot(
@@ -76,7 +63,6 @@ export function DailyBriefingPanel({
   calendarEvents,
   guidelines = [],
   habits = [],
-  onExcelLinkedChange,
 }: DailyBriefingPanelProps) {
   const [settings, setSettings] = useState<AppSettings>({
     briefingHour: "08:00",
@@ -85,32 +71,17 @@ export function DailyBriefingPanel({
     attachXlsx: true,
   });
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
-  const [busy, setBusy] = useState<
-    "none" | "gen" | "xlsx" | "api" | "sync"
-  >("none");
+  const [busy, setBusy] = useState<"none" | "api" | "sync">("none");
   const [apiNote, setApiNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
-  const [excelLinked, setExcelLinked] = useState(false);
-  const [saveToast, setSaveToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fsOk = supportsFileSystemAccess();
 
   useEffect(() => {
     const loaded = loadSettings();
     const locked = { ...loaded, workEmail: FATHER_EMAIL };
     setSettings(locked);
     saveSettings(locked);
-    void loadExcelHandle().then((h) => setExcelLinked(Boolean(h)));
   }, []);
-
-  const showSaveToast = (text: string | null) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setSaveToast(text);
-    if (text) {
-      toastTimer.current = setTimeout(() => setSaveToast(null), 3200);
-    }
-  };
 
   const nextLabel = useMemo(
     () => formatNextBriefingKo(nextBriefingUtc(8, 0)),
@@ -142,7 +113,7 @@ export function DailyBriefingPanel({
       }).then((r) => {
         setSyncNote(
           r.ok
-            ? `서버 동기화됨 · ${r.store ?? ""} · ${r.message ?? ""}`
+            ? `서버 동기화됨 · ${r.message ?? ""}`
             : `동기화 실패 · ${r.error || r.message || ""}`,
         );
       });
@@ -155,69 +126,6 @@ export function DailyBriefingPanel({
     guidelines,
     habits,
   ]);
-
-  const generate = () => {
-    setBusy("gen");
-    setError(null);
-    try {
-      setBriefing(
-        buildDailyBriefing(
-          tasks,
-          calendarEvents,
-          undefined,
-          guidelines,
-          habits,
-        ),
-      );
-      setApiNote(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "브리핑 생성 실패");
-    } finally {
-      setBusy("none");
-    }
-  };
-
-  const exportExcel = async (forceNewFile = false) => {
-    setBusy("xlsx");
-    setError(null);
-    try {
-      const b = buildDailyBriefing(
-        tasks,
-        calendarEvents,
-        undefined,
-        guidelines,
-        habits,
-      );
-      setBriefing(b);
-      const buf = await buildWorkbook({
-        tasks,
-        calendarEvents,
-        briefing: b,
-        guidelines,
-        habits,
-      });
-      const result = await saveExcelBuffer(buf, {
-        forceNewFile,
-        suggestedName: fsOk ? DEFAULT_EXCEL_NAME : briefingFilename(b.date),
-      });
-      const msg = excelSaveToastMessage(result);
-      if (msg) showSaveToast(msg);
-      if (result.mode === "overwrite" || result.mode === "created") {
-        setExcelLinked(true);
-        onExcelLinkedChange?.(true);
-      } else if (result.mode === "error" && result.kind === "not_found") {
-        setExcelLinked(false);
-        onExcelLinkedChange?.(false);
-      }
-      if (result.mode === "error") {
-        setError(result.message);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "엑셀 내보내기 실패");
-    } finally {
-      setBusy("none");
-    }
-  };
 
   const callApi = async (send: boolean) => {
     setBusy("api");
@@ -265,11 +173,9 @@ export function DailyBriefingPanel({
         ),
       );
       setApiNote(
-        `${send ? "테스트 메일" : "미리보기"} · ${data.delivery?.status} · ${data.delivery?.message}${
-          data.delivery?.transport
-            ? ` · 전송=${data.delivery.transport}`
-            : ""
-        }`,
+        send
+          ? `테스트 메일 · ${data.delivery?.message ?? data.delivery?.status ?? "완료"}`
+          : `미리보기 · ${data.delivery?.message ?? "발송하지 않음"}`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "API 호출 실패");
@@ -290,7 +196,7 @@ export function DailyBriefingPanel({
       });
       setSyncNote(
         r.ok
-          ? `서버 동기화됨 · ${r.store ?? ""} · ${r.message ?? ""}`
+          ? `서버 동기화됨 · ${r.message ?? ""}`
           : `동기화 실패 · ${r.error || r.message || ""}`,
       );
       if (!r.ok) setError(r.error || r.message || "동기화 실패");
@@ -304,69 +210,8 @@ export function DailyBriefingPanel({
       title="오늘 브리핑 · 매일 메일"
       description="매일 아침 08:00(한국 시간) 네이버 메일."
       icon={<Newspaper className="size-5" />}
-      actions={
-        <>
-          <Button
-            type="button"
-            size="lg"
-            className="min-h-11"
-            onClick={generate}
-            disabled={busy !== "none"}
-          >
-            {busy === "gen" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RefreshCw className="size-4" />
-            )}
-            지금 생성
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            className="min-h-11"
-            variant="secondary"
-            onClick={() => void exportExcel(false)}
-            disabled={busy !== "none"}
-          >
-            {busy === "xlsx" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Save className="size-4" />
-            )}
-            엑셀 파일 저장
-          </Button>
-          {fsOk ? (
-            <Button
-              type="button"
-              size="lg"
-              className="min-h-11"
-              variant="outline"
-              onClick={() => void exportExcel(true)}
-              disabled={busy !== "none"}
-            >
-              <FileSpreadsheet className="size-4" />
-              다른 이름으로 저장
-            </Button>
-          ) : null}
-        </>
-      }
     >
-      {saveToast ? (
-        <div
-          className="fixed left-1/2 top-3 z-50 w-[min(92vw,24rem)] -translate-x-1/2 rounded-xl border border-[var(--brand)]/30 bg-[var(--sheet)] px-4 py-3 text-center text-[15px] text-[var(--brand)] shadow-md"
-          role="status"
-        >
-          {saveToast}
-        </div>
-      ) : null}
       <div className="space-y-5">
-        <p className="text-[14px] leading-relaxed text-[var(--ink-muted)]">
-          {fsOk
-            ? excelLinked
-              ? "「엑셀 파일 저장」은 예전에 고른 파일에만 덮어씁니다. 파일이 열려 있으면 닫은 뒤 다시 눌러 주세요. 새 위치는 「다른 이름으로 저장」."
-              : "처음에는 저장 위치와 이름을 고릅니다. 그다음부터는 같은 파일에 덮어씁니다. (Chrome·Edge PC)"
-            : "이 브라우저에서는 매번 다운로드로 저장됩니다. 같은 파일에 덮어쓰려면 PC Chrome·Edge를 사용해 주세요."}
-        </p>
         <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-4 space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="work-email" className="text-[14px]">
@@ -381,7 +226,7 @@ export function DailyBriefingPanel({
               className="h-11 bg-[var(--sheet-header)] text-[var(--ink)]"
             />
             <p className="text-[13px] text-[var(--ink-muted)]">
-              발신·수신 모두 {FATHER_EMAIL} · 네이버 SMTP (도메인 인증 불필요)
+              발신·수신 모두 {FATHER_EMAIL}
             </p>
           </div>
 
@@ -400,8 +245,7 @@ export function DailyBriefingPanel({
             <span>
               <span className="font-semibold">매일 08:00(KST) 자동 발송</span>
               <span className="mt-0.5 block text-[13px] text-[var(--ink-muted)]">
-                켜면 이 기기의 할 일·캘린더를 서버에 동기화해 크론이 보낼 수
-                있습니다. Vercel에서는 Upstash Redis도 필요합니다.
+                켜면 이 기기의 할 일·캘린더를 서버에 맞춰 아침 메일을 보냅니다.
               </span>
             </span>
           </label>
@@ -429,10 +273,7 @@ export function DailyBriefingPanel({
           <p className="text-[14px] text-[var(--ink)]">
             다음 예정:{" "}
             <strong className="tabular-nums">{nextLabel}</strong>
-            <span className="text-[var(--ink-muted)]">
-              {" "}
-              (Asia/Seoul 08:00 · UTC cron 23:00)
-            </span>
+            <span className="text-[var(--ink-muted)]"> (한국 시간 08:00)</span>
           </p>
 
           <div className="flex flex-wrap gap-2">
@@ -477,8 +318,7 @@ export function DailyBriefingPanel({
 
           <p className="text-[13px] text-[var(--ink-muted)]">
             {FATHER_EMAIL} · 매일 발송{" "}
-            {settings.dailyEmailEnabled ? "켜짐" : "꺼짐"} ·{" "}
-            NAVER_SMTP_PASSWORD 없으면 발송 안 함
+            {settings.dailyEmailEnabled ? "켜짐" : "꺼짐"}
           </p>
           {syncNote ? (
             <p className="text-[13px] text-[var(--ink-muted)]">{syncNote}</p>

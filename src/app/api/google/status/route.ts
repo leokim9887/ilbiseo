@@ -25,6 +25,6 @@ export async function GET() {
           },
         ),
     setupHint:
-      "자세한 설정은 프로젝트 문서 google-calendar-setup.md 또는 README를 보세요. 비밀값이 없으면 mock·ICS로 쓸 수 있습니다.",
+      "Google 캘린더 연결에 필요한 키가 없습니다. 서버 환경 변수를 확인해 주세요.",
   });
 }

@@ -341,7 +341,6 @@ export function AssistantApp() {
               calendarEvents={app.calendarEvents}
               guidelines={app.guidelines}
               habits={app.habits}
-              onExcelLinkedChange={app.setExcelLinked}
             />
           ) : null}
 

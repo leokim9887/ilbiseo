@@ -19,6 +19,7 @@ import { inferGroupKey, sortCompleted, sortTasks } from "@/lib/sort";
 import { buildDailyBriefing } from "@/lib/briefing";
 import { buildWorkbook } from "@/lib/excel";
 import {
+  classifyExcelWriteError,
   loadExcelHandle,
   supportsFileSystemAccess,
   writeBufferToHandle,
@@ -90,8 +91,12 @@ export function useAppState() {
         `엑셀 갱신됨 · ${new Date().toLocaleTimeString("ko-KR")}`,
       );
     } catch (e) {
+      const { kind, message } = classifyExcelWriteError(e);
+      // Keep linked on lock/permission — never clear handle on soft auto-sync errors
       setExcelStatus(
-        e instanceof Error ? e.message : "엑셀 자동 저장에 실패했습니다.",
+        kind === "locked"
+          ? "엑셀이 열려 있어 자동 저장을 건너뛰었습니다. 닫은 뒤 「엑셀 파일 저장」을 눌러 주세요."
+          : message,
       );
     }
   }, []);

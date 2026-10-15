@@ -27,7 +27,7 @@ export function ExcelLinker({
   linked,
   status,
   onLinkedChange,
-  onSync,
+  onSync: _onSync,
 }: ExcelLinkerProps) {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -73,8 +73,10 @@ export function ExcelLinker({
       const msg = excelSaveToastMessage(result);
       if (msg) showToast(msg);
       if (result.mode === "overwrite" || result.mode === "created") {
+        // Content already written — do not write again via onSync (race / lock).
         onLinkedChange(true);
-        await onSync();
+      } else if (result.mode === "error" && result.kind === "not_found") {
+        onLinkedChange(false);
       }
     } catch (e) {
       showToast(
@@ -112,7 +114,7 @@ export function ExcelLinker({
           <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
             {fsOk
               ? linked
-                ? "연결됨 — 「엑셀 파일 저장」은 같은 파일을 덮어씁니다. 할 일을 바꿔도 자동으로 갱신됩니다."
+                ? "연결됨 — 「엑셀 파일 저장」은 같은 파일만 덮어씁니다(저장 창이 다시 뜨지 않음). 파일이 열려 있으면 닫은 뒤 저장하세요."
                 : "처음에는 저장 위치와 이름을 고릅니다. 그다음부터는 같은 파일에 덮어씁니다. (Chrome·Edge PC)"
               : "이 브라우저는 같은 파일 덮어쓰기를 지원하지 않습니다. 저장 시 다운로드되며니다. PC Chrome·Edge를 쓰면 덮어쓰기가 됩니다."}
           </p>

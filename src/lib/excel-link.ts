@@ -1,26 +1,41 @@
 /**
- * File System Access API — 아버지 PC에서 엑셀을 한 번 저장하면
+ * File System Access API — 기기(브라우저)마다 엑셀 파일을 한 번 고르면
  * 이후 「엑셀 파일 저장」은 같은 파일을 덮어씁니다.
- * 핸들은 IndexedDB에 보관(Chrome/Edge). Safari·모바일은 다운로드 폴백.
+ *
+ * 중요: 저장된 핸들이 있을 때 덮어쓰기 실패 → 피커/다운로드로 떨어지지 않음.
+ * 피커는 (1) 핸들 없음 첫 저장 (2) 「다른 이름으로 저장」만.
  */
 
 import { downloadXlsx } from "./excel";
+import {
+  classifyExcelWriteError,
+  excelSaveToastMessage,
+  resolveSaveStrategy,
+  type ExcelSaveResult,
+  type ExcelWriteErrorKind,
+} from "./excel-save-policy";
+
+export type { ExcelSaveResult, ExcelWriteErrorKind };
+export {
+  classifyExcelWriteError,
+  excelSaveToastMessage,
+  resolveSaveStrategy,
+};
 
 const DB_NAME = "ilbiseo-fs";
 const STORE = "handles";
 const KEY = "excel";
+const META_KEY = "ilbiseo-excel-link-meta-v1";
 
 export const DEFAULT_EXCEL_NAME = "일비서.xlsx";
 
-export type ExcelSaveResult =
-  | { mode: "overwrite"; fileName: string }
-  | { mode: "created"; fileName: string }
-  | {
-      mode: "download";
-      fileName: string;
-      reason: "unsupported" | "fallback";
-    }
-  | { mode: "cancelled" };
+type ExcelLinkMeta = {
+  fileName: string;
+  updatedAt: string;
+};
+
+/** Session cache — avoids IDB flakes within one tab lifetime */
+let memoryHandle: FileSystemFileHandle | null = null;
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -30,51 +45,123 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error ?? new Error("IndexedDB open failed"));
   });
 }
 
-export async function saveExcelHandle(
-  handle: FileSystemFileHandle,
-): Promise<void> {
-  const db = await openDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(handle, KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
-}
-
-export async function loadExcelHandle(): Promise<FileSystemFileHandle | null> {
+function readMeta(): ExcelLinkMeta | null {
+  if (typeof localStorage === "undefined") return null;
   try {
-    const db = await openDb();
-    const handle = await new Promise<FileSystemFileHandle | null>(
-      (resolve, reject) => {
-        const tx = db.transaction(STORE, "readonly");
-        const req = tx.objectStore(STORE).get(KEY);
-        req.onsuccess = () =>
-          resolve((req.result as FileSystemFileHandle) ?? null);
-        req.onerror = () => reject(req.error);
-      },
-    );
-    db.close();
-    return handle;
+    const raw = localStorage.getItem(META_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ExcelLinkMeta;
+    if (!parsed?.fileName) return null;
+    return parsed;
   } catch {
     return null;
   }
 }
 
-export async function clearExcelHandle(): Promise<void> {
+function writeMeta(fileName: string): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const meta: ExcelLinkMeta = {
+      fileName,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(META_KEY, JSON.stringify(meta));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function clearMeta(): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.removeItem(META_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getExcelLinkMeta(): ExcelLinkMeta | null {
+  return readMeta();
+}
+
+export async function saveExcelHandle(
+  handle: FileSystemFileHandle,
+): Promise<void> {
+  memoryHandle = handle;
+  writeMeta(handle.name || DEFAULT_EXCEL_NAME);
   const db = await openDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).delete(KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(handle, KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error("IndexedDB put failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("IndexedDB put aborted"));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function loadExcelHandle(): Promise<FileSystemFileHandle | null> {
+  if (memoryHandle) return memoryHandle;
+  try {
+    const db = await openDb();
+    try {
+      const handle = await new Promise<FileSystemFileHandle | null>(
+        (resolve, reject) => {
+          const tx = db.transaction(STORE, "readonly");
+          const req = tx.objectStore(STORE).get(KEY);
+          req.onsuccess = () => {
+            const value = req.result;
+            resolve(
+              value && typeof value === "object"
+                ? (value as FileSystemFileHandle)
+                : null,
+            );
+          };
+          req.onerror = () =>
+            reject(req.error ?? new Error("IndexedDB get failed"));
+        },
+      );
+      if (handle) {
+        memoryHandle = handle;
+        if (!readMeta()?.fileName) {
+          writeMeta(handle.name || DEFAULT_EXCEL_NAME);
+        }
+      }
+      return handle;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return memoryHandle;
+  }
+}
+
+export async function clearExcelHandle(): Promise<void> {
+  memoryHandle = null;
+  clearMeta();
+  try {
+    const db = await openDb();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(KEY);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () =>
+          reject(tx.error ?? new Error("IndexedDB delete failed"));
+      });
+    } finally {
+      db.close();
+    }
+  } catch {
+    /* still cleared memory + meta */
+  }
 }
 
 export function supportsFileSystemAccess(): boolean {
@@ -91,10 +178,11 @@ function isAbortError(e: unknown): boolean {
 function toArrayBuffer(
   buffer: ArrayBuffer | ArrayBufferView,
 ): ArrayBuffer {
-  if (buffer instanceof ArrayBuffer) return buffer;
-  return buffer.buffer.slice(
-    buffer.byteOffset,
-    buffer.byteOffset + buffer.byteLength,
+  if (buffer instanceof ArrayBuffer) return buffer.slice(0);
+  const view = buffer;
+  return view.buffer.slice(
+    view.byteOffset,
+    view.byteOffset + view.byteLength,
   ) as ArrayBuffer;
 }
 
@@ -106,7 +194,9 @@ export async function ensureWritePermission(
     if (typeof handle.queryPermission === "function") {
       const current = await handle.queryPermission(opts);
       if (current === "granted") return true;
+      if (current === "denied") return false;
     }
+    if (typeof handle.requestPermission !== "function") return true;
     const next = await handle.requestPermission(opts);
     return next === "granted";
   } catch {
@@ -142,19 +232,38 @@ export async function writeBufferToHandle(
 ): Promise<void> {
   const ok = await ensureWritePermission(handle);
   if (!ok) {
-    throw new Error(
-      "엑셀 파일 쓰기 권한이 없습니다. 「다른 이름으로 저장」으로 다시 골라 주세요.",
+    throw Object.assign(
+      new Error(
+        "엑셀 파일 쓰기 권한이 없습니다. 「다른 이름으로 저장」으로 다시 골라 주세요.",
+      ),
+      { name: "NotAllowedError" },
     );
   }
   const writable = await handle.createWritable();
-  await writable.write(toArrayBuffer(buffer));
-  await writable.close();
+  try {
+    await writable.write(toArrayBuffer(buffer));
+    await writable.close();
+  } catch (e) {
+    try {
+      await writable.abort();
+    } catch {
+      /* ignore abort failure */
+    }
+    throw e;
+  }
+  // Refresh persistence after a successful write
+  try {
+    await saveExcelHandle(handle);
+  } catch {
+    memoryHandle = handle;
+    writeMeta(handle.name || DEFAULT_EXCEL_NAME);
+  }
 }
 
 /**
- * 첫 저장: 위치·이름 선택 → 핸들 IndexedDB 보관.
- * 이후 저장: 같은 파일 createWritable 덮어쓰기.
- * FS Access 없음(Safari·모바일 등): 다운로드 폴백.
+ * 첫 저장: 위치·이름 선택 → 핸들 IndexedDB(+메모리·localStorage 메타) 보관.
+ * 이후 저장: 같은 파일 createWritable 덮어쓰기. 실패해도 피커로 떨어지지 않음.
+ * FS Access 없음: 다운로드 폴백.
  */
 export async function saveExcelBuffer(
   buffer: ArrayBuffer | ArrayBufferView,
@@ -169,6 +278,7 @@ export async function saveExcelBuffer(
   const suggestedName = options?.suggestedName ?? DEFAULT_EXCEL_NAME;
   const downloadFallback = options?.downloadFallback !== false;
   const data = toArrayBuffer(buffer);
+  const forceNewFile = Boolean(options?.forceNewFile);
 
   if (!supportsFileSystemAccess()) {
     if (!downloadFallback) {
@@ -184,18 +294,35 @@ export async function saveExcelBuffer(
     };
   }
 
-  if (!options?.forceNewFile) {
-    const existing = await loadExcelHandle();
-    if (existing) {
-      try {
-        await writeBufferToHandle(existing, data);
-        return { mode: "overwrite", fileName: existing.name || suggestedName };
-      } catch {
-        // 권한 만료·파일 이동 등 → 다시 고르기
+  const existing = forceNewFile ? null : await loadExcelHandle();
+  const strategy = resolveSaveStrategy({
+    forceNewFile,
+    hasStoredHandle: Boolean(existing),
+  });
+
+  if (strategy === "overwrite" && existing) {
+    try {
+      await writeBufferToHandle(existing, data);
+      return {
+        mode: "overwrite",
+        fileName: existing.name || readMeta()?.fileName || suggestedName,
+      };
+    } catch (e) {
+      const { kind, message } = classifyExcelWriteError(e);
+      // Stale handle only: drop it so UI shows "not linked", but still NO auto-picker
+      if (kind === "not_found") {
+        await clearExcelHandle();
       }
+      return {
+        mode: "error",
+        kind,
+        message,
+        fileName: existing.name || readMeta()?.fileName,
+      };
     }
   }
 
+  // Picker ONLY: first save (no handle) or explicit 「다른 이름으로 저장」
   try {
     const handle = await pickExcelFile(suggestedName);
     if (!handle) {
@@ -209,26 +336,26 @@ export async function saveExcelBuffer(
       }
       return { mode: "cancelled" };
     }
-    await writeBufferToHandle(handle, data);
-    return { mode: "created", fileName: handle.name || suggestedName };
+    try {
+      await writeBufferToHandle(handle, data);
+      return { mode: "created", fileName: handle.name || suggestedName };
+    } catch (e) {
+      // Handle already stored by pickExcelFile — keep it for next overwrite
+      const { kind, message } = classifyExcelWriteError(e);
+      return {
+        mode: "error",
+        kind,
+        message,
+        fileName: handle.name || suggestedName,
+      };
+    }
   } catch (e) {
     if (isAbortError(e)) return { mode: "cancelled" };
     throw e;
   }
 }
 
-/** 토스트용 짧은 한국어 메시지 */
-export function excelSaveToastMessage(result: ExcelSaveResult): string | null {
-  switch (result.mode) {
-    case "overwrite":
-      return "기존 파일에 저장했습니다";
-    case "created":
-      return `저장했습니다 · ${result.fileName}`;
-    case "download":
-      return result.reason === "unsupported"
-        ? "다운로드로 저장했습니다. 같은 파일에 덮어쓰려면 PC Chrome·Edge를 써 주세요"
-        : "다운로드로 저장했습니다";
-    case "cancelled":
-      return null;
-  }
+/** @internal test helper — reset module cache between tests */
+export function __resetExcelLinkMemoryForTests(): void {
+  memoryHandle = null;
 }

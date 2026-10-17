@@ -66,7 +66,7 @@ const TODO_DONE_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
   { name: "완료여부", filterButton: false },
 ];
 
-/** 마감목표: real Excel date (start) so Oldest/Newest sort works. */
+/** 마감목표: single day = Date; range/언젠가 = text (exact round-trip). */
 function writeDeadlineCell(
   cell: ExcelJS.Cell,
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
@@ -151,11 +151,11 @@ function addSideSheet(
   const sheet = wb.addWorksheet(name, {
     views: [{ state: "frozen", ySplit: 1 }],
   });
+  // Unified model — no 완료 column (same on 할 일 / 한 일 views)
   sheet.columns = [
     { header: "순서", key: "order", width: 8 },
     { header: "내용", key: "title", width: 40 },
     { header: "메모", key: "memo", width: 28 },
-    { header: "완료", key: "done", width: 10 },
   ];
   styleHeader(sheet.getRow(1));
   items.forEach((item, i) => {
@@ -163,7 +163,6 @@ function addSideSheet(
       order: i + 1,
       title: item.title,
       memo: item.memo,
-      done: item.done ? "완료" : "",
     });
   });
 }

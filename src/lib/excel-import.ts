@@ -148,6 +148,14 @@ export function isAllowedImportSheet(name: string): boolean {
   return classifyImportSheet(name) != null;
 }
 
+/** Delta vs current in-app data (program is default truth). */
+export type ImportDeltaKind =
+  | "new"
+  | "changed"
+  | "unchanged"
+  | "exact_block"
+  | "empty";
+
 export type MappedPreviewRow = {
   title: string;
   memo: string;
@@ -156,13 +164,84 @@ export type MappedPreviewRow = {
   done: boolean;
   category: TaskCategory;
   categoryLabel: string;
-  /** empty title / exact duplicate / unusable */
+  startDate: string | null;
+  targetDate: string | null;
+  kind: TaskKind;
+  /** empty / unchanged / exact_block → not applied as add */
   skip: boolean;
-  /** Exact same as an existing item — blocked from import */
   exactDuplicate: boolean;
-  /** Peers with 2+ real overlapping words (exact dupes excluded) */
+  delta: ImportDeltaKind;
+  /** Existing task/side id to update when delta=changed */
+  matchId: string | null;
   similarHits: SimilarityHit[];
 };
+
+function compactKey(s: string): string {
+  return s
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/** Match key: title + 틀 — edits update the same row rather than always appending. */
+export function taskMatchKey(
+  title: string,
+  category: TaskCategory,
+): string {
+  return `${compactKey(title)}|${category}`;
+}
+
+/** Full content fingerprint — unchanged if equal. */
+export function taskContentKey(partial: {
+  title: string;
+  memo: string;
+  category: TaskCategory;
+  startDate: string | null;
+  targetDate: string | null;
+  importance: number;
+}): string {
+  return [
+    compactKey(partial.title),
+    partial.category,
+    partial.startDate ?? "",
+    partial.targetDate ?? "",
+    String(partial.importance),
+    compactKey(partial.memo ?? ""),
+  ].join("|");
+}
+
+export function sideMatchKey(title: string): string {
+  return compactKey(title);
+}
+
+export function sideContentKey(title: string, memo: string): string {
+  return `${compactKey(title)}|${compactKey(memo ?? "")}`;
+}
+
+export function summarizeDeltaCounts(preview: MappedPreviewRow[]): {
+  neu: number;
+  changed: number;
+  unchanged: number;
+  blocked: number;
+  message: string;
+} {
+  const neu = preview.filter((r) => r.delta === "new").length;
+  const changed = preview.filter((r) => r.delta === "changed").length;
+  const unchanged = preview.filter((r) => r.delta === "unchanged").length;
+  const blocked = preview.filter((r) => r.delta === "exact_block").length;
+  const parts: string[] = [];
+  if (neu) parts.push(`새 ${neu}건`);
+  if (changed) parts.push(`바뀐 ${changed}건`);
+  if (unchanged) parts.push(`그대로 ${unchanged}건`);
+  if (blocked) parts.push(`같은 내용 ${blocked}건 제외`);
+  return {
+    neu,
+    changed,
+    unchanged,
+    blocked,
+    message: parts.length ? parts.join(" · ") : "가져올 변경 없음",
+  };
+}
 
 /** True when mapping includes an Excel 「틀」 column. */
 export function mappingHasCategory(mapping: ColumnMapping): boolean {
@@ -196,7 +275,8 @@ export function summarizeImportSimilarities(
 export function summarizeExactBlocks(
   preview: MappedPreviewRow[],
 ): { count: number; message: string } | null {
-  const blocked = preview.filter((r) => r.exactDuplicate);
+  // Only cross-틀 exact blocks — unchanged (same title+틀) is covered by delta summary
+  const blocked = preview.filter((r) => r.delta === "exact_block");
   if (blocked.length === 0) return null;
   return {
     count: blocked.length,
@@ -390,34 +470,27 @@ function excelSerialToIso(serial: number): string | null {
 }
 
 /**
- * Date → YYYY-MM-DD (KST-safe).
- * - Our export writes UTC midnight → use UTC parts.
- * - Excel/Office on father’s PC often yields **local** midnight → use local parts
- *   (UTC getters would shift one day early in KST).
+ * Date → YYYY-MM-DD without TZ off-by-one.
+ * Prefer reconstructing the Excel serial (absolute calendar day) when possible;
+ * fall back to local YMD (father’s typed day) then UTC midnight export style.
  */
 export function dateToIsoCalendar(d: Date): string | null {
   if (Number.isNaN(d.getTime())) return null;
+  // Reconstruct Excel serial from epoch 1899-12-30 UTC — timezone-independent
+  const excelEpoch = Date.UTC(1899, 11, 30);
+  const serial = Math.round((d.getTime() - excelEpoch) / 86400000);
+  if (serial > 20000 && serial < 80000) {
+    const fromSerial = excelSerialToIso(serial);
+    if (fromSerial) return fromSerial;
+  }
   const utcMid =
     d.getUTCHours() === 0 &&
     d.getUTCMinutes() === 0 &&
-    d.getUTCSeconds() === 0 &&
-    d.getUTCMilliseconds() === 0;
-  const localMid =
-    d.getHours() === 0 &&
-    d.getMinutes() === 0 &&
-    d.getSeconds() === 0 &&
-    d.getMilliseconds() === 0;
-  if (utcMid && !localMid) {
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(d.getUTCDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    d.getUTCSeconds() === 0;
+  if (utcMid) {
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
   }
-  // Prefer local calendar day (father typed date in Excel)
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function cellToString(v: unknown): string {
@@ -614,6 +687,11 @@ export function buildPreviewRows(
   const importanceCol = fieldOf("importance");
   const categoryCol = fieldOf("category");
   const peers = existingTasks.filter((t) => t.status === "active");
+  const byMatch = new Map<string, Task>();
+  for (const t of peers) {
+    const k = taskMatchKey(t.title, t.category);
+    if (!byMatch.has(k)) byMatch.set(k, t);
+  }
 
   return sheet.rows.map((row) => {
     const titleRaw = titleCol ? cellToString(row[titleCol]) : "";
@@ -630,13 +708,55 @@ export function buildPreviewRows(
     const category = categoryCol
       ? parseTaskCategory(cellToString(row[categoryCol]))
       : defaultCategory;
-    const exactDuplicate =
-      Boolean(title) &&
-      findExactDuplicateTasks({ title, memo }, peers).length > 0;
+
+    let delta: ImportDeltaKind = "empty";
+    let matchId: string | null = null;
+    let exactDuplicate = false;
+
+    if (!title) {
+      delta = "empty";
+    } else {
+      const mk = taskMatchKey(title, category);
+      const matched = byMatch.get(mk);
+      const ck = taskContentKey({
+        title,
+        memo,
+        category,
+        startDate: dl.startDate,
+        targetDate: dl.targetDate,
+        importance,
+      });
+      if (matched) {
+        matchId = matched.id;
+        const existingCk = taskContentKey({
+          title: matched.title,
+          memo: matched.memo,
+          category: matched.category,
+          startDate: matched.startDate,
+          targetDate: matched.targetDate,
+          importance: matched.importance,
+        });
+        if (ck === existingCk) {
+          delta = "unchanged";
+          exactDuplicate = true;
+        } else {
+          delta = "changed";
+        }
+      } else if (findExactDuplicateTasks({ title, memo }, peers).length > 0) {
+        // Same title+memo elsewhere (different 틀) — block silent re-add
+        delta = "exact_block";
+        exactDuplicate = true;
+      } else {
+        delta = "new";
+      }
+    }
+
     const similarHits =
-      title && !exactDuplicate
+      title && delta !== "exact_block" && delta !== "unchanged"
         ? findSimilarActiveTasks({ title, memo }, peers).filter(
-            (h) => h.sharedTokens.length >= 2,
+            (h) =>
+              h.sharedTokens.length >= 2 &&
+              (matchId == null || h.task.id !== matchId),
           )
         : [];
 
@@ -648,138 +768,115 @@ export function buildPreviewRows(
       done: false,
       category,
       categoryLabel: CATEGORY_LABEL[category],
-      skip: !title || exactDuplicate,
+      startDate: dl.startDate,
+      targetDate: dl.targetDate,
+      kind: dl.kind,
+      skip:
+        delta === "empty" ||
+        delta === "unchanged" ||
+        delta === "exact_block",
       exactDuplicate,
+      delta,
+      matchId,
       similarHits,
     };
   });
 }
 
-/** Build tasks directly from sheet + mapping (preferred for commit). */
+export type TodoDeltaCommit = {
+  add: Task[];
+  update: { id: string; patch: Partial<Task> }[];
+};
+
+/** Build add/update payloads from delta preview (only new + changed). */
+export function previewToTodoDelta(
+  preview: MappedPreviewRow[],
+): TodoDeltaCommit {
+  const now = new Date().toISOString();
+  const add: Task[] = [];
+  const update: { id: string; patch: Partial<Task> }[] = [];
+  for (const r of preview) {
+    if (r.delta === "new") {
+      add.push({
+        id: createId(),
+        title: r.title,
+        category: r.category,
+        kind: r.kind,
+        startDate: r.startDate,
+        targetDate: r.targetDate,
+        urgency: 1,
+        importance: r.importance,
+        groupKey: inferGroupKey(r.title),
+        memo: r.memo,
+        source: "import",
+        status: "active",
+        createdAt: now,
+        completedAt: null,
+      });
+    } else if (r.delta === "changed" && r.matchId) {
+      update.push({
+        id: r.matchId,
+        patch: {
+          title: r.title,
+          category: r.category,
+          kind: r.kind,
+          startDate: r.startDate,
+          targetDate: r.targetDate,
+          importance: r.importance,
+          memo: r.memo,
+          source: "import",
+        },
+      });
+    }
+  }
+  return { add, update };
+}
+
+/** Full sheet → tasks (replace mode / empty-app first load). Ignores delta skip. */
+export function previewToReplaceTasks(
+  preview: MappedPreviewRow[],
+): Task[] {
+  const now = new Date().toISOString();
+  return preview
+    .filter((r) => r.delta !== "empty")
+    .map((r) => ({
+      id: createId(),
+      title: r.title,
+      category: r.category,
+      kind: r.kind,
+      startDate: r.startDate,
+      targetDate: r.targetDate,
+      urgency: 1,
+      importance: r.importance,
+      groupKey: inferGroupKey(r.title),
+      memo: r.memo,
+      source: "import" as const,
+      status: "active" as const,
+      createdAt: now,
+      completedAt: null,
+    }));
+}
+
+/** @deprecated prefer previewToTodoDelta — returns only *new* rows (not changed). */
 export function sheetToTasks(
   sheet: ParsedSheet,
   mapping: ColumnMapping,
   defaultCategory: TaskCategory,
   existingTasks: readonly Task[] = [],
 ): Task[] {
-  const clean = sanitizeMapping(mapping);
-  const fieldOf = (field: ImportField): string | null => {
-    const entry = Object.entries(clean).find(([, f]) => f === field);
-    return entry ? entry[0] : null;
-  };
-  const titleCol = fieldOf("title");
-  if (!titleCol) return [];
-
-  const memoCol = fieldOf("memo");
-  const deadlineCol = fieldOf("deadline");
-  const importanceCol = fieldOf("importance");
-  const categoryCol = fieldOf("category");
-  const now = new Date().toISOString();
-  const peers = existingTasks.filter((t) => t.status === "active");
-
-  return sheet.rows
-    .map((row) => {
-      const titleRaw = cellToString(row[titleCol]);
-      const { title: splitTitle, memo: splitMemo } = splitListUp(titleRaw);
-      const memoFromCol = memoCol ? cellToString(row[memoCol]) : "";
-      const memo = [splitMemo, memoFromCol].filter(Boolean).join("\n");
-      const title = splitTitle || titleRaw.trim();
-      if (!title) return null;
-      // Exact duplicate → block (cannot add)
-      if (findExactDuplicateTasks({ title, memo }, peers).length > 0) {
-        return null;
-      }
-
-      const deadlineRaw = deadlineCol ? cellToString(row[deadlineCol]) : "";
-      const dl = parseDeadline(deadlineRaw);
-      const importance = clampPriority(
-        importanceCol ? cellToString(row[importanceCol]) : 2,
-        2,
-      );
-      const category = categoryCol
-        ? parseTaskCategory(cellToString(row[categoryCol]))
-        : defaultCategory;
-
-      const task: Task = {
-        id: createId(),
-        title,
-        category,
-        kind: dl.kind,
-        startDate: dl.startDate,
-        targetDate: dl.targetDate,
-        urgency: 1,
-        importance,
-        groupKey: inferGroupKey(title),
-        memo,
-        source: "import",
-        status: "active",
-        createdAt: now,
-        completedAt: null,
-      };
-      return task;
-    })
-    .filter((t): t is Task => t != null);
+  const preview = buildPreviewRows(
+    sheet,
+    mapping,
+    defaultCategory,
+    existingTasks,
+  );
+  return previewToTodoDelta(preview).add;
 }
 
-/** 지침 / 습관 sheet → SideListItem[] (exact dupes blocked). */
-export function sheetToSideItems(
-  sheet: ParsedSheet,
-  mapping: ColumnMapping,
-  existing: readonly SideListItem[] = [],
-): SideListItem[] {
-  const clean = sanitizeMapping(mapping);
-  const fieldOf = (field: ImportField): string | null => {
-    const entry = Object.entries(clean).find(([, f]) => f === field);
-    return entry ? entry[0] : null;
-  };
-  const titleCol = fieldOf("title");
-  if (!titleCol) return [];
-  const memoCol = fieldOf("memo");
-  const doneCol = fieldOf("done");
-  const now = new Date().toISOString();
-  const openExisting = existing.filter((i) => !i.done);
-
-  return sheet.rows
-    .map((row) => {
-      const title = cellToString(row[titleCol]).trim();
-      if (!title) return null;
-      const memo = memoCol ? cellToString(row[memoCol]) : "";
-      if (
-        findExactDuplicateTasks(
-          { title, memo },
-          openExisting.map((i) => ({
-            id: i.id,
-            title: i.title,
-            memo: i.memo,
-            category: "work" as TaskCategory,
-            kind: "someday" as TaskKind,
-            startDate: null,
-            targetDate: null,
-            urgency: 1,
-            importance: 1,
-            groupKey: "",
-            source: "manual" as const,
-            status: "active" as const,
-            createdAt: i.createdAt,
-            completedAt: null,
-          })),
-        ).length > 0
-      ) {
-        return null;
-      }
-      const done = doneCol ? parseDone(cellToString(row[doneCol])) : false;
-      const item: SideListItem = {
-        id: createId(),
-        title,
-        memo,
-        done,
-        createdAt: now,
-        completedAt: done ? now : null,
-      };
-      return item;
-    })
-    .filter((i): i is SideListItem => i != null);
-}
+export type SideDeltaCommit = {
+  add: SideListItem[];
+  update: { id: string; patch: Partial<SideListItem> }[];
+};
 
 export function buildSidePreviewRows(
   sheet: ParsedSheet,
@@ -793,35 +890,62 @@ export function buildSidePreviewRows(
   };
   const titleCol = fieldOf("title");
   const memoCol = fieldOf("memo");
-  const peersAsTasks: Task[] = existing
-    .filter((i) => !i.done)
-    .map((i) => ({
-      id: i.id,
-      title: i.title,
-      memo: i.memo,
-      category: "work",
-      kind: "someday",
-      startDate: null,
-      targetDate: null,
-      urgency: 1,
-      importance: 1,
-      groupKey: "",
-      source: "manual",
-      status: "active",
-      createdAt: i.createdAt,
-      completedAt: null,
-    }));
+  const byMatch = new Map<string, SideListItem>();
+  for (const i of existing) {
+    const k = sideMatchKey(i.title);
+    if (!byMatch.has(k)) byMatch.set(k, i);
+  }
+  const peersAsTasks: Task[] = existing.map((i) => ({
+    id: i.id,
+    title: i.title,
+    memo: i.memo,
+    category: "work",
+    kind: "someday",
+    startDate: null,
+    targetDate: null,
+    urgency: 1,
+    importance: 1,
+    groupKey: "",
+    source: "manual",
+    status: "active",
+    createdAt: i.createdAt,
+    completedAt: null,
+  }));
 
   return sheet.rows.map((row) => {
     const title = titleCol ? cellToString(row[titleCol]).trim() : "";
     const memo = memoCol ? cellToString(row[memoCol]) : "";
-    const exactDuplicate =
-      Boolean(title) &&
-      findExactDuplicateTasks({ title, memo }, peersAsTasks).length > 0;
+    let delta: ImportDeltaKind = "empty";
+    let matchId: string | null = null;
+    let exactDuplicate = false;
+    if (!title) {
+      delta = "empty";
+    } else {
+      const matched = byMatch.get(sideMatchKey(title));
+      const ck = sideContentKey(title, memo);
+      if (matched) {
+        matchId = matched.id;
+        if (ck === sideContentKey(matched.title, matched.memo)) {
+          delta = "unchanged";
+          exactDuplicate = true;
+        } else {
+          delta = "changed";
+        }
+      } else if (
+        findExactDuplicateTasks({ title, memo }, peersAsTasks).length > 0
+      ) {
+        delta = "exact_block";
+        exactDuplicate = true;
+      } else {
+        delta = "new";
+      }
+    }
     const similarHits =
-      title && !exactDuplicate
+      title && delta !== "exact_block" && delta !== "unchanged"
         ? findSimilarActiveTasks({ title, memo }, peersAsTasks).filter(
-            (h) => h.sharedTokens.length >= 2,
+            (h) =>
+              h.sharedTokens.length >= 2 &&
+              (matchId == null || h.task.id !== matchId),
           )
         : [];
     return {
@@ -830,13 +954,74 @@ export function buildSidePreviewRows(
       deadlineLabel: "",
       importance: 0,
       done: false,
-      category: "work",
+      category: "work" as TaskCategory,
       categoryLabel: "",
-      skip: !title || exactDuplicate,
+      startDate: null,
+      targetDate: null,
+      kind: "someday" as TaskKind,
+      skip:
+        delta === "empty" ||
+        delta === "unchanged" ||
+        delta === "exact_block",
       exactDuplicate,
+      delta,
+      matchId,
       similarHits,
     };
   });
+}
+
+export function previewToSideDelta(
+  preview: MappedPreviewRow[],
+): SideDeltaCommit {
+  const now = new Date().toISOString();
+  const add: SideListItem[] = [];
+  const update: { id: string; patch: Partial<SideListItem> }[] = [];
+  for (const r of preview) {
+    if (r.delta === "new") {
+      add.push({
+        id: createId(),
+        title: r.title,
+        memo: r.memo,
+        done: false,
+        createdAt: now,
+        completedAt: null,
+      });
+    } else if (r.delta === "changed" && r.matchId) {
+      update.push({
+        id: r.matchId,
+        patch: { title: r.title, memo: r.memo, done: false },
+      });
+    }
+  }
+  return { add, update };
+}
+
+/** Full side sheet → items (replace mode). */
+export function previewToReplaceSideItems(
+  preview: MappedPreviewRow[],
+): SideListItem[] {
+  const now = new Date().toISOString();
+  return preview
+    .filter((r) => r.delta !== "empty")
+    .map((r) => ({
+      id: createId(),
+      title: r.title,
+      memo: r.memo,
+      done: false,
+      createdAt: now,
+      completedAt: null,
+    }));
+}
+
+/** @deprecated prefer previewToSideDelta — returns only *new* rows. */
+export function sheetToSideItems(
+  sheet: ParsedSheet,
+  mapping: ColumnMapping,
+  existing: readonly SideListItem[] = [],
+): SideListItem[] {
+  return previewToSideDelta(buildSidePreviewRows(sheet, mapping, existing))
+    .add;
 }
 
 export function sideKindFromSheet(
@@ -848,17 +1033,19 @@ export function sideKindFromSheet(
 }
 
 /**
- * Prefer raw Date/serial over locale-formatted text (avoids m/d/yy → 「언젠가」).
- * Keep formatted `w` when it encodes a range (`~`) or unambiguous YYYY-MM-DD.
+ * Prefer calendar-faithful values:
+ * 1) formatted `w` when it is a range or unambiguous date text
+ * 2) Excel serial number (no TZ) — cellDates:false
+ * 3) Date object last
  */
 function extractSheetCell(cell: XLSX.CellObject | undefined): unknown {
   if (!cell) return "";
   const w = typeof cell.w === "string" ? cell.w.trim() : "";
   if (w && /[~～〜]/.test(w)) return w;
-  // Unambiguous calendar text beats timezone-shifting Date objects
   if (w && /^\d{4}-\d{2}-\d{2}$/.test(w)) return w;
-  if (cell.v instanceof Date) return cell.v;
+  if (w && /^\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}/.test(w)) return w;
   if (typeof cell.v === "number" && Number.isFinite(cell.v)) return cell.v;
+  if (cell.v instanceof Date) return cell.v;
   if (typeof cell.v === "boolean") return cell.v ? "true" : "";
   if (typeof cell.v === "string") return cell.v;
   if (w) return w;
@@ -922,10 +1109,10 @@ export async function parseExcelFile(file: File): Promise<ParsedWorkbook> {
   const buf = await file.arrayBuffer();
   let wb: XLSX.WorkBook;
   try {
-    // raw:true keeps Date/serial — we format ourselves (locale w is lossy)
+    // cellDates:false → keep Excel serials (no TZ Date shift). cellText for `w`.
     wb = XLSX.read(buf, {
       type: "array",
-      cellDates: true,
+      cellDates: false,
       raw: true,
       cellText: true,
     });

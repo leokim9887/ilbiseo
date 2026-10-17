@@ -24,8 +24,19 @@ interface ToolbarExtrasProps {
   onImport: (tasks: Task[]) => void;
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
   onReplaceByCategories?: (tasks: Task[]) => void;
+  onTodoDelta?: (payload: {
+    add: Task[];
+    update: { id: string; patch: Partial<Task> }[];
+  }) => void;
   onImportSide?: (kind: SideListKind, items: SideListItem[]) => void;
   onReplaceSide?: (kind: SideListKind, items: SideListItem[]) => void;
+  onSideDelta?: (
+    kind: SideListKind,
+    payload: {
+      add: SideListItem[];
+      update: { id: string; patch: Partial<SideListItem> }[];
+    },
+  ) => void;
   existingTasks?: Task[];
   existingGuidelines?: SideListItem[];
   existingHabits?: SideListItem[];
@@ -39,8 +50,10 @@ export function ToolbarExtras({
   onImport,
   onReplaceCategory,
   onReplaceByCategories,
+  onTodoDelta,
   onImportSide,
   onReplaceSide,
+  onSideDelta,
   existingTasks,
   existingGuidelines,
   existingHabits,
@@ -105,8 +118,10 @@ export function ToolbarExtras({
         onImport={onImport}
         onReplaceCategory={onReplaceCategory}
         onReplaceByCategories={onReplaceByCategories}
+        onTodoDelta={onTodoDelta}
         onImportSide={onImportSide}
         onReplaceSide={onReplaceSide}
+        onSideDelta={onSideDelta}
         existingTasks={existingTasks}
         existingGuidelines={existingGuidelines}
         existingHabits={existingHabits}

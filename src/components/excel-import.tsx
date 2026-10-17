@@ -25,10 +25,13 @@ import {
   mappingHasTitle,
   parseExcelFile,
   pickDefaultSheetIndex,
+  previewToReplaceSideItems,
+  previewToReplaceTasks,
+  previewToSideDelta,
+  previewToTodoDelta,
   saveMapping,
-  sheetToSideItems,
-  sheetToTasks,
   sideKindFromSheet,
+  summarizeDeltaCounts,
   summarizeExactBlocks,
   summarizeImportSimilarities,
   type ColumnMapping,
@@ -36,6 +39,8 @@ import {
   type ImportSheetKind,
   type ParsedSheet,
   type ParsedWorkbook,
+  type SideDeltaCommit,
+  type TodoDeltaCommit,
 } from "@/lib/excel-import";
 import {
   CATEGORY_LABEL,
@@ -52,12 +57,23 @@ type ImportMode = "merge" | "replace";
 const SELECT_CLASS =
   "h-11 w-full rounded-sm border border-[#8a939a] bg-white px-2.5 text-[15px] text-[#1a1f1c] dark:border-[#4a5c52] dark:bg-[#1c2621] dark:text-[#e8eee9]";
 
+const DELTA_LABEL: Record<string, string> = {
+  new: "새",
+  changed: "바뀜",
+  unchanged: "그대로",
+  exact_block: "같은 내용",
+};
+
 interface ExcelImportProps {
+  /** Fallback when delta callback missing (memo/OCR-style add-only). */
   onImport: (tasks: Task[]) => void;
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
   onReplaceByCategories?: (tasks: Task[]) => void;
+  /** Preferred: only new + changed vs in-app data. */
+  onTodoDelta?: (payload: TodoDeltaCommit) => void;
   onImportSide?: (kind: SideListKind, items: SideListItem[]) => void;
   onReplaceSide?: (kind: SideListKind, items: SideListItem[]) => void;
+  onSideDelta?: (kind: SideListKind, payload: SideDeltaCommit) => void;
   category: TaskCategory;
   existingTasks?: Task[];
   existingGuidelines?: SideListItem[];
@@ -71,8 +87,10 @@ export function ExcelImport({
   onImport,
   onReplaceCategory,
   onReplaceByCategories,
+  onTodoDelta,
   onImportSide,
   onReplaceSide,
+  onSideDelta,
   category,
   existingTasks = [],
   existingGuidelines = [],
@@ -115,8 +133,15 @@ export function ExcelImport({
     return buildPreviewRows(sheet, mapping, category, existingTasks);
   }, [sheet, mapping, category, existingTasks, isSide, sideExisting]);
 
-  const usableCount = preview.filter((r) => !r.skip).length;
-  const blockedExact = preview.filter((r) => r.exactDuplicate).length;
+  const deltaSummary = useMemo(
+    () => summarizeDeltaCounts(preview),
+    [preview],
+  );
+  const applyCount =
+    mode === "replace"
+      ? preview.filter((r) => r.delta !== "empty").length
+      : deltaSummary.neu + deltaSummary.changed;
+  const blockedExact = deltaSummary.blocked;
   const similaritySummary = useMemo(
     () => summarizeImportSimilarities(preview),
     [preview],
@@ -130,11 +155,23 @@ export function ExcelImport({
     if (isSide) return [];
     const counts = new Map<TaskCategory, number>();
     for (const r of preview) {
-      if (r.skip) continue;
+      if (mode === "replace") {
+        if (r.delta === "empty") continue;
+      } else if (r.delta !== "new" && r.delta !== "changed") {
+        continue;
+      }
       counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
     }
     return [...counts.entries()];
-  }, [preview, isSide]);
+  }, [preview, isSide, mode]);
+
+  const previewRows = useMemo(() => {
+    if (mode === "replace") {
+      return preview.filter((r) => r.delta !== "empty");
+    }
+    // Father preview: show new/changed/unchanged/blocked (not empty)
+    return preview.filter((r) => r.delta !== "empty");
+  }, [preview, mode]);
 
   const reset = () => {
     setStep("pick");
@@ -219,10 +256,10 @@ export function ExcelImport({
       setError("「할 일」또는 「내용」열을 지정해 주세요.");
       return;
     }
-    if (usableCount === 0) {
+    if (applyCount === 0) {
       setError(
-        blockedExact > 0
-          ? "같은 내용만 있어서 넣을 행이 없습니다."
+        blockedExact > 0 || deltaSummary.unchanged > 0
+          ? "바꿀 내용이 없습니다. (그대로이거나 같은 내용만 있음)"
           : "가져올 행이 없습니다.",
       );
       return;
@@ -239,35 +276,48 @@ export function ExcelImport({
           setError("시트 종류를 알 수 없습니다.");
           return;
         }
-        const items = sheetToSideItems(sheet, mapping, sideExisting);
-        if (items.length === 0) {
-          setError("가져올 행이 없습니다.");
-          return;
-        }
         if (mode === "replace") {
           if (!onReplaceSide) {
             setError("바꾸기를 쓸 수 없습니다.");
             return;
           }
+          const items = previewToReplaceSideItems(preview);
+          if (items.length === 0) {
+            setError("가져올 행이 없습니다.");
+            return;
+          }
           onReplaceSide(sideKind, items);
         } else {
-          if (!onImportSide) {
+          const delta = previewToSideDelta(preview);
+          if (delta.add.length === 0 && delta.update.length === 0) {
+            setError("바꿀 내용이 없습니다.");
+            return;
+          }
+          if (onSideDelta) {
+            onSideDelta(sideKind, delta);
+          } else if (onImportSide) {
+            // Fallback: add-only (changed rows skipped)
+            if (delta.add.length === 0) {
+              setError("지침·습관 변경 반영을 쓸 수 없습니다.");
+              return;
+            }
+            onImportSide(sideKind, delta.add);
+          } else {
             setError("지침·습관 가져오기를 쓸 수 없습니다.");
             return;
           }
-          onImportSide(sideKind, items);
         }
         handleOpenChange(false);
         return;
       }
 
-      const tasks = sheetToTasks(sheet, mapping, category, existingTasks);
-      if (tasks.length === 0) {
-        setError("가져올 할 일이 없습니다.");
-        return;
-      }
       saveMapping(mapping);
       if (mode === "replace") {
+        const tasks = previewToReplaceTasks(preview);
+        if (tasks.length === 0) {
+          setError("가져올 할 일이 없습니다.");
+          return;
+        }
         if (hasFrameCol && onReplaceByCategories) {
           onReplaceByCategories(tasks);
         } else if (onReplaceCategory) {
@@ -277,7 +327,21 @@ export function ExcelImport({
           return;
         }
       } else {
-        onImport(tasks);
+        const delta = previewToTodoDelta(preview);
+        if (delta.add.length === 0 && delta.update.length === 0) {
+          setError("바꿀 내용이 없습니다.");
+          return;
+        }
+        if (onTodoDelta) {
+          onTodoDelta(delta);
+        } else {
+          // Fallback: add-only
+          if (delta.add.length === 0) {
+            setError("변경 반영을 쓸 수 없습니다. (새 행만 추가 가능)");
+            return;
+          }
+          onImport(delta.add);
+        }
       }
       handleOpenChange(false);
     } catch (e) {
@@ -291,6 +355,15 @@ export function ExcelImport({
       : sheetKind === "habit"
         ? "습관"
         : "할 일";
+
+  const commitLabel =
+    mode === "replace"
+      ? `${applyCount}건으로 바꾸기`
+      : deltaSummary.changed > 0 && deltaSummary.neu > 0
+        ? `새 ${deltaSummary.neu} · 바뀐 ${deltaSummary.changed} 반영`
+        : deltaSummary.changed > 0
+          ? `바뀐 ${deltaSummary.changed}건 반영`
+          : `새 ${deltaSummary.neu}건 추가`;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -314,7 +387,7 @@ export function ExcelImport({
         <DialogHeader>
           <DialogTitle>엑셀 불러오기</DialogTitle>
           <DialogDescription>
-            「할 일」·「지침」·「습관」만 가져옵니다.
+            프로그램 값이 기본입니다. 엑셀에서 새로 넣거나 바꾼 행만 가져옵니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -397,7 +470,7 @@ export function ExcelImport({
                         <td className="px-2 py-1.5">
                           <select
                             value={
-                              mapping[h] === "urgency"
+                              mapping[h] === "urgency" || mapping[h] === "done"
                                 ? "skip"
                                 : (mapping[h] ?? "skip")
                             }
@@ -414,15 +487,12 @@ export function ExcelImport({
                               {IMPORT_FIELD_LABEL.skip}
                             </option>
                             {IMPORT_TARGET_FIELDS.filter((f) => {
+                              // 지침/습관·할 일 모두 완료여부 매핑 UI 숨김
+                              if (f === "done") return false;
                               if (isSide) {
-                                return (
-                                  f === "title" ||
-                                  f === "memo" ||
-                                  f === "done"
-                                );
+                                return f === "title" || f === "memo";
                               }
-                              // 할 일: 완료여부 매핑 UI 숨김
-                              return f !== "done";
+                              return true;
                             }).map((f) => (
                               <option key={f} value={f}>
                                 {IMPORT_FIELD_LABEL[f]}
@@ -451,9 +521,11 @@ export function ExcelImport({
 
           {step === "preview" && sheet ? (
             <div className="space-y-2" data-excel-import-preview>
-              <p className="text-[14px] font-medium text-[var(--ink)]">
-                {sheetLabel} {usableCount}건 추가
-                {blockedExact > 0 ? ` · 같은 내용 ${blockedExact}건 제외` : ""}
+              <p
+                className="text-[14px] font-medium text-[var(--ink)]"
+                data-excel-import-delta-summary
+              >
+                {sheetLabel} · {deltaSummary.message}
               </p>
 
               {hasFrameCol && frameCounts.length > 0 ? (
@@ -488,7 +560,7 @@ export function ExcelImport({
                 </div>
               ) : null}
 
-              {usableCount === 0 ? (
+              {previewRows.length === 0 ? (
                 <div className="rounded-sm border border-dashed border-[#9aa5ad] bg-[#f7f8f9] px-3 py-6 text-center text-[14px] text-[var(--ink-muted)] dark:border-[#4a5c52] dark:bg-[#1c2621]">
                   가져올 행이 없습니다.
                 </div>
@@ -497,6 +569,9 @@ export function ExcelImport({
                   <table className="w-full min-w-[320px] text-left text-[13px]">
                     <thead className="sticky top-0 bg-[#f3f3f3] dark:bg-[#24302a]">
                       <tr>
+                        <th className="border-b border-[#9aa5ad] px-2 py-1 dark:border-[#4a5c52]">
+                          구분
+                        </th>
                         <th className="border-b border-[#9aa5ad] px-2 py-1 dark:border-[#4a5c52]">
                           {isSide ? "내용" : "할 일"}
                         </th>
@@ -513,40 +588,51 @@ export function ExcelImport({
                       </tr>
                     </thead>
                     <tbody>
-                      {preview
-                        .filter((r) => !r.skip)
-                        .slice(0, 30)
-                        .map((r, i) => (
-                          <tr
-                            key={`${r.title}-${i}`}
-                            className="border-b border-[#e0e4e7] dark:border-[#3d4a44]"
-                            data-excel-import-similar-row={
-                              r.similarHits.length > 0 ? "1" : undefined
-                            }
-                          >
-                            <td className="max-w-[12rem] truncate px-2 py-1">
-                              {r.title}
-                              {r.similarHits.length > 0 ? (
-                                <span className="ml-1 text-[11px] text-[#b42318] dark:text-[#f0a8a0]">
-                                  (비슷함)
-                                </span>
-                              ) : null}
+                      {previewRows.slice(0, 40).map((r, i) => (
+                        <tr
+                          key={`${r.title}-${r.delta}-${i}`}
+                          className="border-b border-[#e0e4e7] dark:border-[#3d4a44]"
+                          data-excel-import-delta={r.delta}
+                          data-excel-import-similar-row={
+                            r.similarHits.length > 0 ? "1" : undefined
+                          }
+                        >
+                          <td className="whitespace-nowrap px-2 py-1">
+                            <span
+                              className={
+                                r.delta === "new"
+                                  ? "text-[#217346] dark:text-[#6dba8f]"
+                                  : r.delta === "changed"
+                                    ? "text-[#3b6ea5] dark:text-[#8eb4dc]"
+                                    : "text-[var(--ink-muted)]"
+                              }
+                            >
+                              {DELTA_LABEL[r.delta] ?? r.delta}
+                            </span>
+                          </td>
+                          <td className="max-w-[11rem] truncate px-2 py-1">
+                            {r.title}
+                            {r.similarHits.length > 0 ? (
+                              <span className="ml-1 text-[11px] text-[#b42318] dark:text-[#f0a8a0]">
+                                (비슷함)
+                              </span>
+                            ) : null}
+                          </td>
+                          {hasFrameCol ? (
+                            <td className="whitespace-nowrap px-2 py-1">
+                              {r.categoryLabel}
                             </td>
-                            {hasFrameCol ? (
-                              <td className="whitespace-nowrap px-2 py-1">
-                                {r.categoryLabel}
-                              </td>
-                            ) : null}
-                            {!isSide ? (
-                              <td
-                                className="whitespace-nowrap px-2 py-1"
-                                data-excel-import-deadline
-                              >
-                                {r.deadlineLabel}
-                              </td>
-                            ) : null}
-                          </tr>
-                        ))}
+                          ) : null}
+                          {!isSide ? (
+                            <td
+                              className="whitespace-nowrap px-2 py-1"
+                              data-excel-import-deadline
+                            >
+                              {r.deadlineLabel}
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -573,7 +659,7 @@ export function ExcelImport({
                         setError(null);
                       }}
                     />
-                    <span>기존에 추가 (기본)</span>
+                    <span>새·바뀐 행만 반영 (기본)</span>
                   </label>
                   <label className="flex cursor-pointer items-start gap-2 text-[13px]">
                     <input
@@ -644,13 +730,11 @@ export function ExcelImport({
             <Button
               type="button"
               className="h-11 touch-manipulation bg-[#217346] text-white hover:bg-[#1a5c38]"
-              disabled={usableCount === 0 || busy}
+              disabled={applyCount === 0 || busy}
               onClick={handleCommit}
               data-excel-import-commit
             >
-              {mode === "replace"
-                ? `${usableCount}건으로 바꾸기`
-                : `${usableCount}건 추가`}
+              {commitLabel}
             </Button>
           ) : null}
         </DialogFooter>

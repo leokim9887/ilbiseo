@@ -157,37 +157,36 @@ export function excelDateFromIso(iso: string): Date {
 }
 
 /**
- * Excel 「마감목표」 sort/display rule:
- * - Sort key = **시작일** (app column-sort와 동일)
- * - 구간은 셀 값은 시작일(Date), 표시 서식에 ` ~ 종료일` 리터럴
- * - 「언젠가」·날짜 없음 → 텍스트 `"언젠가"` (날짜 정렬 시 텍스트 그룹)
+ * Excel 「마감목표」:
+ * - 단일일 → Excel Date(시작일) + yyyy-mm-dd (정렬용)
+ * - 구간 → **텍스트** `YYYY-MM-DD ~ YYYY-MM-DD` (라운드트립 정확 — numFmt 리터럴 의존 제거)
+ * - 「언젠가」→ 텍스트
  */
 export function deadlineExcelParts(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
 ):
   | { kind: "someday"; value: string }
   | { kind: "empty"; value: "" }
-  | { kind: "date"; value: Date; numFmt: string; start: string; end: string } {
+  | { kind: "date"; value: Date; numFmt: string; start: string; end: string }
+  | { kind: "rangeText"; value: string; start: string; end: string } {
   if (isSomedayDeadline(task)) {
     return { kind: "someday", value: "언젠가" };
   }
   const r = taskDateRange(task);
   if (!r) return { kind: "empty", value: "" };
-  const value = excelDateFromIso(r.start);
   if (r.start === r.end) {
     return {
       kind: "date",
-      value,
+      value: excelDateFromIso(r.start),
       numFmt: "yyyy-mm-dd",
       start: r.start,
       end: r.end,
     };
   }
+  // Plain text so import reads exact start+end (no TZ / numFmt loss)
   return {
-    kind: "date",
-    value,
-    // Display keeps `YYYY-MM-DD ~ YYYY-MM-DD`; serial date = start for sort
-    numFmt: `yyyy-mm-dd" ~ ${r.end}"`,
+    kind: "rangeText",
+    value: `${r.start} ~ ${r.end}`,
     start: r.start,
     end: r.end,
   };

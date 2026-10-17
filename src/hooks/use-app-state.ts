@@ -237,6 +237,67 @@ export function useAppState() {
     [persist, state],
   );
 
+  /** Apply Excel delta: add new rows + patch changed rows (unchanged skipped). */
+  const applyTodoDelta = useCallback(
+    (payload: {
+      add: Task[];
+      update: { id: string; patch: Partial<Task> }[];
+    }) => {
+      const { add, update } = payload;
+      if (add.length === 0 && update.length === 0) return;
+      const byId = new Map(update.map((u) => [u.id, u.patch]));
+      let tasks = state.tasks.map((t) => {
+        const patch = byId.get(t.id);
+        if (!patch) return t;
+        const next = { ...t, ...patch };
+        if (patch.urgency !== undefined) {
+          next.urgency = clampPriority(patch.urgency);
+        }
+        if (patch.importance !== undefined) {
+          next.importance = clampPriority(patch.importance);
+        }
+        return next;
+      });
+      if (add.length > 0) {
+        const normalized = add.map((t) => ({
+          ...t,
+          urgency: clampPriority(t.urgency),
+          importance: clampPriority(t.importance),
+        }));
+        tasks = [...tasks, ...normalized];
+      }
+      persist({ ...state, tasks });
+    },
+    [persist, state],
+  );
+
+  const applySideDelta = useCallback(
+    (
+      kind: SideListKind,
+      payload: {
+        add: SideListItem[];
+        update: { id: string; patch: Partial<SideListItem> }[];
+      },
+    ) => {
+      const { add, update } = payload;
+      if (add.length === 0 && update.length === 0) return;
+      const key = sideKey(kind);
+      const byId = new Map(update.map((u) => [u.id, u.patch]));
+      let items = state[key].map((item) => {
+        const patch = byId.get(item.id);
+        return patch ? { ...item, ...patch, done: false } : item;
+      });
+      if (add.length > 0) {
+        items = [
+          ...items,
+          ...add.map((i) => ({ ...i, done: false, completedAt: null })),
+        ];
+      }
+      persist({ ...state, [key]: items });
+    },
+    [persist, state],
+  );
+
   const updateTask = useCallback(
     (id: string, patch: Partial<Task>) => {
       persist({
@@ -554,6 +615,8 @@ export function useAppState() {
     addMany,
     replaceCategoryTasks,
     replaceByTaskCategories,
+    applyTodoDelta,
+    applySideDelta,
     updateTask,
     completeTask,
     completeTasks,

@@ -277,6 +277,7 @@ export function AssistantApp() {
                 activeTasks={active}
                 doneTasks={done}
                 allActiveTasks={app.allActive}
+                allTasksForImport={[...app.allActive, ...app.allCompleted]}
                 calendarEvents={app.calendarEvents}
                 onUpdate={app.updateTask}
                 onComplete={app.completeTask}
@@ -294,20 +295,22 @@ export function AssistantApp() {
                 onImport={app.addMany}
                 onReplaceCategory={app.replaceCategoryTasks}
                 onReplaceByCategories={app.replaceByTaskCategories}
+                onTodoDelta={app.applyTodoDelta}
                 onImportSide={app.addManySideItems}
                 onReplaceSide={app.replaceSideItems}
+                onSideDelta={app.applySideDelta}
                 guidelines={app.guidelines}
                 habits={app.habits}
               />
-              {/* PC: 지침 | 습관 side-by-side · 모바일: 세로 스택 */}
+              {/* PC: 지침 | 습관 통일 영역 · 할 일/한 일 탭 동일 · 완료 없음 */}
               <div
                 className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-2 lg:items-start lg:gap-3"
                 data-side-lists-pair
+                data-side-lists-unified="1"
               >
                 <SideListSection
                   kind="guideline"
                   items={app.guidelines}
-                  mode={view === "done" ? "done" : "active"}
                   onAdd={() => app.addSideItem("guideline")}
                   onUpdate={(id, patch) =>
                     app.updateSideItem("guideline", id, patch)
@@ -316,23 +319,16 @@ export function AssistantApp() {
                   onDeleteMany={(ids) =>
                     app.deleteSideItems("guideline", ids)
                   }
-                  onCompleteMany={(ids) =>
-                    app.completeSideItems("guideline", ids)
-                  }
                 />
                 <SideListSection
                   kind="habit"
                   items={app.habits}
-                  mode={view === "done" ? "done" : "active"}
                   onAdd={() => app.addSideItem("habit")}
                   onUpdate={(id, patch) =>
                     app.updateSideItem("habit", id, patch)
                   }
                   onDelete={(id) => app.deleteSideItem("habit", id)}
                   onDeleteMany={(ids) => app.deleteSideItems("habit", ids)}
-                  onCompleteMany={(ids) =>
-                    app.completeSideItems("habit", ids)
-                  }
                 />
               </div>
             </div>

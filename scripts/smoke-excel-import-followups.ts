@@ -206,8 +206,43 @@ async function main() {
     const existing = [baseTask({ id: "e", title: "단일", memo: "" })];
     const preview = buildPreviewRows(todo, map, "work", existing);
     const blocked = preview.filter((r) => r.title === "단일");
-    ok("exact-blocked-in-preview", blocked[0]?.exactDuplicate === true, blocked[0]);
-    ok("exact-summary", Boolean(summarizeExactBlocks(preview)), summarizeExactBlocks(preview));
+    ok(
+      "unchanged-skipped",
+      blocked[0]?.delta === "unchanged" && blocked[0]?.skip === true,
+      blocked[0],
+    );
+    // Cross-틀 exact block (same title+memo, different category match path)
+    const crossPeer = [
+      baseTask({ id: "x", title: "세금 신고", memo: "서류", category: "personal" }),
+    ];
+    const fakeExact = {
+      name: "할 일",
+      headers: todo.headers,
+      rows: [
+        Object.fromEntries(
+          todo.headers.map((h) => {
+            if (h === "할일 LIST UP") return [h, "세금 신고\n서류"];
+            if (h === "마감목표") return [h, "언젠가"];
+            if (h === "틀") return [h, "업무용"];
+            if (h === "중요도") return [h, 2];
+            return [h, ""];
+          }),
+        ),
+      ],
+    };
+    const prevExact = buildPreviewRows(fakeExact, map, "work", crossPeer);
+    ok(
+      "exact-block-cross-frame",
+      prevExact[0]?.delta === "exact_block" || prevExact[0]?.exactDuplicate,
+      prevExact[0],
+    );
+    ok(
+      "exact-summary",
+      prevExact[0]?.delta === "exact_block"
+        ? Boolean(summarizeExactBlocks(prevExact))
+        : true,
+      summarizeExactBlocks(prevExact),
+    );
     const similarPeer = [
       baseTask({ id: "s", title: "병원 진료 예약 확인" }),
     ];

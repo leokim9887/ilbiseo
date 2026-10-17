@@ -193,6 +193,8 @@ interface ExcelWorkbookProps {
   doneTasks: Task[];
   /** All-frame active tasks — for title/memo similarity warn */
   allActiveTasks?: Task[];
+  /** Active + completed — for Excel delta match (program truth). */
+  allTasksForImport?: Task[];
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onComplete: (id: string) => void;
   onCompleteMany?: (ids: string[]) => void;
@@ -206,6 +208,11 @@ interface ExcelWorkbookProps {
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
   /** 엑셀 「틀」칸별 교체 */
   onReplaceByCategories?: (tasks: Task[]) => void;
+  /** Delta-only: new + changed vs in-app */
+  onTodoDelta?: (payload: {
+    add: Task[];
+    update: { id: string; patch: Partial<Task> }[];
+  }) => void;
   onImportSide?: (
     kind: SideListKind,
     items: SideListItem[],
@@ -213,6 +220,13 @@ interface ExcelWorkbookProps {
   onReplaceSide?: (
     kind: SideListKind,
     items: SideListItem[],
+  ) => void;
+  onSideDelta?: (
+    kind: SideListKind,
+    payload: {
+      add: SideListItem[];
+      update: { id: string; patch: Partial<SideListItem> }[];
+    },
   ) => void;
   guidelines?: SideListItem[];
   habits?: SideListItem[];
@@ -226,6 +240,7 @@ export function ExcelWorkbook({
   activeTasks,
   doneTasks,
   allActiveTasks,
+  allTasksForImport,
   onUpdate,
   onComplete,
   onCompleteMany,
@@ -237,8 +252,10 @@ export function ExcelWorkbook({
   onImport,
   onReplaceCategory,
   onReplaceByCategories,
+  onTodoDelta,
   onImportSide,
   onReplaceSide,
+  onSideDelta,
   guidelines = [],
   habits = [],
   calendarEvents = [],
@@ -286,6 +303,8 @@ export function ExcelWorkbook({
   );
   const todayKst = useMemo(() => todayIsoKst(), []);
   const similarityPeers = allActiveTasks ?? activeTasks;
+  /** Delta import must see completed rows too (same title+틀 → update, not re-add). */
+  const importPeers = allTasksForImport ?? similarityPeers;
   const [similarityAlert, setSimilarityAlert] = useState<string | null>(null);
   /** Conflicting peer row to scroll/highlight when alert opens */
   const [similarityFocusId, setSimilarityFocusId] = useState<string | null>(
@@ -817,9 +836,11 @@ export function ExcelWorkbook({
                 onImport={onImport}
                 onReplaceCategory={onReplaceCategory}
                 onReplaceByCategories={onReplaceByCategories}
+                onTodoDelta={onTodoDelta}
                 onImportSide={onImportSide}
                 onReplaceSide={onReplaceSide}
-                existingTasks={similarityPeers}
+                onSideDelta={onSideDelta}
+                existingTasks={importPeers}
                 existingGuidelines={guidelines}
                 existingHabits={habits}
                 excelOnly={isAll}

@@ -315,11 +315,8 @@ export function suggestFieldForHeader(
   ) {
     return "skip";
   }
-  // 「할 일」: 완료여부 열은 더 이상 쓰지 않음 (예전 파일 skip)
-  if (
-    sheetKind === "todo" &&
-    (n === "완료여부" || n === "완료" || n === "done")
-  ) {
+  // 완료여부 열은 할 일·한 일·지침·습관 모두 사용 안 함 (예전 파일 skip)
+  if (n === "완료여부" || n === "완료" || n === "done" || n === "status") {
     return "skip";
   }
   // Prefer exact template match for title
@@ -1158,4 +1155,159 @@ export function pickDefaultSheetIndex(sheets: ParsedSheet[]): number {
 
 export function mappingHasTitle(mapping: ColumnMapping): boolean {
   return Object.values(mapping).includes("title");
+}
+
+/** Find allowlisted sheet by kind (first match). Missing → null (skip quietly). */
+export function findSheetByKind(
+  sheets: readonly ParsedSheet[],
+  kind: ImportSheetKind,
+): ParsedSheet | null {
+  return sheets.find((s) => classifyImportSheet(s.name) === kind) ?? null;
+}
+
+export type SheetImportSlice = {
+  kind: ImportSheetKind;
+  label: string;
+  sheet: ParsedSheet;
+  mapping: ColumnMapping;
+  preview: MappedPreviewRow[];
+  summary: ReturnType<typeof summarizeDeltaCounts>;
+};
+
+export type WorkbookImportPlan = {
+  todo: SheetImportSlice | null;
+  guideline: SheetImportSlice | null;
+  habit: SheetImportSlice | null;
+  /** Sheets present in file among the fixed three */
+  presentLabels: string[];
+  combined: ReturnType<typeof summarizeDeltaCounts>;
+};
+
+const SHEET_LABEL: Record<ImportSheetKind, string> = {
+  todo: "할 일",
+  guideline: "지침",
+  habit: "습관",
+};
+
+/**
+ * One-shot plan for 「할 일」+「지침」+「습관」.
+ * Missing sheets are null (skipped quietly). Delta vs in-app data.
+ */
+export function buildWorkbookImportPlan(
+  workbook: ParsedWorkbook,
+  opts: {
+    defaultCategory: TaskCategory;
+    existingTasks: readonly Task[];
+    existingGuidelines: readonly SideListItem[];
+    existingHabits: readonly SideListItem[];
+    /** Optional override for todo mapping (after father edits map step). */
+    todoMapping?: ColumnMapping | null;
+  },
+): WorkbookImportPlan {
+  const saved = loadSavedMapping();
+
+  const makeSlice = (
+    kind: ImportSheetKind,
+    sheet: ParsedSheet | null,
+    existingSide?: readonly SideListItem[],
+  ): SheetImportSlice | null => {
+    if (!sheet) return null;
+    const mapping =
+      kind === "todo"
+        ? sanitizeMapping(
+            opts.todoMapping ??
+              applySavedOrAuto(sheet.headers, saved, "todo"),
+          )
+        : applySavedOrAuto(sheet.headers, null, kind);
+    const preview =
+      kind === "todo"
+        ? buildPreviewRows(
+            sheet,
+            mapping,
+            opts.defaultCategory,
+            opts.existingTasks,
+          )
+        : buildSidePreviewRows(sheet, mapping, existingSide ?? []);
+    return {
+      kind,
+      label: SHEET_LABEL[kind],
+      sheet,
+      mapping,
+      preview,
+      summary: summarizeDeltaCounts(preview),
+    };
+  };
+
+  const todo = makeSlice("todo", findSheetByKind(workbook.sheets, "todo"));
+  const guideline = makeSlice(
+    "guideline",
+    findSheetByKind(workbook.sheets, "guideline"),
+    opts.existingGuidelines,
+  );
+  const habit = makeSlice(
+    "habit",
+    findSheetByKind(workbook.sheets, "habit"),
+    opts.existingHabits,
+  );
+
+  const slices = [todo, guideline, habit].filter(
+    (s): s is SheetImportSlice => s != null,
+  );
+  const neu = slices.reduce((n, s) => n + s.summary.neu, 0);
+  const changed = slices.reduce((n, s) => n + s.summary.changed, 0);
+  const unchanged = slices.reduce((n, s) => n + s.summary.unchanged, 0);
+  const blocked = slices.reduce((n, s) => n + s.summary.blocked, 0);
+  const parts: string[] = [];
+  if (neu) parts.push(`새 ${neu}건`);
+  if (changed) parts.push(`바뀐 ${changed}건`);
+  if (unchanged) parts.push(`그대로 ${unchanged}건`);
+  if (blocked) parts.push(`같은 내용 ${blocked}건 제외`);
+
+  return {
+    todo,
+    guideline,
+    habit,
+    presentLabels: slices.map((s) => s.label),
+    combined: {
+      neu,
+      changed,
+      unchanged,
+      blocked,
+      message: parts.length ? parts.join(" · ") : "가져올 변경 없음",
+    },
+  };
+}
+
+export type WorkbookDeltaCommit = {
+  todo: TodoDeltaCommit;
+  guideline: SideDeltaCommit;
+  habit: SideDeltaCommit;
+};
+
+/** Commit payloads for all present slices (empty commits for missing sheets). */
+export function planToWorkbookDelta(
+  plan: WorkbookImportPlan,
+): WorkbookDeltaCommit {
+  return {
+    todo: plan.todo
+      ? previewToTodoDelta(plan.todo.preview)
+      : { add: [], update: [] },
+    guideline: plan.guideline
+      ? previewToSideDelta(plan.guideline.preview)
+      : { add: [], update: [] },
+    habit: plan.habit
+      ? previewToSideDelta(plan.habit.preview)
+      : { add: [], update: [] },
+  };
+}
+
+export function workbookDeltaApplyCount(d: WorkbookDeltaCommit): number {
+  return (
+    d.todo.add.length +
+    d.todo.update.length +
+    d.guideline.add.length +
+    d.guideline.update.length +
+    d.habit.add.length +
+    d.habit.update.length
+  );
 }

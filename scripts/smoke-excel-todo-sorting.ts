@@ -56,11 +56,11 @@ async function main() {
       }),
     );
     ok(
-      "parts-range-start-sort",
-      range.kind === "date" &&
+      "parts-range-text",
+      range.kind === "rangeText" &&
         range.start === "2026-11-01" &&
         range.end === "2026-11-15" &&
-        range.numFmt.includes("2026-11-15"),
+        range.value === "2026-11-01 ~ 2026-11-15",
       range,
     );
 
@@ -130,16 +130,12 @@ async function main() {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
 
-  const wantFilterTodo: Record<string, boolean> = {
+  const wantFilter: Record<string, boolean> = {
     순서: false,
     틀: true,
     "할일 LIST UP": false,
     마감목표: true,
     중요도: true,
-  };
-  const wantFilterDone: Record<string, boolean> = {
-    ...wantFilterTodo,
-    완료여부: false,
   };
 
   const tableNameBySheet: Record<string, string> = {
@@ -152,8 +148,7 @@ async function main() {
     ok(`sheet-${name}`, Boolean(sh), null);
     const table = sh!.getTable(tableNameBySheet[name]);
     ok(`table-${name}`, Boolean(table), tableNameBySheet[name]);
-    const want = name === "할 일" ? wantFilterTodo : wantFilterDone;
-    const colCount = Object.keys(want).length;
+    const colCount = Object.keys(wantFilter).length;
     const buttons: Record<string, boolean> = {};
     for (let i = 0; i < colCount; i++) {
       const col = table.getColumn(i);
@@ -161,14 +156,12 @@ async function main() {
     }
     ok(
       `filter-buttons-${name}`,
-      Object.keys(want).every((k) => buttons[k] === want[k]),
+      Object.keys(wantFilter).every((k) => buttons[k] === wantFilter[k]),
       buttons,
     );
     ok(
       `no-sort-cols-hidden-${name}`,
-      buttons["순서"] === false &&
-        buttons["할일 LIST UP"] === false &&
-        (name === "할 일" || buttons["완료여부"] === false),
+      buttons["순서"] === false && buttons["할일 LIST UP"] === false,
       buttons,
     );
     ok(
@@ -178,13 +171,11 @@ async function main() {
         buttons["중요도"] === true,
       buttons,
     );
-    if (name === "할 일") {
-      ok(
-        "todo-no-완료여부-col",
-        !Object.prototype.hasOwnProperty.call(buttons, "완료여부"),
-        buttons,
-      );
-    }
+    ok(
+      `${name}-no-완료여부-col`,
+      !Object.prototype.hasOwnProperty.call(buttons, "완료여부"),
+      buttons,
+    );
   }
 
   const todo = wb.getWorksheet("할 일")!;
@@ -227,19 +218,15 @@ async function main() {
     deadlines,
   );
   ok(
-    "range-keeps-end-in-numFmt",
+    "range-as-plain-text",
     deadlines.some(
       (d) =>
-        d.type === "date" &&
-        typeof d.numFmt === "string" &&
-        d.numFmt.includes("~") &&
-        d.numFmt.includes("2026-10-30"),
+        d.type === "string" &&
+        typeof d.text === "string" &&
+        d.text.includes("2026-10-10") &&
+        d.text.includes("2026-10-30") &&
+        d.text.includes("~"),
     ),
-    deadlines,
-  );
-  ok(
-    "range-sort-key-is-start",
-    deadlines.some((d) => d.type === "date" && d.iso === "2026-10-10"),
     deadlines,
   );
   ok(

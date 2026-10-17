@@ -49,25 +49,15 @@ function styleHeader(row: ExcelJS.Row) {
 }
 
 /**
- * 「할 일」Excel Table — no 완료여부 column.
+ * 「할 일」·「한 일」동일 열 — no 완료여부.
  * ▾ only on 틀 · 마감목표 · 중요도.
  */
-const TODO_ACTIVE_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
+const TODO_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
   { name: "순서", filterButton: false },
   { name: "틀", filterButton: true },
   { name: "할일 LIST UP", filterButton: false },
   { name: "마감목표", filterButton: true },
   { name: "중요도", filterButton: true },
-];
-
-/** 「한 일」keeps 완료여부 for clarity. */
-const TODO_DONE_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
-  { name: "순서", filterButton: false },
-  { name: "틀", filterButton: true },
-  { name: "할일 LIST UP", filterButton: false },
-  { name: "마감목표", filterButton: true },
-  { name: "중요도", filterButton: true },
-  { name: "완료여부", filterButton: false },
 ];
 
 function listUpCell(task: Pick<Task, "title" | "memo">): string {
@@ -254,27 +244,27 @@ export async function buildWorkbook(
     "IlbiseoTodo",
     todoRows,
     activeTasks,
-    TODO_ACTIVE_TABLE_COLUMNS,
+    TODO_TABLE_COLUMNS,
   );
 
   const done = wb.addWorksheet("한 일", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
   const completedTasks = sortCompleted(tasks);
+  // Same columns as 「할 일」— no 완료여부 (sheet membership already means done)
   const doneRows: ExcelJS.CellValue[][] = completedTasks.map((t, i) => [
     i + 1,
     CATEGORY_LABEL[t.category],
     listUpCell(t),
     deadlineCellValue(t),
     Number(t.importance) || 0,
-    "완료",
   ]);
   enableSortableTodoTable(
     done,
     "IlbiseoDone",
     doneRows,
     completedTasks,
-    TODO_DONE_TABLE_COLUMNS,
+    TODO_TABLE_COLUMNS,
   );
 
   // 「구글캘린더」: only events within 2 weeks from save (KST), one row per event

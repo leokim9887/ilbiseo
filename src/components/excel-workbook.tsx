@@ -1250,7 +1250,7 @@ export function ExcelWorkbook({
                     }
                   >
                     <td
-                      className="border border-black px-0.5 py-1 text-center align-middle select-none sm:px-1.5"
+                      className="border border-black px-0.5 py-0.5 text-center align-middle select-none sm:px-1"
                       data-excel-select-cell={task.id}
                       title="클릭하거나 드래그해서 여러 행 선택"
                       onMouseDown={(e) => {
@@ -1288,7 +1288,7 @@ export function ExcelWorkbook({
                         data-excel-row-check={task.id}
                       />
                     </td>
-                    <td className="border border-black px-0.5 py-1 text-center align-middle text-[12.5px] font-medium tabular-nums sm:px-1.5 sm:text-[15px]">
+                    <td className="border border-black px-0.5 py-0.5 text-center align-middle text-[12.5px] font-medium tabular-nums sm:px-1 sm:text-[15px]">
                       {order}
                     </td>
 
@@ -1308,10 +1308,10 @@ export function ExcelWorkbook({
                         handleNav(e, task.id, "listup", moveFocus)
                       }
                     >
-                      <div className="flex w-full min-w-0 flex-col gap-0.5 px-1 py-0.5 sm:px-1.5 sm:py-1">
+                      <div className="flex w-full min-w-0 flex-col gap-0 px-1 py-0 sm:px-1 sm:py-0.5">
                         {isAll ? (
                           <span
-                            className="w-fit rounded-sm bg-[#e8ecef] px-1 py-0.5 text-[11px] font-semibold text-[#3a4540] sm:px-1.5 sm:text-[12px]"
+                            className="w-fit rounded-sm bg-[#e8ecef] px-1 py-0 text-[11px] font-semibold leading-tight text-[#3a4540] sm:px-1.5 sm:text-[12px]"
                             data-excel-frame-badge={task.category}
                           >
                             {CATEGORY_LABEL[task.category]}
@@ -1345,7 +1345,7 @@ export function ExcelWorkbook({
                           placeholder="할 일 제목"
                         />
                         <label className="flex flex-col gap-0">
-                          <span className="rounded-sm bg-[#e8ecef]/80 px-1 py-0.5 text-[12px] font-medium leading-tight text-[#454d48] dark:bg-[#24302a] dark:text-[#a8b3ad]">
+                          <span className="rounded-sm bg-[#e8ecef]/80 px-1 py-0 text-[11px] font-medium leading-tight text-[#454d48] dark:bg-[#24302a] dark:text-[#a8b3ad] sm:text-[12px]">
                             메모
                           </span>
                           <AutoGrowTextarea
@@ -1397,7 +1397,7 @@ export function ExcelWorkbook({
                     >
                       {deadlineFocused ? (
                         <div
-                          className="flex w-full flex-col gap-1 px-1 py-1"
+                          className="flex w-full flex-col gap-0.5 px-1 py-0.5"
                           onBlur={relockIfLeavingRow}
                         >
                           <button
@@ -1525,7 +1525,7 @@ export function ExcelWorkbook({
                       ) : (
                         <button
                           type="button"
-                          className={`min-h-8 w-full px-0.5 text-center text-[12px] leading-snug break-words text-[#1a2420] dark:text-[#e8ece9] sm:min-h-9 sm:px-1 sm:text-[14px] ${
+                          className={`min-h-8 w-full px-0.5 py-0.5 text-center text-[12px] leading-snug break-words text-[#1a2420] dark:text-[#e8ece9] sm:min-h-8 sm:px-1 sm:text-[14px] ${
                             someday
                               ? "font-semibold text-[#217346] dark:text-[#5bb8a8]"
                               : ""
@@ -1588,11 +1588,11 @@ export function ExcelWorkbook({
                     </EditCell>
 
                     {isDoneSheet ? (
-                      <td className="border border-black px-0.5 py-0.5 text-center align-middle sm:px-1">
+                      <td className="border border-black px-0.5 py-0 text-center align-middle sm:px-1">
                         {locked ? (
                           <button
                             type="button"
-                            className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346]/40 bg-white px-1.5 text-[12px] font-medium text-[#217346] hover:bg-[#e8f5ee] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
+                            className="inline-flex h-9 min-h-9 touch-manipulation items-center justify-center gap-0.5 rounded-sm border border-[#217346]/40 bg-white px-1.5 text-[12px] font-medium text-[#217346] hover:bg-[#e8f5ee] sm:h-8 sm:min-h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
                             onClick={(e) => {
                               e.stopPropagation();
                               beginEditDone(task.id);
@@ -1609,7 +1609,7 @@ export function ExcelWorkbook({
                         ) : (
                           <button
                             type="button"
-                            className="inline-flex h-8 items-center justify-center gap-0.5 rounded-sm border border-[#217346] bg-[#217346] px-1.5 text-[12px] font-medium text-white hover:bg-[#1a5c38] sm:h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
+                            className="inline-flex h-9 min-h-9 touch-manipulation items-center justify-center gap-0.5 rounded-sm border border-[#217346] bg-[#217346] px-1.5 text-[12px] font-medium text-white hover:bg-[#1a5c38] sm:h-8 sm:min-h-8 sm:gap-1 sm:px-2 sm:text-[13px]"
                             onMouseDown={(e) => {
                               e.preventDefault();
                             }}
@@ -1707,7 +1707,7 @@ function EditCell({
       onKeyDown={locked ? undefined : onKeyNav}
     >
       <div
-        className={`flex min-h-9 items-stretch ${center ? "justify-center" : ""}`}
+        className={`flex min-h-8 items-stretch sm:min-h-8 ${center ? "justify-center" : ""}`}
       >
         {children}
       </div>

@@ -79,21 +79,21 @@ export function TodoGrid({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="overflow-x-auto rounded-lg border border-[var(--grid-line)] bg-[var(--sheet)]">
         <table className="w-full min-w-[920px] border-collapse text-[15px]">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[var(--brand)] text-left text-[14px] font-semibold text-[var(--primary-foreground)]">
-              <th className="w-12 px-3 py-3 text-center">완료</th>
-              <th className="min-w-[200px] px-3 py-3">제목</th>
-              <th className="w-[140px] px-3 py-3">종류</th>
-              <th className="w-[130px] px-3 py-3">목표기일</th>
-              <th className="w-[72px] px-3 py-3 text-center">중요</th>
+              <th className="w-12 px-2 py-2 text-center">완료</th>
+              <th className="min-w-[200px] px-2 py-2">제목</th>
+              <th className="w-[140px] px-2 py-2">종류</th>
+              <th className="w-[130px] px-2 py-2">목표기일</th>
+              <th className="w-[72px] px-2 py-2 text-center">중요</th>
               {!hideCategory ? (
-                <th className="w-[100px] px-3 py-3">틀</th>
+                <th className="w-[100px] px-2 py-2">틀</th>
               ) : null}
-              <th className="min-w-[160px] px-3 py-3">메모</th>
-              <th className="w-14 px-2 py-3" />
+              <th className="min-w-[160px] px-2 py-2">메모</th>
+              <th className="w-14 px-1 py-2" />
             </tr>
           </thead>
           <tbody>
@@ -106,7 +106,7 @@ export function TodoGrid({
                   >
                     <td
                       colSpan={hideCategory ? 7 : 8}
-                      className="border-b border-[var(--grid-line)] px-3 py-2 text-[13px] font-semibold tracking-wide text-[var(--brand)]"
+                      className="border-b border-[var(--grid-line)] px-2 py-1 text-[13px] font-semibold tracking-wide text-[var(--brand)]"
                     >
                       {row.label}
                     </td>
@@ -119,7 +119,7 @@ export function TodoGrid({
                   key={task.id}
                   className="border-b border-[var(--grid-line)] hover:bg-[var(--row-hover)]"
                 >
-                  <td className="px-3 py-2.5 text-center align-middle">
+                  <td className="px-2 py-1 text-center align-middle">
                     <Checkbox
                       checked={false}
                       onCheckedChange={() => onComplete(task.id)}
@@ -127,17 +127,17 @@ export function TodoGrid({
                       className="size-5"
                     />
                   </td>
-                  <td className="px-2 py-1.5 align-middle">
+                  <td className="px-1.5 py-0.5 align-middle">
                     <Input
                       value={task.title}
                       onChange={(e) =>
                         onUpdate(task.id, { title: e.target.value })
                       }
-                      className="h-10 border-transparent bg-transparent px-2 text-[15px] font-medium shadow-none focus-visible:border-[var(--grid-line)] focus-visible:bg-white"
+                      className="h-9 border-transparent bg-transparent px-2 text-[15px] font-medium shadow-none focus-visible:border-[var(--grid-line)] focus-visible:bg-white"
                       aria-label="할 일 제목"
                     />
                   </td>
-                  <td className="px-2 py-1.5 align-middle">
+                  <td className="px-1.5 py-0.5 align-middle">
                     <Select
                       value={task.kind}
                       onValueChange={(v) =>
@@ -151,7 +151,7 @@ export function TodoGrid({
                         })
                       }
                     >
-                      <SelectTrigger className="h-10 w-full bg-transparent">
+                      <SelectTrigger className="h-9 w-full bg-transparent">
                         <SelectValue>{KIND_LABEL[task.kind]}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -163,7 +163,7 @@ export function TodoGrid({
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-2 py-1.5 align-middle">
+                  <td className="px-1.5 py-0.5 align-middle">
                     <Input
                       type="date"
                       value={task.targetDate ?? ""}
@@ -173,11 +173,11 @@ export function TodoGrid({
                           targetDate: e.target.value || null,
                         })
                       }
-                      className="h-10 bg-transparent disabled:opacity-40"
+                      className="h-9 bg-transparent disabled:opacity-40"
                       aria-label="목표기일"
                     />
                   </td>
-                  <td className="px-2 py-1.5 align-middle">
+                  <td className="px-1.5 py-0.5 align-middle">
                     <ScoreSelect
                       value={task.importance}
                       onChange={(n) => onUpdate(task.id, { importance: n })}
@@ -185,7 +185,7 @@ export function TodoGrid({
                     />
                   </td>
                   {!hideCategory ? (
-                    <td className="px-2 py-1.5 align-middle">
+                    <td className="px-1.5 py-0.5 align-middle">
                       <Select
                         value={task.category}
                         onValueChange={(v) =>
@@ -194,7 +194,7 @@ export function TodoGrid({
                           })
                         }
                       >
-                        <SelectTrigger className="h-10 w-full bg-transparent">
+                        <SelectTrigger className="h-9 w-full bg-transparent">
                           <SelectValue>
                             {CATEGORY_LABEL[task.category]}
                           </SelectValue>
@@ -211,23 +211,23 @@ export function TodoGrid({
                       </Select>
                     </td>
                   ) : null}
-                  <td className="px-2 py-1.5 align-middle">
+                  <td className="px-1.5 py-0.5 align-middle">
                     <Input
                       value={task.memo}
                       placeholder="메모"
                       onChange={(e) =>
                         onUpdate(task.id, { memo: e.target.value })
                       }
-                      className="h-10 border-transparent bg-transparent px-2 shadow-none focus-visible:border-[var(--grid-line)] focus-visible:bg-white"
+                      className="h-9 border-transparent bg-transparent px-2 shadow-none focus-visible:border-[var(--grid-line)] focus-visible:bg-white"
                       aria-label="메모"
                     />
                   </td>
-                  <td className="px-1 py-1.5 text-center align-middle">
+                  <td className="px-1 py-0.5 text-center align-middle">
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-10 text-[var(--ink-muted)]"
+                      className="size-9 text-[var(--ink-muted)]"
                       onClick={() => onDelete(task.id)}
                       aria-label="삭제"
                     >
@@ -271,7 +271,7 @@ function ScoreSelect({
 }) {
   return (
     <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-      <SelectTrigger className="h-10 w-full justify-center bg-transparent" aria-label={label}>
+      <SelectTrigger className="h-9 w-full justify-center bg-transparent" aria-label={label}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

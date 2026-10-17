@@ -269,7 +269,7 @@ export function AssistantApp() {
           key={workbookOpen ? "wb" : view}
         >
           {workbookOpen ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <ExcelWorkbook
                 sheet={view === "done" ? "done" : "todo"}
                 frame={frame}
@@ -296,7 +296,7 @@ export function AssistantApp() {
               />
               {/* PC: 지침 | 습관 side-by-side · 모바일: 세로 스택 */}
               <div
-                className="grid w-full grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4"
+                className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-2 lg:items-start lg:gap-3"
                 data-side-lists-pair
               >
                 <SideListSection

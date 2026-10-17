@@ -21,9 +21,9 @@ interface SideListSectionProps {
   onCompleteMany: (ids: string[]) => void;
 }
 
-/** Compact so PC side-by-side pair fits; ~4 rows before scroll. */
+/** Compact so PC side-by-side pair fits; ~4 denser rows before scroll. */
 const LIST_MAX_HEIGHT_CLASS =
-  "max-h-[min(18rem,calc(4*4.4rem))] lg:max-h-[min(20rem,calc(4*4.6rem))]";
+  "max-h-[min(16rem,calc(4*3.9rem))] lg:max-h-[min(18rem,calc(4*4.1rem))]";
 
 export function SideListSection({
   kind,
@@ -320,18 +320,18 @@ export function SideListSection({
 
       <div
         ref={listScrollRef}
-        className={`bg-white px-1.5 py-1.5 dark:bg-[#1a221e] sm:px-2 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
+        className={`bg-white px-1.5 py-1 dark:bg-[#1a221e] sm:px-2 ${LIST_MAX_HEIGHT_CLASS} overflow-y-auto`}
         data-side-list-scroll={kind}
         data-side-list-mode={mode}
       >
         {ordered.length === 0 ? (
-          <p className="px-2 py-6 text-center text-[13px] text-[#666] dark:text-[#a8b3ad]">
+          <p className="px-2 py-5 text-center text-[13px] text-[#666] dark:text-[#a8b3ad]">
             {mode === "done"
               ? `완료한 ${label}이 없습니다.`
               : `${label}이 비어 있습니다. 「항목 추가」로 적으세요.`}
           </p>
         ) : (
-          <ul ref={listRef} className="space-y-1.5">
+          <ul ref={listRef} className="space-y-1">
             {ordered.map((item) => {
               const checked = selectedIds.has(item.id);
               const editingDone = editingDoneIds.has(item.id);
@@ -343,7 +343,7 @@ export function SideListSection({
                   data-side-item-selected={checked ? "1" : "0"}
                   data-side-item-done={item.done ? "1" : "0"}
                   data-side-item-locked={locked ? "1" : "0"}
-                  className={`flex flex-col gap-1 rounded-sm border px-2 py-1.5 sm:flex-row sm:items-start ${
+                  className={`flex flex-col gap-0.5 rounded-sm border px-1.5 py-1 sm:flex-row sm:items-start sm:px-2 ${
                     checked
                       ? "border-[#217346]/50 bg-[#e8f5ee] dark:border-[#3d8f82]/50 dark:bg-[#1e332d]"
                       : item.done
@@ -352,7 +352,7 @@ export function SideListSection({
                   }`}
                 >
                   <div
-                    className="mt-1.5 flex shrink-0 items-center justify-center select-none"
+                    className="mt-1 flex shrink-0 items-center justify-center select-none"
                     data-side-select-cell={item.id}
                     title="클릭하거나 드래그해서 여러 항목 선택"
                     onMouseDown={(e) => {
@@ -390,22 +390,22 @@ export function SideListSection({
                       title="항목 선택"
                     />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 flex-1 space-y-0.5">
                     {item.done ? (
                       <div
-                        className="mb-0.5 flex flex-wrap items-center gap-1.5"
+                        className="mb-0 flex flex-wrap items-center gap-1"
                         data-side-done-badge={item.id}
                       >
-                        <span className="inline-flex items-center gap-1 rounded-sm bg-[#217346] px-1.5 py-0.5 text-[12px] font-bold text-white">
+                        <span className="inline-flex items-center gap-1 rounded-sm bg-[#217346] px-1.5 py-0 text-[11px] font-bold leading-tight text-white sm:text-[12px]">
                           <Check className="size-3.5 stroke-[3]" aria-hidden />
                           완료됨
                         </span>
                         {locked ? (
-                          <span className="text-[12px] font-medium text-[#5a6b62]">
+                          <span className="text-[11px] font-medium text-[#5a6b62] sm:text-[12px]">
                             수정하려면 「수정」을 누르세요
                           </span>
                         ) : (
-                          <span className="text-[12px] font-medium text-[#217346]">
+                          <span className="text-[11px] font-medium text-[#217346] sm:text-[12px]">
                             수정 중
                           </span>
                         )}
@@ -430,7 +430,7 @@ export function SideListSection({
                       }}
                       disabled={locked}
                       readOnly={locked}
-                      className={`h-9 w-full rounded-sm border px-2 text-[15px] outline-none dark:border-[#4a5c52] ${
+                      className={`h-10 min-h-10 w-full touch-manipulation rounded-sm border px-2 text-[15px] outline-none dark:border-[#4a5c52] sm:h-8 sm:min-h-8 ${
                         locked
                           ? "cursor-default border-[#b7c4bc] bg-[#e4ebe6] text-[#6a7670] opacity-90 dark:bg-[#24302a] dark:text-[#8a9490]"
                           : item.done
@@ -458,7 +458,7 @@ export function SideListSection({
                       }}
                       disabled={locked}
                       readOnly={locked}
-                      className={`h-7 w-full rounded-sm border px-2 text-[12.5px] outline-none dark:border-[#4a5c52] ${
+                      className={`h-8 min-h-8 w-full touch-manipulation rounded-sm border px-2 text-[12.5px] outline-none dark:border-[#4a5c52] sm:h-6 sm:min-h-6 ${
                         locked
                           ? "cursor-default border-[#c5d0c9] bg-[#e8eee9] text-[#7a8680] dark:bg-[#24302a] dark:text-[#8a9490]"
                           : "border-[#d0d5d9] bg-white text-[#2a3230] focus:border-[#8a939a] dark:bg-[#1a221e] dark:text-[#c5cec9]"
@@ -470,11 +470,11 @@ export function SideListSection({
                   </div>
                   {/* 삭제는 선택 후 「선택 삭제」만 — 행마다 삭제 버튼 없음 */}
                   {item.done ? (
-                    <div className="flex shrink-0 flex-row gap-1.5 self-end sm:flex-col sm:self-start">
+                    <div className="flex shrink-0 flex-row gap-1 self-end sm:flex-col sm:self-start">
                       {locked ? (
                         <button
                           type="button"
-                          className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#217346]/45 bg-white px-2 text-[13px] font-medium text-[#217346] hover:bg-[#e8f5ee]"
+                          className="inline-flex h-10 min-h-10 touch-manipulation items-center justify-center gap-1 rounded-sm border border-[#217346]/45 bg-white px-2 text-[13px] font-medium text-[#217346] hover:bg-[#e8f5ee] sm:h-8 sm:min-h-8"
                           onClick={() => beginEditDone(item.id)}
                           aria-label={`${label} 수정`}
                           data-side-edit={item.id}
@@ -485,7 +485,7 @@ export function SideListSection({
                       ) : (
                         <button
                           type="button"
-                          className="inline-flex h-9 items-center justify-center gap-1 rounded-sm border border-[#217346] bg-[#217346] px-2 text-[13px] font-medium text-white hover:bg-[#1a5c38]"
+                          className="inline-flex h-10 min-h-10 touch-manipulation items-center justify-center gap-1 rounded-sm border border-[#217346] bg-[#217346] px-2 text-[13px] font-medium text-white hover:bg-[#1a5c38] sm:h-8 sm:min-h-8"
                           onMouseDown={(e) => {
                             // Keep focus in the row so title/memo blur does not
                             // re-lock before this click runs.

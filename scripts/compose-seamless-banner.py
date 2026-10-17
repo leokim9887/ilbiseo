@@ -31,8 +31,8 @@ CHEER_SRC = "04-baby.png"
 DOG_SRC = "02-dog-new.png"
 # Face + tan cap framing (mobile / shared default)
 BABY_BIAS = (0.52, 0.30)
-# Gemini-inspired PC/mobile Ace: more face in frame (cheeks readable, not ultra-tight)
-BABY_BIAS_PC = (0.50, 0.36)
+# Gemini-match Ace: full cheeks + chin + hat brim (face-centered like ref)
+BABY_BIAS_PC = (0.50, 0.32)
 # Original cheer crop bias (pre Ace-cap replace)
 CHEER_BIAS = (0.50, 0.14)
 # New dog: face-forward Maltese; bias keeps eyes in upper-center of square crop
@@ -367,59 +367,60 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     canvas = city_atmosphere(fam_src, W, H)
     mist_right(canvas)
 
-    # Wider plane — slightly contained so soft mask doesn't eat chin / elder
-    fw, fh = 1240, H
+    # Gemini-match: family ~left 42–45% with soft-right feather into mid gutter
+    fw, fh = 1080, H
     family = family_plane(
-        fam_src, fw, fh, scale_boost=1.04, anchor_x=0.34, anchor_y=0.50
+        fam_src, fw, fh, scale_boost=1.02, anchor_x=0.30, anchor_y=0.50
     )
     family = ImageEnhance.Brightness(family).enhance(1.05)
     family = ImageEnhance.Color(family).enhance(1.0)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
-    paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
+    fam_mask = soft_right_fade((fw, fh), fade_start=0.68)
+    paste_masked(canvas, family, (-40, 0), fam_mask, 1.0)
 
-    # Gemini-inspired layout (real sources only — never paste Gemini mock):
-    # Ace more face-visible with soft glow; pets lower so cheeks stay clear.
-    bw, bh = 580, 640
+    # Gemini-match (real sources only — never paste Gemini mock):
+    # Ace dominates right; closer to mid so gutter matches ref; soft circular glow.
+    bw, bh = 740, 800
     baby = night_grade(
-        cover_crop(load(BABY_SRC), bw, bh, bias=BABY_BIAS_PC), strength=0.22
+        cover_crop(load(BABY_SRC), bw, bh, bias=BABY_BIAS_PC), strength=0.16
     )
-    # Soft halo behind Ace (ref has gentle circular glow)
+    # Warm circular halo behind Ace (ref soft yellow-white glow)
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gx, gy = 1310, 280
-    for r, a in ((320, 18), (240, 28), (170, 38)):
-        gd.ellipse([gx - r, gy - r, gx + r, gy + r], fill=(240, 230, 210, a))
-    canvas.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=48)))
+    gx, gy = 1285, 300
+    for r, a in ((400, 24), (300, 36), (210, 50), (140, 58)):
+        gd.ellipse([gx - r, gy - r, gx + r, gy + r], fill=(245, 235, 210, a))
+    canvas.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=52)))
     paste_masked(
         canvas,
         baby,
-        (1035, -20),
-        radial_mask((bw, bh), soft=0.68, rx_scale=1.18, ry_scale=1.08),
+        (920, -30),
+        radial_mask((bw, bh), soft=0.58, rx_scale=1.14, ry_scale=1.08),
         0.99,
     )
 
-    # Pets after Ace but lower — overlap chest/neck, not cheeks (Gemini balance)
+    # Pets after Ace — smaller, flanking chin/chest like ref (cheeks clear)
     dog = night_grade(
-        cover_crop(load_dog(), 420, 420, bias=DOG_BIAS), strength=0.32
+        cover_crop(load_dog(), 310, 310, bias=DOG_BIAS), strength=0.26
     )
-    paste_masked(canvas, dog, (860, 370), radial_mask((420, 420), soft=0.50), 0.96)
+    paste_masked(canvas, dog, (940, 440), radial_mask((310, 310), soft=0.40), 0.95)
 
     cat = night_grade(
-        cover_crop(load("03-cat.png"), 400, 400, bias=(0.52, 0.32)), strength=0.30
+        cover_crop(load("03-cat.png"), 300, 300, bias=(0.52, 0.32)), strength=0.24
     )
-    paste_masked(canvas, cat, (1340, 365), radial_mask((400, 400), soft=0.52), 0.96)
+    paste_masked(canvas, cat, (1410, 420), radial_mask((300, 300), soft=0.42), 0.95)
 
+    # Soft mid feather bridge (family → Ace)
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)
-    for x in range(800, 1120):
-        mid = 960
-        dist = abs(x - mid) / 180
+    for x in range(760, 1100):
+        mid = 930
+        dist = abs(x - mid) / 190
         peak = max(0.0, 1.0 - dist)
-        a = int(10 * peak * peak)
-        bd.line([(x, 0), (x, H)], fill=(30, 50, 55, a))
-    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=16)))
+        a = int(12 * peak * peak)
+        bd.line([(x, 0), (x, H)], fill=(28, 45, 52, a))
+    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=20)))
 
-    calm_wash(canvas, left_w=420, bottom_h=150)
+    calm_wash(canvas, left_w=360, bottom_h=140)
     return canvas.convert("RGB")
 
 
@@ -428,53 +429,57 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
     canvas = city_atmosphere(fam_src, W, H)
     mist_right(canvas)
 
-    # Large family blob — fit height so all 5 faces stay solid; shift LEFT on canvas
-    fw, fh = 980, H - 16
+    # Gemini-match mobile: family left + soft feather; Ace larger on right
+    fw, fh = 880, H - 16
     family = family_plane(
-        fam_src, fw, fh, scale_boost=1.0, anchor_x=0.08, anchor_y=0.55
+        fam_src, fw, fh, scale_boost=1.0, anchor_x=0.10, anchor_y=0.52
     )
     family = ImageEnhance.Brightness(family).enhance(1.06)
     family = ImageEnhance.Color(family).enhance(1.02)
-    fam_mask = soft_right_fade((fw, fh), fade_start=0.90)
-    bot = soft_bottom_fade((fw, fh), fade_start=0.995)
+    fam_mask = soft_right_fade((fw, fh), fade_start=0.72)
+    bot = soft_bottom_fade((fw, fh), fade_start=0.97)
     combined = ImageChops.multiply(fam_mask, bot)
-    # Negative x fills empty dark left; positive y keeps chin above bottom fade
-    paste_masked(canvas, family, (-96, 12), combined, 1.0)
+    paste_masked(canvas, family, (-80, 10), combined, 1.0)
 
-    # Mobile: same Gemini-inspired balance — Ace face clearer, pets lower
+    bw, bh = 600, 660
     baby = night_grade(
-        cover_crop(load(BABY_SRC), 480, 530, bias=BABY_BIAS_PC), strength=0.22
+        cover_crop(load(BABY_SRC), bw, bh, bias=BABY_BIAS_PC), strength=0.16
     )
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gx, gy = 900, 290
+    for r, a in ((320, 22), (240, 34), (160, 46)):
+        gd.ellipse([gx - r, gy - r, gx + r, gy + r], fill=(245, 235, 210, a))
+    canvas.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=42)))
     paste_masked(
         canvas,
         baby,
-        (690, 8),
-        radial_mask((480, 530), soft=0.66, rx_scale=1.15, ry_scale=1.06),
+        (600, -5),
+        radial_mask((bw, bh), soft=0.56, rx_scale=1.12, ry_scale=1.06),
         0.99,
     )
 
     dog = night_grade(
-        cover_crop(load_dog(), 360, 360, bias=DOG_BIAS), strength=0.30
+        cover_crop(load_dog(), 260, 260, bias=DOG_BIAS), strength=0.24
     )
-    paste_masked(canvas, dog, (600, 430), radial_mask((360, 360), soft=0.50), 0.96)
+    paste_masked(canvas, dog, (610, 475), radial_mask((260, 260), soft=0.38), 0.95)
 
     cat = night_grade(
-        cover_crop(load("03-cat.png"), 350, 350, bias=(0.52, 0.30)), strength=0.28
+        cover_crop(load("03-cat.png"), 250, 250, bias=(0.52, 0.30)), strength=0.22
     )
-    paste_masked(canvas, cat, (860, 410), radial_mask((350, 350), soft=0.52), 0.96)
+    paste_masked(canvas, cat, (960, 455), radial_mask((250, 250), soft=0.40), 0.95)
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)
-    for x in range(560, 820):
-        mid = 690
-        dist = abs(x - mid) / 150
+    for x in range(500, 760):
+        mid = 630
+        dist = abs(x - mid) / 140
         peak = max(0.0, 1.0 - dist)
-        a = int(8 * peak * peak)
-        bd.line([(x, 0), (x, H)], fill=(30, 50, 55, a))
-    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=14)))
+        a = int(11 * peak * peak)
+        bd.line([(x, 0), (x, H)], fill=(28, 45, 52, a))
+    canvas.alpha_composite(bridge.filter(ImageFilter.GaussianBlur(radius=16)))
 
-    # Narrower left wash — family now occupies left edge
-    calm_wash(canvas, left_w=160, bottom_h=130)
+    calm_wash(canvas, left_w=140, bottom_h=120)
     return canvas.convert("RGB")
 
 

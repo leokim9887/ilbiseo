@@ -419,6 +419,25 @@ export function useAppState() {
     [persist, state],
   );
 
+  /** Merge imported 지침/습관 rows (exact dupes already filtered by importer). */
+  const addManySideItems = useCallback(
+    (kind: SideListKind, items: SideListItem[]) => {
+      if (items.length === 0) return;
+      const key = sideKey(kind);
+      persist({ ...state, [key]: [...state[key], ...items] });
+    },
+    [persist, state],
+  );
+
+  /** Replace all 지침 or 습관 with imported list (explicit confirm). */
+  const replaceSideItems = useCallback(
+    (kind: SideListKind, items: SideListItem[]) => {
+      const key = sideKey(kind);
+      persist({ ...state, [key]: items });
+    },
+    [persist, state],
+  );
+
   const updateSideItem = useCallback(
     (kind: SideListKind, id: string, patch: Partial<SideListItem>) => {
       const key = sideKey(kind);
@@ -544,6 +563,8 @@ export function useAppState() {
     deleteTasks,
     restoreTasks,
     addSideItem,
+    addManySideItems,
+    replaceSideItems,
     updateSideItem,
     toggleSideItem,
     deleteSideItem,

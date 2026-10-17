@@ -11,7 +11,12 @@ import {
 import { ExcelImport } from "@/components/excel-import";
 import { MemoImport } from "@/components/memo-import";
 import { OcrImport } from "@/components/ocr-import";
-import type { Task, TaskCategory } from "@/lib/types";
+import type {
+  SideListItem,
+  SideListKind,
+  Task,
+  TaskCategory,
+} from "@/lib/types";
 import { ChevronDown, FileSpreadsheet, ImageIcon, StickyNote } from "lucide-react";
 
 interface ToolbarExtrasProps {
@@ -19,7 +24,11 @@ interface ToolbarExtrasProps {
   onImport: (tasks: Task[]) => void;
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
   onReplaceByCategories?: (tasks: Task[]) => void;
+  onImportSide?: (kind: SideListKind, items: SideListItem[]) => void;
+  onReplaceSide?: (kind: SideListKind, items: SideListItem[]) => void;
   existingTasks?: Task[];
+  existingGuidelines?: SideListItem[];
+  existingHabits?: SideListItem[];
   /** 「전체」에서는 엑셀만 (메모·OCR은 틀이 필요) */
   excelOnly?: boolean;
 }
@@ -30,7 +39,11 @@ export function ToolbarExtras({
   onImport,
   onReplaceCategory,
   onReplaceByCategories,
+  onImportSide,
+  onReplaceSide,
   existingTasks,
+  existingGuidelines,
+  existingHabits,
   excelOnly = false,
 }: ToolbarExtrasProps) {
   const [excelOpen, setExcelOpen] = useState(false);
@@ -92,7 +105,11 @@ export function ToolbarExtras({
         onImport={onImport}
         onReplaceCategory={onReplaceCategory}
         onReplaceByCategories={onReplaceByCategories}
+        onImportSide={onImportSide}
+        onReplaceSide={onReplaceSide}
         existingTasks={existingTasks}
+        existingGuidelines={existingGuidelines}
+        existingHabits={existingHabits}
         showTrigger={false}
         open={excelOpen}
         onOpenChange={setExcelOpen}

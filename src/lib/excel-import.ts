@@ -3,6 +3,7 @@ import { createId } from "./id";
 import { clampPriority } from "./priority";
 import { inferGroupKey } from "./sort";
 import {
+  findExactDuplicateTasks,
   findSimilarActiveTasks,
   buildSimilarityAlertMessage,
   type SimilarityHit,
@@ -10,6 +11,8 @@ import {
 import {
   CATEGORY_LABEL,
   parseTaskCategory,
+  type SideListItem,
+  type SideListKind,
   type Task,
   type TaskCategory,
   type TaskKind,
@@ -94,9 +97,13 @@ const HEADER_ALIASES: Record<ImportTargetField, string[]> = {
     "기간",
   ],
   importance: ["중요도", "중요", "importance", "priority"],
+  // 「할 일」시트에서는 완료여부 열 제거 — 예전 파일만 skip
   done: ["완료여부", "완료", "done", "status", "상태", "끝", "끝?"],
   category: ["틀", "분류", "category", "frame", "카테고리"],
 };
+
+/** 지침/습관 시트 「내용」열 */
+const SIDE_TITLE_ALIASES = ["내용", "할일", "할 일", "항목", "제목", "title"];
 
 /** Coerce deprecated urgency mappings to skip (saved localStorage / old flows). */
 export function sanitizeMapping(mapping: ColumnMapping): ColumnMapping {
@@ -123,6 +130,24 @@ export type ParsedWorkbook = {
   sheets: ParsedSheet[];
 };
 
+/** Sheets father may import — everything else is hidden. */
+export const IMPORT_SHEET_ALLOWLIST = ["할 일", "지침", "습관"] as const;
+export type ImportableSheetName = (typeof IMPORT_SHEET_ALLOWLIST)[number];
+
+export type ImportSheetKind = "todo" | "guideline" | "habit";
+
+export function classifyImportSheet(name: string): ImportSheetKind | null {
+  const n = name.replace(/\s+/g, " ").trim();
+  if (n === "할 일" || n === "할일") return "todo";
+  if (n === "지침") return "guideline";
+  if (n === "습관") return "habit";
+  return null;
+}
+
+export function isAllowedImportSheet(name: string): boolean {
+  return classifyImportSheet(name) != null;
+}
+
 export type MappedPreviewRow = {
   title: string;
   memo: string;
@@ -131,9 +156,11 @@ export type MappedPreviewRow = {
   done: boolean;
   category: TaskCategory;
   categoryLabel: string;
-  /** empty title / unusable */
+  /** empty title / exact duplicate / unusable */
   skip: boolean;
-  /** Peers already in the app that look similar (2+ shared words / near-dupe) */
+  /** Exact same as an existing item — blocked from import */
+  exactDuplicate: boolean;
+  /** Peers with 2+ real overlapping words (exact dupes excluded) */
   similarHits: SimilarityHit[];
 };
 
@@ -143,13 +170,14 @@ export function mappingHasCategory(mapping: ColumnMapping): boolean {
 }
 
 /**
- * Father-visible summary when imported rows overlap existing tasks.
- * Uses the same similarity engine as in-app edit alerts (no false loose singles).
+ * Father-visible summary for 2+ word overlaps only (exact dupes are blocked, not alerted here).
  */
 export function summarizeImportSimilarities(
   preview: MappedPreviewRow[],
 ): { count: number; message: string } | null {
-  const withHits = preview.filter((r) => !r.skip && r.similarHits.length > 0);
+  const withHits = preview.filter(
+    (r) => !r.skip && !r.exactDuplicate && r.similarHits.length > 0,
+  );
   if (withHits.length === 0) return null;
   const sample = withHits[0];
   const peerMsg = buildSimilarityAlertMessage(sample.similarHits);
@@ -162,6 +190,17 @@ export function summarizeImportSimilarities(
   return {
     count: withHits.length,
     message: `비슷한 할 일 ${withHits.length}건이 이미 있습니다. 아래 미리보기에서 확인한 뒤 추가하세요.`,
+  };
+}
+
+export function summarizeExactBlocks(
+  preview: MappedPreviewRow[],
+): { count: number; message: string } | null {
+  const blocked = preview.filter((r) => r.exactDuplicate);
+  if (blocked.length === 0) return null;
+  return {
+    count: blocked.length,
+    message: `같은 내용 ${blocked.length}건은 이미 있어서 넣지 않습니다.`,
   };
 }
 
@@ -180,13 +219,14 @@ const TEMPLATE_TITLE_HEADERS = new Set([
   "할일 listup",
 ]);
 
-export function suggestFieldForHeader(header: string): ImportField {
+export function suggestFieldForHeader(
+  header: string,
+  sheetKind: ImportSheetKind = "todo",
+): ImportField {
   const n = normalizeHeader(header);
   if (!n) return "skip";
-  // Prefer exact template match for title
-  if (TEMPLATE_TITLE_HEADERS.has(n) || n === "할 일" || n === "할일") {
-    return "title";
-  }
+  // 순서 열은 무시
+  if (n === "순서" || n === "순" || n === "no" || n === "#") return "skip";
   // 시급성 열은 조용히 무시 (예전 파일 호환)
   if (
     URGENCY_HEADER_ALIASES.some(
@@ -195,7 +235,32 @@ export function suggestFieldForHeader(header: string): ImportField {
   ) {
     return "skip";
   }
+  // 「할 일」: 완료여부 열은 더 이상 쓰지 않음 (예전 파일 skip)
+  if (
+    sheetKind === "todo" &&
+    (n === "완료여부" || n === "완료" || n === "done")
+  ) {
+    return "skip";
+  }
+  // Prefer exact template match for title
+  if (TEMPLATE_TITLE_HEADERS.has(n) || n === "할 일" || n === "할일") {
+    return "title";
+  }
+  if (sheetKind !== "todo") {
+    if (SIDE_TITLE_ALIASES.some((a) => n === a || n.includes(a))) {
+      return "title";
+    }
+  }
   for (const field of IMPORT_TARGET_FIELDS) {
+    // Side sheets: ignore deadline/importance/category
+    if (
+      sheetKind !== "todo" &&
+      (field === "deadline" ||
+        field === "importance" ||
+        field === "category")
+    ) {
+      continue;
+    }
     const aliases = HEADER_ALIASES[field];
     if (
       aliases.some(
@@ -205,16 +270,17 @@ export function suggestFieldForHeader(header: string): ImportField {
       return field;
     }
   }
-  // 순서 열은 무시
-  if (n === "순서" || n === "순" || n === "no" || n === "#") return "skip";
   return "skip";
 }
 
-export function autoMapHeaders(headers: string[]): ColumnMapping {
+export function autoMapHeaders(
+  headers: string[],
+  sheetKind: ImportSheetKind = "todo",
+): ColumnMapping {
   const used = new Set<ImportField>();
   const mapping: ColumnMapping = {};
   for (const h of headers) {
-    const suggested = suggestFieldForHeader(h);
+    const suggested = suggestFieldForHeader(h, sheetKind);
     if (suggested !== "skip" && used.has(suggested)) {
       mapping[h] = "skip";
       continue;
@@ -273,8 +339,9 @@ export function saveMapping(mapping: ColumnMapping): void {
 export function applySavedOrAuto(
   headers: string[],
   saved: ColumnMapping | null,
+  sheetKind: ImportSheetKind = "todo",
 ): ColumnMapping {
-  const auto = autoMapHeaders(headers);
+  const auto = autoMapHeaders(headers, sheetKind);
   if (!saved) return auto;
   const cleaned = sanitizeMapping(saved);
   const byNorm = new Map<string, ImportField>();
@@ -322,19 +389,41 @@ function excelSerialToIso(serial: number): string | null {
   return null;
 }
 
-/** Date → YYYY-MM-DD using UTC (export writes UTC midnight). */
-function dateToIsoUtc(d: Date): string | null {
+/**
+ * Date → YYYY-MM-DD (KST-safe).
+ * - Our export writes UTC midnight → use UTC parts.
+ * - Excel/Office on father’s PC often yields **local** midnight → use local parts
+ *   (UTC getters would shift one day early in KST).
+ */
+export function dateToIsoCalendar(d: Date): string | null {
   if (Number.isNaN(d.getTime())) return null;
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
+  const utcMid =
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0;
+  const localMid =
+    d.getHours() === 0 &&
+    d.getMinutes() === 0 &&
+    d.getSeconds() === 0 &&
+    d.getMilliseconds() === 0;
+  if (utcMid && !localMid) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  // Prefer local calendar day (father typed date in Excel)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
 function cellToString(v: unknown): string {
   if (v == null) return "";
   if (v instanceof Date) {
-    return dateToIsoUtc(v) ?? "";
+    return dateToIsoCalendar(v) ?? "";
   }
   if (typeof v === "number" && Number.isFinite(v)) {
     const iso = excelSerialToIso(v);
@@ -523,7 +612,6 @@ export function buildPreviewRows(
   const memoCol = fieldOf("memo");
   const deadlineCol = fieldOf("deadline");
   const importanceCol = fieldOf("importance");
-  const doneCol = fieldOf("done");
   const categoryCol = fieldOf("category");
   const peers = existingTasks.filter((t) => t.status === "active");
 
@@ -539,13 +627,17 @@ export function buildPreviewRows(
       importanceCol ? cellToString(row[importanceCol]) : 2,
       2,
     );
-    const done = doneCol ? parseDone(cellToString(row[doneCol])) : false;
     const category = categoryCol
       ? parseTaskCategory(cellToString(row[categoryCol]))
       : defaultCategory;
+    const exactDuplicate =
+      Boolean(title) &&
+      findExactDuplicateTasks({ title, memo }, peers).length > 0;
     const similarHits =
-      title && !done
-        ? findSimilarActiveTasks({ title, memo }, peers)
+      title && !exactDuplicate
+        ? findSimilarActiveTasks({ title, memo }, peers).filter(
+            (h) => h.sharedTokens.length >= 2,
+          )
         : [];
 
     return {
@@ -553,10 +645,11 @@ export function buildPreviewRows(
       memo,
       deadlineLabel: dl.label,
       importance,
-      done,
+      done: false,
       category,
       categoryLabel: CATEGORY_LABEL[category],
-      skip: !title,
+      skip: !title || exactDuplicate,
+      exactDuplicate,
       similarHits,
     };
   });
@@ -567,6 +660,7 @@ export function sheetToTasks(
   sheet: ParsedSheet,
   mapping: ColumnMapping,
   defaultCategory: TaskCategory,
+  existingTasks: readonly Task[] = [],
 ): Task[] {
   const clean = sanitizeMapping(mapping);
   const fieldOf = (field: ImportField): string | null => {
@@ -579,9 +673,9 @@ export function sheetToTasks(
   const memoCol = fieldOf("memo");
   const deadlineCol = fieldOf("deadline");
   const importanceCol = fieldOf("importance");
-  const doneCol = fieldOf("done");
   const categoryCol = fieldOf("category");
   const now = new Date().toISOString();
+  const peers = existingTasks.filter((t) => t.status === "active");
 
   return sheet.rows
     .map((row) => {
@@ -591,6 +685,10 @@ export function sheetToTasks(
       const memo = [splitMemo, memoFromCol].filter(Boolean).join("\n");
       const title = splitTitle || titleRaw.trim();
       if (!title) return null;
+      // Exact duplicate → block (cannot add)
+      if (findExactDuplicateTasks({ title, memo }, peers).length > 0) {
+        return null;
+      }
 
       const deadlineRaw = deadlineCol ? cellToString(row[deadlineCol]) : "";
       const dl = parseDeadline(deadlineRaw);
@@ -598,7 +696,6 @@ export function sheetToTasks(
         importanceCol ? cellToString(row[importanceCol]) : 2,
         2,
       );
-      const done = doneCol ? parseDone(cellToString(row[doneCol])) : false;
       const category = categoryCol
         ? parseTaskCategory(cellToString(row[categoryCol]))
         : defaultCategory;
@@ -610,29 +707,156 @@ export function sheetToTasks(
         kind: dl.kind,
         startDate: dl.startDate,
         targetDate: dl.targetDate,
-        // 시급성 열은 무시 — 기본값만 저장 (JSON 호환)
         urgency: 1,
         importance,
         groupKey: inferGroupKey(title),
         memo,
         source: "import",
-        status: done ? "completed" : "active",
+        status: "active",
         createdAt: now,
-        completedAt: done ? now : null,
+        completedAt: null,
       };
       return task;
     })
     .filter((t): t is Task => t != null);
 }
 
+/** 지침 / 습관 sheet → SideListItem[] (exact dupes blocked). */
+export function sheetToSideItems(
+  sheet: ParsedSheet,
+  mapping: ColumnMapping,
+  existing: readonly SideListItem[] = [],
+): SideListItem[] {
+  const clean = sanitizeMapping(mapping);
+  const fieldOf = (field: ImportField): string | null => {
+    const entry = Object.entries(clean).find(([, f]) => f === field);
+    return entry ? entry[0] : null;
+  };
+  const titleCol = fieldOf("title");
+  if (!titleCol) return [];
+  const memoCol = fieldOf("memo");
+  const doneCol = fieldOf("done");
+  const now = new Date().toISOString();
+  const openExisting = existing.filter((i) => !i.done);
+
+  return sheet.rows
+    .map((row) => {
+      const title = cellToString(row[titleCol]).trim();
+      if (!title) return null;
+      const memo = memoCol ? cellToString(row[memoCol]) : "";
+      if (
+        findExactDuplicateTasks(
+          { title, memo },
+          openExisting.map((i) => ({
+            id: i.id,
+            title: i.title,
+            memo: i.memo,
+            category: "work" as TaskCategory,
+            kind: "someday" as TaskKind,
+            startDate: null,
+            targetDate: null,
+            urgency: 1,
+            importance: 1,
+            groupKey: "",
+            source: "manual" as const,
+            status: "active" as const,
+            createdAt: i.createdAt,
+            completedAt: null,
+          })),
+        ).length > 0
+      ) {
+        return null;
+      }
+      const done = doneCol ? parseDone(cellToString(row[doneCol])) : false;
+      const item: SideListItem = {
+        id: createId(),
+        title,
+        memo,
+        done,
+        createdAt: now,
+        completedAt: done ? now : null,
+      };
+      return item;
+    })
+    .filter((i): i is SideListItem => i != null);
+}
+
+export function buildSidePreviewRows(
+  sheet: ParsedSheet,
+  mapping: ColumnMapping,
+  existing: readonly SideListItem[] = [],
+): MappedPreviewRow[] {
+  const clean = sanitizeMapping(mapping);
+  const fieldOf = (field: ImportField): string | null => {
+    const entry = Object.entries(clean).find(([, f]) => f === field);
+    return entry ? entry[0] : null;
+  };
+  const titleCol = fieldOf("title");
+  const memoCol = fieldOf("memo");
+  const peersAsTasks: Task[] = existing
+    .filter((i) => !i.done)
+    .map((i) => ({
+      id: i.id,
+      title: i.title,
+      memo: i.memo,
+      category: "work",
+      kind: "someday",
+      startDate: null,
+      targetDate: null,
+      urgency: 1,
+      importance: 1,
+      groupKey: "",
+      source: "manual",
+      status: "active",
+      createdAt: i.createdAt,
+      completedAt: null,
+    }));
+
+  return sheet.rows.map((row) => {
+    const title = titleCol ? cellToString(row[titleCol]).trim() : "";
+    const memo = memoCol ? cellToString(row[memoCol]) : "";
+    const exactDuplicate =
+      Boolean(title) &&
+      findExactDuplicateTasks({ title, memo }, peersAsTasks).length > 0;
+    const similarHits =
+      title && !exactDuplicate
+        ? findSimilarActiveTasks({ title, memo }, peersAsTasks).filter(
+            (h) => h.sharedTokens.length >= 2,
+          )
+        : [];
+    return {
+      title,
+      memo,
+      deadlineLabel: "",
+      importance: 0,
+      done: false,
+      category: "work",
+      categoryLabel: "",
+      skip: !title || exactDuplicate,
+      exactDuplicate,
+      similarHits,
+    };
+  });
+}
+
+export function sideKindFromSheet(
+  kind: ImportSheetKind,
+): SideListKind | null {
+  if (kind === "guideline") return "guideline";
+  if (kind === "habit") return "habit";
+  return null;
+}
+
 /**
  * Prefer raw Date/serial over locale-formatted text (avoids m/d/yy → 「언젠가」).
- * Keep formatted `w` when it encodes a range (`~`) from our export numFmt.
+ * Keep formatted `w` when it encodes a range (`~`) or unambiguous YYYY-MM-DD.
  */
 function extractSheetCell(cell: XLSX.CellObject | undefined): unknown {
   if (!cell) return "";
   const w = typeof cell.w === "string" ? cell.w.trim() : "";
   if (w && /[~～〜]/.test(w)) return w;
+  // Unambiguous calendar text beats timezone-shifting Date objects
+  if (w && /^\d{4}-\d{2}-\d{2}$/.test(w)) return w;
   if (cell.v instanceof Date) return cell.v;
   if (typeof cell.v === "number" && Number.isFinite(cell.v)) return cell.v;
   if (typeof cell.v === "boolean") return cell.v ? "true" : "";
@@ -717,6 +941,7 @@ export async function parseExcelFile(file: File): Promise<ParsedWorkbook> {
 
   const sheets: ParsedSheet[] = [];
   for (const sheetName of wb.SheetNames) {
+    if (!isAllowedImportSheet(sheetName)) continue;
     const ws = wb.Sheets[sheetName];
     if (!ws) continue;
     const parsed = sheetFromWorksheet(sheetName, ws);
@@ -724,18 +949,22 @@ export async function parseExcelFile(file: File): Promise<ParsedWorkbook> {
   }
 
   if (sheets.length === 0) {
-    throw new Error("읽을 수 있는 표가 없습니다. 첫 줄에 열 이름이 있는지 확인해 주세요.");
+    throw new Error(
+      "가져올 시트가 없습니다. 「할 일」·「지침」·「습관」만 불러올 수 있습니다.",
+    );
   }
 
   return { fileName: name, sheets };
 }
 
-/** Prefer 「할 일」 sheet when present. */
+/** Prefer 「할 일」 then 지침 · 습관. */
 export function pickDefaultSheetIndex(sheets: ParsedSheet[]): number {
-  const prefer = ["할 일", "할일", "todo", "to do", "to-do"];
-  for (let i = 0; i < sheets.length; i++) {
-    const n = sheets[i].name.trim().toLowerCase();
-    if (prefer.some((p) => n === p || n.includes(p))) return i;
+  const order = ["할 일", "할일", "지침", "습관"];
+  for (const want of order) {
+    const i = sheets.findIndex(
+      (s) => s.name.replace(/\s+/g, " ").trim() === want,
+    );
+    if (i >= 0) return i;
   }
   return 0;
 }

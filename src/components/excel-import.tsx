@@ -14,6 +14,8 @@ import {
 import {
   applySavedOrAuto,
   buildPreviewRows,
+  buildSidePreviewRows,
+  classifyImportSheet,
   IMPORT_FIELD_LABEL,
   IMPORT_TARGET_FIELDS,
   isImportTargetField,
@@ -24,28 +26,42 @@ import {
   parseExcelFile,
   pickDefaultSheetIndex,
   saveMapping,
+  sheetToSideItems,
   sheetToTasks,
+  sideKindFromSheet,
+  summarizeExactBlocks,
   summarizeImportSimilarities,
   type ColumnMapping,
   type ImportField,
+  type ImportSheetKind,
   type ParsedSheet,
   type ParsedWorkbook,
 } from "@/lib/excel-import";
-import { CATEGORY_LABEL, type Task, type TaskCategory } from "@/lib/types";
+import {
+  CATEGORY_LABEL,
+  type SideListItem,
+  type SideListKind,
+  type Task,
+  type TaskCategory,
+} from "@/lib/types";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 
 type Step = "pick" | "sheet" | "map" | "preview";
 type ImportMode = "merge" | "replace";
 
+const SELECT_CLASS =
+  "h-11 w-full rounded-sm border border-[#8a939a] bg-white px-2.5 text-[15px] text-[#1a1f1c] dark:border-[#4a5c52] dark:bg-[#1c2621] dark:text-[#e8eee9]";
+
 interface ExcelImportProps {
   onImport: (tasks: Task[]) => void;
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
-  /** Replace by each row's 틀 (Excel 「틀」) — preferred when 틀 column present */
   onReplaceByCategories?: (tasks: Task[]) => void;
+  onImportSide?: (kind: SideListKind, items: SideListItem[]) => void;
+  onReplaceSide?: (kind: SideListKind, items: SideListItem[]) => void;
   category: TaskCategory;
-  /** Active tasks already in the app — for similar-content notice */
   existingTasks?: Task[];
-  /** false면 툴바 트리거 없이 open/onOpenChange로만 연다 */
+  existingGuidelines?: SideListItem[];
+  existingHabits?: SideListItem[];
   showTrigger?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -55,8 +71,12 @@ export function ExcelImport({
   onImport,
   onReplaceCategory,
   onReplaceByCategories,
+  onImportSide,
+  onReplaceSide,
   category,
   existingTasks = [],
+  existingGuidelines = [],
+  existingHabits = [],
   showTrigger = true,
   open: openProp,
   onOpenChange,
@@ -77,27 +97,44 @@ export function ExcelImport({
   const open = controlled ? openProp : uncontrolledOpen;
 
   const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
-  const hasFrameCol = mappingHasCategory(mapping);
+  const sheetKind: ImportSheetKind =
+    (sheet && classifyImportSheet(sheet.name)) || "todo";
+  const isSide = sheetKind !== "todo";
+  const hasFrameCol = !isSide && mappingHasCategory(mapping);
+
+  const sideExisting =
+    sheetKind === "guideline"
+      ? existingGuidelines
+      : sheetKind === "habit"
+        ? existingHabits
+        : [];
 
   const preview = useMemo(() => {
     if (!sheet) return [];
+    if (isSide) return buildSidePreviewRows(sheet, mapping, sideExisting);
     return buildPreviewRows(sheet, mapping, category, existingTasks);
-  }, [sheet, mapping, category, existingTasks]);
+  }, [sheet, mapping, category, existingTasks, isSide, sideExisting]);
 
   const usableCount = preview.filter((r) => !r.skip).length;
+  const blockedExact = preview.filter((r) => r.exactDuplicate).length;
   const similaritySummary = useMemo(
     () => summarizeImportSimilarities(preview),
     [preview],
   );
+  const exactSummary = useMemo(
+    () => summarizeExactBlocks(preview),
+    [preview],
+  );
 
   const frameCounts = useMemo(() => {
+    if (isSide) return [];
     const counts = new Map<TaskCategory, number>();
     for (const r of preview) {
       if (r.skip) continue;
       counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
     }
     return [...counts.entries()];
-  }, [preview]);
+  }, [preview, isSide]);
 
   const reset = () => {
     setStep("pick");
@@ -124,9 +161,14 @@ export function ExcelImport({
       setError("시트를 찾지 못했습니다.");
       return;
     }
-    const saved = loadSavedMapping();
-    const nextMap = applySavedOrAuto(s.headers, saved);
+    const kind = classifyImportSheet(s.name) ?? "todo";
+    const saved = kind === "todo" ? loadSavedMapping() : null;
+    const nextMap = applySavedOrAuto(s.headers, saved, kind);
     setMapping(nextMap);
+    if (kind !== "todo") {
+      setStep(mappingHasTitle(nextMap) ? "preview" : "map");
+      return;
+    }
     if (isIlbiseoTemplate(s.headers) && mappingHasTitle(nextMap)) {
       setStep("preview");
     } else {
@@ -157,7 +199,6 @@ export function ExcelImport({
   };
 
   const setFieldMapping = (header: string, field: ImportField) => {
-    // 시급성은 매핑 UI에 없음 — 들어오면 skip
     const resolved: ImportField =
       field !== "skip" && !isImportTargetField(field) ? "skip" : field;
     setMapping((prev) => {
@@ -175,28 +216,52 @@ export function ExcelImport({
   const handleCommit = () => {
     if (!sheet) return;
     if (!mappingHasTitle(mapping)) {
-      setError("「할 일」열을 하나 지정해 주세요.");
+      setError("「할 일」또는 「내용」열을 지정해 주세요.");
       return;
     }
     if (usableCount === 0) {
-      setError("가져올 할 일이 없습니다.");
+      setError(
+        blockedExact > 0
+          ? "같은 내용만 있어서 넣을 행이 없습니다."
+          : "가져올 행이 없습니다.",
+      );
       return;
     }
-    if (mode === "replace") {
-      if (!replaceConfirm) {
-        setError("바꾸려면 「정말 바꿀게요」를 체크해 주세요.");
-        return;
-      }
-      const canReplace =
-        (hasFrameCol && onReplaceByCategories) || onReplaceCategory;
-      if (!canReplace) {
-        setError("바꾸기를 쓸 수 없습니다.");
-        return;
-      }
+    if (mode === "replace" && !replaceConfirm) {
+      setError("바꾸려면 「정말 바꿀게요」를 체크해 주세요.");
+      return;
     }
 
     try {
-      const tasks = sheetToTasks(sheet, mapping, category);
+      if (isSide) {
+        const sideKind = sideKindFromSheet(sheetKind);
+        if (!sideKind) {
+          setError("시트 종류를 알 수 없습니다.");
+          return;
+        }
+        const items = sheetToSideItems(sheet, mapping, sideExisting);
+        if (items.length === 0) {
+          setError("가져올 행이 없습니다.");
+          return;
+        }
+        if (mode === "replace") {
+          if (!onReplaceSide) {
+            setError("바꾸기를 쓸 수 없습니다.");
+            return;
+          }
+          onReplaceSide(sideKind, items);
+        } else {
+          if (!onImportSide) {
+            setError("지침·습관 가져오기를 쓸 수 없습니다.");
+            return;
+          }
+          onImportSide(sideKind, items);
+        }
+        handleOpenChange(false);
+        return;
+      }
+
+      const tasks = sheetToTasks(sheet, mapping, category, existingTasks);
       if (tasks.length === 0) {
         setError("가져올 할 일이 없습니다.");
         return;
@@ -207,6 +272,9 @@ export function ExcelImport({
           onReplaceByCategories(tasks);
         } else if (onReplaceCategory) {
           onReplaceCategory(category, tasks);
+        } else {
+          setError("바꾸기를 쓸 수 없습니다.");
+          return;
         }
       } else {
         onImport(tasks);
@@ -217,12 +285,12 @@ export function ExcelImport({
     }
   };
 
-  const description =
-    step === "pick" || step === "sheet"
-      ? "「할 일」시트를 고르면 엑셀 「틀」칸대로 넣습니다. (.xlsx · .xls · .csv)"
-      : hasFrameCol
-        ? "엑셀 「틀」칸대로 업무·개인·과제·팀원에 넣습니다. 「전체」에서도 보입니다."
-        : `틀 열이 없으면 「${CATEGORY_LABEL[category]}」에 추가합니다.`;
+  const sheetLabel =
+    sheetKind === "guideline"
+      ? "지침"
+      : sheetKind === "habit"
+        ? "습관"
+        : "할 일";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -233,7 +301,7 @@ export function ExcelImport({
               type="button"
               variant="outline"
               size="sm"
-              className="h-11 min-h-11 touch-manipulation rounded-sm border-[#8a939a] bg-white px-3 sm:h-9 sm:min-h-9"
+              className="h-11 min-h-11 touch-manipulation rounded-sm border-[#8a939a] bg-white px-3 sm:h-9 sm:min-h-9 dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8eee9]"
               data-excel-import
             >
               <FileSpreadsheet className="size-3.5" />
@@ -242,10 +310,12 @@ export function ExcelImport({
           }
         />
       ) : null}
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg dark:border-[#3d4a44] dark:bg-[#15201b]">
         <DialogHeader>
           <DialogTitle>엑셀 불러오기</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription>
+            「할 일」·「지침」·「습관」만 가져옵니다.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -275,13 +345,14 @@ export function ExcelImport({
           ) : null}
 
           {step === "sheet" && workbook ? (
-            <div className="space-y-2">
+            <div className="space-y-2" data-excel-import-sheet-pick>
               <p className="text-[14px] text-[var(--ink)]">시트 선택</p>
               <select
                 value={sheetIndex}
                 onChange={(e) => setSheetIndex(Number(e.target.value))}
-                className="h-11 w-full rounded-sm border border-[#8a939a] bg-white px-2.5 text-[15px]"
+                className={SELECT_CLASS}
                 aria-label="가져올 시트"
+                data-excel-import-sheet-select
               >
                 {workbook.sheets.map((s, i) => (
                   <option key={`${s.name}-${i}`} value={i}>
@@ -302,23 +373,26 @@ export function ExcelImport({
           {step === "map" && sheet ? (
             <div className="space-y-2">
               <p className="text-[13px] text-[var(--ink-muted)]">
-                열이 달라요. 아빠 열 → 우리 칸
+                아빠 열 → 우리 칸
               </p>
-              <div className="overflow-x-auto rounded-sm border border-[#9aa5ad]">
+              <div className="overflow-x-auto rounded-sm border border-[#9aa5ad] dark:border-[#4a5c52]">
                 <table className="w-full min-w-[280px] text-left text-[14px]">
-                  <thead className="bg-[#f3f3f3]">
+                  <thead className="bg-[#f3f3f3] dark:bg-[#24302a]">
                     <tr>
-                      <th className="border-b border-[#9aa5ad] px-2 py-1.5 font-semibold">
+                      <th className="border-b border-[#9aa5ad] px-2 py-1.5 font-semibold dark:border-[#4a5c52]">
                         아빠 열
                       </th>
-                      <th className="border-b border-[#9aa5ad] px-2 py-1.5 font-semibold">
+                      <th className="border-b border-[#9aa5ad] px-2 py-1.5 font-semibold dark:border-[#4a5c52]">
                         우리 칸
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {sheet.headers.map((h) => (
-                      <tr key={h} className="border-b border-[#d0d5d9]">
+                      <tr
+                        key={h}
+                        className="border-b border-[#d0d5d9] dark:border-[#3d4a44]"
+                      >
                         <td className="px-2 py-1.5 align-middle">{h}</td>
                         <td className="px-2 py-1.5">
                           <select
@@ -333,13 +407,23 @@ export function ExcelImport({
                                 e.target.value as ImportField,
                               )
                             }
-                            className="h-9 w-full min-w-[7.5rem] rounded-sm border border-[#8a939a] bg-white px-2 text-[14px]"
+                            className={`${SELECT_CLASS} h-9 min-w-[7.5rem] text-[14px]`}
                             aria-label={`${h} 매핑`}
                           >
                             <option value="skip">
                               {IMPORT_FIELD_LABEL.skip}
                             </option>
-                            {IMPORT_TARGET_FIELDS.map((f) => (
+                            {IMPORT_TARGET_FIELDS.filter((f) => {
+                              if (isSide) {
+                                return (
+                                  f === "title" ||
+                                  f === "memo" ||
+                                  f === "done"
+                                );
+                              }
+                              // 할 일: 완료여부 매핑 UI 숨김
+                              return f !== "done";
+                            }).map((f) => (
                               <option key={f} value={f}>
                                 {IMPORT_FIELD_LABEL[f]}
                               </option>
@@ -351,11 +435,6 @@ export function ExcelImport({
                   </tbody>
                 </table>
               </div>
-              {!mappingHasTitle(mapping) ? (
-                <p className="text-[13px] text-destructive">
-                  「할 일」열을 골라 주세요.
-                </p>
-              ) : null}
               <Button
                 type="button"
                 className="h-11 w-full touch-manipulation"
@@ -371,9 +450,10 @@ export function ExcelImport({
           ) : null}
 
           {step === "preview" && sheet ? (
-            <div className="space-y-2">
+            <div className="space-y-2" data-excel-import-preview>
               <p className="text-[14px] font-medium text-[var(--ink)]">
-                {usableCount}건 · 기존 목록에 추가
+                {sheetLabel} {usableCount}건 추가
+                {blockedExact > 0 ? ` · 같은 내용 ${blockedExact}건 제외` : ""}
               </p>
 
               {hasFrameCol && frameCounts.length > 0 ? (
@@ -383,20 +463,24 @@ export function ExcelImport({
                 >
                   틀:{" "}
                   {frameCounts
-                    .map(
-                      ([cat, n]) => `${CATEGORY_LABEL[cat]} ${n}건`,
-                    )
+                    .map(([cat, n]) => `${CATEGORY_LABEL[cat]} ${n}건`)
                     .join(" · ")}
                 </p>
-              ) : (
-                <p className="text-[13px] text-[var(--ink-muted)]">
-                  → {CATEGORY_LABEL[category]}
-                </p>
-              )}
+              ) : null}
+
+              {exactSummary ? (
+                <div
+                  className="rounded-sm border border-[#8a939a]/40 bg-[#f0f2f1] px-2.5 py-2 text-[13px] text-[var(--ink-muted)] dark:border-[#4a5c52] dark:bg-[#24302a]"
+                  role="status"
+                  data-excel-import-exact
+                >
+                  {exactSummary.message}
+                </div>
+              ) : null}
 
               {similaritySummary ? (
                 <div
-                  className="rounded-sm border border-[#b42318]/35 bg-[#fff8f7] px-2.5 py-2 text-[13px] text-[#7a1f16]"
+                  className="rounded-sm border border-[#b42318]/35 bg-[#fff8f7] px-2.5 py-2 text-[13px] text-[#7a1f16] dark:border-[#c45c52]/50 dark:bg-[#2a1a18] dark:text-[#f0c4be]"
                   role="status"
                   data-excel-import-similar
                 >
@@ -405,28 +489,27 @@ export function ExcelImport({
               ) : null}
 
               {usableCount === 0 ? (
-                <div className="rounded-sm border border-dashed border-[#9aa5ad] bg-[#f7f8f9] px-3 py-6 text-center text-[14px] text-[var(--ink-muted)]">
+                <div className="rounded-sm border border-dashed border-[#9aa5ad] bg-[#f7f8f9] px-3 py-6 text-center text-[14px] text-[var(--ink-muted)] dark:border-[#4a5c52] dark:bg-[#1c2621]">
                   가져올 행이 없습니다.
                 </div>
               ) : (
-                <div className="max-h-52 overflow-auto rounded-sm border border-[#9aa5ad]">
-                  <table className="w-full min-w-[400px] text-left text-[13px]">
-                    <thead className="sticky top-0 bg-[#f3f3f3]">
+                <div className="max-h-52 overflow-auto rounded-sm border border-[#9aa5ad] dark:border-[#4a5c52]">
+                  <table className="w-full min-w-[320px] text-left text-[13px]">
+                    <thead className="sticky top-0 bg-[#f3f3f3] dark:bg-[#24302a]">
                       <tr>
-                        <th className="border-b border-[#9aa5ad] px-2 py-1">
-                          할 일
+                        <th className="border-b border-[#9aa5ad] px-2 py-1 dark:border-[#4a5c52]">
+                          {isSide ? "내용" : "할 일"}
                         </th>
                         {hasFrameCol ? (
-                          <th className="border-b border-[#9aa5ad] px-2 py-1">
+                          <th className="border-b border-[#9aa5ad] px-2 py-1 dark:border-[#4a5c52]">
                             틀
                           </th>
                         ) : null}
-                        <th className="border-b border-[#9aa5ad] px-2 py-1">
-                          마감
-                        </th>
-                        <th className="border-b border-[#9aa5ad] px-2 py-1">
-                          중요
-                        </th>
+                        {!isSide ? (
+                          <th className="border-b border-[#9aa5ad] px-2 py-1 dark:border-[#4a5c52]">
+                            마감
+                          </th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -436,15 +519,15 @@ export function ExcelImport({
                         .map((r, i) => (
                           <tr
                             key={`${r.title}-${i}`}
-                            className="border-b border-[#e0e4e7]"
+                            className="border-b border-[#e0e4e7] dark:border-[#3d4a44]"
                             data-excel-import-similar-row={
                               r.similarHits.length > 0 ? "1" : undefined
                             }
                           >
-                            <td className="max-w-[10rem] truncate px-2 py-1">
+                            <td className="max-w-[12rem] truncate px-2 py-1">
                               {r.title}
                               {r.similarHits.length > 0 ? (
-                                <span className="ml-1 text-[11px] text-[#b42318]">
+                                <span className="ml-1 text-[11px] text-[#b42318] dark:text-[#f0a8a0]">
                                   (비슷함)
                                 </span>
                               ) : null}
@@ -454,10 +537,14 @@ export function ExcelImport({
                                 {r.categoryLabel}
                               </td>
                             ) : null}
-                            <td className="whitespace-nowrap px-2 py-1">
-                              {r.deadlineLabel}
-                            </td>
-                            <td className="px-2 py-1">{r.importance}</td>
+                            {!isSide ? (
+                              <td
+                                className="whitespace-nowrap px-2 py-1"
+                                data-excel-import-deadline
+                              >
+                                {r.deadlineLabel}
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                     </tbody>
@@ -474,7 +561,7 @@ export function ExcelImport({
                   목록 비우고 바꾸기…
                 </button>
               ) : (
-                <div className="space-y-2 rounded-sm border border-[#b42318]/30 bg-[#fff8f7] px-2.5 py-2">
+                <div className="space-y-2 rounded-sm border border-[#b42318]/30 bg-[#fff8f7] px-2.5 py-2 dark:border-[#c45c52]/40 dark:bg-[#2a1a18]">
                   <label className="flex cursor-pointer items-start gap-2 text-[13px]">
                     <input
                       type="radio"
@@ -499,13 +586,15 @@ export function ExcelImport({
                       }}
                     />
                     <span>
-                      {hasFrameCol
-                        ? "엑셀에 있는 틀만 이 목록으로 바꾸기"
-                        : "현재 틀을 이 목록으로 바꾸기"}
+                      {isSide
+                        ? `${sheetLabel}을 이 목록으로 바꾸기`
+                        : hasFrameCol
+                          ? "엑셀에 있는 틀만 바꾸기"
+                          : "현재 틀을 바꾸기"}
                     </span>
                   </label>
                   {mode === "replace" ? (
-                    <label className="flex cursor-pointer items-start gap-2 text-[13px] text-[#b42318]">
+                    <label className="flex cursor-pointer items-start gap-2 text-[13px] text-[#b42318] dark:text-[#f0a8a0]">
                       <input
                         type="checkbox"
                         className="mt-0.5"
@@ -526,17 +615,11 @@ export function ExcelImport({
                 className="text-[13px] text-[var(--ink-muted)] underline-offset-2 hover:underline"
                 onClick={() => {
                   setError(null);
-                  if (sheet && !isIlbiseoTemplate(sheet.headers)) {
-                    setStep("map");
-                  } else {
-                    reset();
-                    setStep("pick");
-                  }
+                  reset();
+                  setStep("pick");
                 }}
               >
-                {sheet && !isIlbiseoTemplate(sheet.headers)
-                  ? "열 다시 맞추기"
-                  : "다른 파일"}
+                다른 파일
               </button>
             </div>
           ) : null}
@@ -552,7 +635,7 @@ export function ExcelImport({
           <Button
             type="button"
             variant="outline"
-            className="h-11 touch-manipulation"
+            className="h-11 touch-manipulation dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8eee9]"
             onClick={() => handleOpenChange(false)}
           >
             취소

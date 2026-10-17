@@ -18,6 +18,8 @@ import {
   isTaskCategory,
   type CalendarEvent,
   type FrameId,
+  type SideListItem,
+  type SideListKind,
   type Task,
   type TaskCategory,
 } from "@/lib/types";
@@ -204,6 +206,16 @@ interface ExcelWorkbookProps {
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
   /** 엑셀 「틀」칸별 교체 */
   onReplaceByCategories?: (tasks: Task[]) => void;
+  onImportSide?: (
+    kind: SideListKind,
+    items: SideListItem[],
+  ) => void;
+  onReplaceSide?: (
+    kind: SideListKind,
+    items: SideListItem[],
+  ) => void;
+  guidelines?: SideListItem[];
+  habits?: SideListItem[];
   calendarEvents?: CalendarEvent[];
 }
 
@@ -225,6 +237,10 @@ export function ExcelWorkbook({
   onImport,
   onReplaceCategory,
   onReplaceByCategories,
+  onImportSide,
+  onReplaceSide,
+  guidelines = [],
+  habits = [],
   calendarEvents = [],
 }: ExcelWorkbookProps) {
   const isGcal = frame === "gcal";
@@ -801,7 +817,11 @@ export function ExcelWorkbook({
                 onImport={onImport}
                 onReplaceCategory={onReplaceCategory}
                 onReplaceByCategories={onReplaceByCategories}
+                onImportSide={onImportSide}
+                onReplaceSide={onReplaceSide}
                 existingTasks={similarityPeers}
+                existingGuidelines={guidelines}
+                existingHabits={habits}
                 excelOnly={isAll}
               />
             ) : null}

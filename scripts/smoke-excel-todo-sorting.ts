@@ -130,12 +130,15 @@ async function main() {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
 
-  const wantFilter: Record<string, boolean> = {
+  const wantFilterTodo: Record<string, boolean> = {
     순서: false,
     틀: true,
     "할일 LIST UP": false,
     마감목표: true,
     중요도: true,
+  };
+  const wantFilterDone: Record<string, boolean> = {
+    ...wantFilterTodo,
     완료여부: false,
   };
 
@@ -149,22 +152,23 @@ async function main() {
     ok(`sheet-${name}`, Boolean(sh), null);
     const table = sh!.getTable(tableNameBySheet[name]);
     ok(`table-${name}`, Boolean(table), tableNameBySheet[name]);
+    const want = name === "할 일" ? wantFilterTodo : wantFilterDone;
+    const colCount = Object.keys(want).length;
     const buttons: Record<string, boolean> = {};
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < colCount; i++) {
       const col = table.getColumn(i);
       buttons[col.name] = Boolean(col.filterButton);
     }
     ok(
       `filter-buttons-${name}`,
-      Object.keys(wantFilter).every((k) => buttons[k] === wantFilter[k]),
+      Object.keys(want).every((k) => buttons[k] === want[k]),
       buttons,
     );
-    // Arrows via Table column hiddenButton — not sheet-level AutoFilter
     ok(
       `no-sort-cols-hidden-${name}`,
       buttons["순서"] === false &&
         buttons["할일 LIST UP"] === false &&
-        buttons["완료여부"] === false,
+        (name === "할 일" || buttons["완료여부"] === false),
       buttons,
     );
     ok(
@@ -174,6 +178,13 @@ async function main() {
         buttons["중요도"] === true,
       buttons,
     );
+    if (name === "할 일") {
+      ok(
+        "todo-no-완료여부-col",
+        !Object.prototype.hasOwnProperty.call(buttons, "완료여부"),
+        buttons,
+      );
+    }
   }
 
   const todo = wb.getWorksheet("할 일")!;

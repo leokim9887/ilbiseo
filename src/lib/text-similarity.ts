@@ -39,6 +39,12 @@ const TRIVIAL = new Set([
   "할일",
   "일정",
   "메모",
+  "하기",
+  "하기요",
+  "됨",
+  "임",
+  "음",
+  "기",
   "a",
   "an",
   "the",
@@ -51,6 +57,9 @@ const TRIVIAL = new Set([
   "on",
 ]);
 
+/** Verbal-noun endings (longest first) — 「정리하기」→「정리」. */
+const STRIP_ENDINGS = ["하기요", "시키기", "되기", "하기"] as const;
+
 /** Placeholder / empty-row titles that must never trigger peer alerts. */
 const PLACEHOLDER_TITLES = new Set([
   "새 할일",
@@ -62,9 +71,37 @@ const PLACEHOLDER_TITLES = new Set([
 ]);
 
 /**
- * Split title/memo into meaningful word tokens (Korean-friendly).
- * Does NOT emit Hangul syllable bigrams — those caused false "already exists"
- * alerts from partial syllable overlaps between unrelated phrases.
+ * Strip Korean verbal-noun endings (~하기, ~~기) to a lexical stem.
+ * Lone suffixes become empty (dropped by tokenize).
+ */
+export function stemKoreanToken(token: string): string {
+  let t = token;
+  for (const end of STRIP_ENDINGS) {
+    if (t.length > end.length + 1 && t.endsWith(end)) {
+      t = t.slice(0, -end.length);
+      break;
+    }
+  }
+  // Trailing light 「기」 on a ≥2-syllable stem (정리기-style / ~~기)
+  if (
+    t.length >= 3 &&
+    t.endsWith("기") &&
+    /[\uac00-\ud7a3]{2,}기$/.test(t)
+  ) {
+    const stem = t.slice(0, -1);
+    // Only strip if stem still looks like content (not a real word ending in 기 like 악기)
+    if (stem.length >= 2 && !TRIVIAL.has(stem)) {
+      t = stem;
+    }
+  }
+  return t;
+}
+
+/**
+ * Split title/memo into meaningful lexical word tokens (Korean-friendly).
+ * - No Hangul syllable bigrams
+ * - Strips ~하기 / ~~기 verb endings so they never count as overlaps
+ * - Drops particles / trivial stems
  */
 export function tokenizeMeaningful(text: string): string[] {
   const raw = text
@@ -77,8 +114,10 @@ export function tokenizeMeaningful(text: string): string[] {
 
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const t of raw) {
-    if (TRIVIAL.has(t)) continue;
+  for (const rawTok of raw) {
+    if (TRIVIAL.has(rawTok)) continue;
+    const t = stemKoreanToken(rawTok);
+    if (!t || TRIVIAL.has(t)) continue;
     const isHangul = /[\uac00-\ud7a3]/.test(t);
     // Hangul: need ≥2 syllables; Latin/digits: ≥2 chars
     if (isHangul && t.length < 2) continue;
@@ -109,9 +148,21 @@ function normalizeCompact(text: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
+/** Exact same content (title+memo) ignoring spaces/punctuation — for import block. */
+export function isExactContentMatch(
+  a: Pick<Task, "title" | "memo">,
+  b: Pick<Task, "title" | "memo">,
+): boolean {
+  const na = normalizeCompact(`${a.title ?? ""}\n${a.memo ?? ""}`);
+  const nb = normalizeCompact(`${b.title ?? ""}\n${b.memo ?? ""}`);
+  if (!na || !nb) return false;
+  return na === nb && na.length >= 2;
+}
+
 /**
  * Substantial wording overlap between two fields.
- * Tuned for father UX: only real duplicates / near-duplicates, not loose shares.
+ * Father rule: alert only when **2+ real overlapping words** (after stem).
+ * Exact-match is handled separately for import blocking.
  */
 export function wordingSimilarity(
   a: string,
@@ -125,28 +176,6 @@ export function wordingSimilarity(
     return { shared: [], score: 0, substantial: false };
   }
 
-  // Exact / near-exact after stripping punctuation · spaces
-  if (na === nb && na.length >= 4) {
-    const ta = tokenizeMeaningful(a);
-    return { shared: ta.length ? ta : [na], score: 1, substantial: true };
-  }
-  if (
-    na.length >= 6 &&
-    nb.length >= 6 &&
-    (na.includes(nb) || nb.includes(na))
-  ) {
-    const shorter = na.length <= nb.length ? na : nb;
-    const longer = na.length > nb.length ? na : nb;
-    if (shorter.length / longer.length >= 0.72) {
-      const ta = tokenizeMeaningful(a);
-      return {
-        shared: ta.length ? ta : [shorter],
-        score: shorter.length / longer.length,
-        substantial: true,
-      };
-    }
-  }
-
   const ta = tokenizeMeaningful(a);
   const tb = tokenizeMeaningful(b);
   if (ta.length === 0 || tb.length === 0) {
@@ -156,25 +185,29 @@ export function wordingSimilarity(
   const shared = [...new Set(ta.filter((t) => setB.has(t)))];
   const union = new Set([...ta, ...tb]);
   const jaccard = shared.length / union.size;
-  // Hangul words are usually 2 syllables — length≥2 is already meaningful
   const strongShared = shared.filter((t) => t.length >= 2);
 
-  // Same-field (title↔title / memo↔memo): careful but catches real dupes
-  // Cross-field (title↔memo): stricter — one shared memo word must not alert
+  // Exact compact match still counts as substantial (in-app warn); import blocks separately
+  if (na === nb && na.length >= 4) {
+    return {
+      shared: strongShared.length ? strongShared : ta,
+      score: 1,
+      substantial: strongShared.length >= 2 || ta.length <= 1,
+    };
+  }
+
+  // Require ≥2 real lexical overlaps — never a single shared stem/suffix
   let substantial = false;
   if (crossField) {
     substantial =
-      (strongShared.length >= 3 && jaccard >= 0.45) ||
-      (strongShared.length >= 2 && jaccard >= 0.6);
+      strongShared.length >= 3 && jaccard >= 0.4;
   } else {
     substantial =
-      (strongShared.length >= 2 && jaccard >= 0.45) ||
-      (strongShared.length >= 1 &&
-        jaccard >= 0.7 &&
-        Math.min(ta.length, tb.length) <= 2);
+      strongShared.length >= 2 &&
+      (jaccard >= 0.35 || strongShared.length >= 3);
   }
 
-  return { shared, score: jaccard, substantial };
+  return { shared: strongShared, score: jaccard, substantial };
 }
 
 /**
@@ -228,7 +261,7 @@ export function hasMeaningfulTaskContent(
 }
 
 /**
- * Active unfinished peers with similar title/memo.
+ * Active unfinished peers with similar title/memo (2+ lexical words).
  * Excludes self by id — same-row title∩memo never triggers.
  */
 export function findSimilarActiveTasks(
@@ -238,21 +271,20 @@ export function findSimilarActiveTasks(
 ): SimilarityHit[] {
   const title = (candidate.title ?? "").trim();
   const memo = (candidate.memo ?? "").trim();
-  // Need real content; placeholders alone never alert
   if (!title && !memo) return [];
   if (isPlaceholderTitle(title) && !memo) return [];
-  // Too short to be a meaningful duplicate signal
   const blob = `${title}${memo}`;
   if (normalizeCompact(blob).length < 4) return [];
 
   const hits: SimilarityHit[] = [];
   for (const t of tasks) {
-    // Hard exclude: never compare a row to itself (title↔memo same row).
     if (excludeId != null && t.id === excludeId) continue;
     if (t.status !== "active") continue;
     if (isPlaceholderTitle(t.title) && !(t.memo ?? "").trim()) continue;
     const { shared, score, substantial } = crossFieldSimilarity(candidate, t);
     if (!substantial) continue;
+    // Enforce 2+ shared tokens even for exact compact path with short titles
+    if (shared.length < 2 && !isExactContentMatch(candidate, t)) continue;
     hits.push({ task: t, sharedTokens: shared, score });
   }
   hits.sort(
@@ -260,6 +292,23 @@ export function findSimilarActiveTasks(
       b.score - a.score || b.sharedTokens.length - a.sharedTokens.length,
   );
   return hits;
+}
+
+/** Peers with exact same title+memo (import must block these). */
+export function findExactDuplicateTasks(
+  candidate: Pick<Task, "title" | "memo">,
+  tasks: readonly Task[],
+  excludeId?: string,
+): Task[] {
+  const title = (candidate.title ?? "").trim();
+  const memo = (candidate.memo ?? "").trim();
+  if (!title && !memo) return [];
+  if (isPlaceholderTitle(title) && !memo) return [];
+  return tasks.filter((t) => {
+    if (excludeId != null && t.id === excludeId) return false;
+    if (t.status !== "active") return false;
+    return isExactContentMatch(candidate, t);
+  });
 }
 
 /** Short polished Korean copy for in-app alert. */

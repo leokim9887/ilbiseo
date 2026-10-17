@@ -45,11 +45,19 @@ function styleHeader(row: ExcelJS.Row) {
 }
 
 /**
- * Excel Table with per-column filter arrows.
- * ▾ only on 틀 · 마감목표 · 중요도 — 순서 / 할일 LIST UP / 완료여부 have
- * filterButton:false (OOXML hiddenButton) so father cannot sort those cols.
+ * 「할 일」Excel Table — no 완료여부 column.
+ * ▾ only on 틀 · 마감목표 · 중요도.
  */
-const TODO_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
+const TODO_ACTIVE_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
+  { name: "순서", filterButton: false },
+  { name: "틀", filterButton: true },
+  { name: "할일 LIST UP", filterButton: false },
+  { name: "마감목표", filterButton: true },
+  { name: "중요도", filterButton: true },
+];
+
+/** 「한 일」keeps 완료여부 for clarity. */
+const TODO_DONE_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
   { name: "순서", filterButton: false },
   { name: "틀", filterButton: true },
   { name: "할일 LIST UP", filterButton: false },
@@ -84,6 +92,7 @@ function enableSortableTodoTable(
   tableName: string,
   dataRows: ExcelJS.CellValue[][],
   tasksForDeadlineFmt: Pick<Task, "startDate" | "targetDate" | "kind">[],
+  columns: ExcelJS.TableColumnProperties[],
 ) {
   // Clear any sheet-level AutoFilter — table owns filter arrows
   sheet.autoFilter = undefined;
@@ -93,12 +102,11 @@ function enableSortableTodoTable(
     headerRow: true,
     totalsRow: false,
     style: {
-      // Light theme; we re-apply classic gray header below
       theme: "TableStyleMedium1",
       showRowStripes: false,
       showColumnStripes: false,
     },
-    columns: TODO_TABLE_COLUMNS,
+    columns,
     rows: dataRows,
   });
   styleHeader(sheet.getRow(1));
@@ -107,7 +115,7 @@ function enableSortableTodoTable(
   sheet.getColumn(3).width = 48;
   sheet.getColumn(4).width = 22;
   sheet.getColumn(5).width = 10;
-  sheet.getColumn(6).width = 10;
+  if (columns.length >= 6) sheet.getColumn(6).width = 10;
   sheet.getColumn(3).alignment = { wrapText: true, vertical: "top" };
   sheet.getColumn(4).alignment = {
     wrapText: true,
@@ -122,7 +130,6 @@ function enableSortableTodoTable(
     vertical: "middle",
     horizontal: "center",
   };
-  // addTable overwrites cells — restore date numFmt (incl. range display)
   tasksForDeadlineFmt.forEach((t, i) => {
     writeDeadlineCell(sheet.getRow(i + 2).getCell(4), t);
   });
@@ -187,9 +194,14 @@ export async function buildWorkbook(
     t.memo ? `${t.title}\n${t.memo}` : t.title,
     deadlineCellValue(t),
     Number(t.importance) || 0,
-    "",
   ]);
-  enableSortableTodoTable(todo, "IlbiseoTodo", todoRows, activeTasks);
+  enableSortableTodoTable(
+    todo,
+    "IlbiseoTodo",
+    todoRows,
+    activeTasks,
+    TODO_ACTIVE_TABLE_COLUMNS,
+  );
 
   const done = wb.addWorksheet("한 일", {
     views: [{ state: "frozen", ySplit: 1 }],
@@ -203,7 +215,13 @@ export async function buildWorkbook(
     Number(t.importance) || 0,
     "완료",
   ]);
-  enableSortableTodoTable(done, "IlbiseoDone", doneRows, completedTasks);
+  enableSortableTodoTable(
+    done,
+    "IlbiseoDone",
+    doneRows,
+    completedTasks,
+    TODO_DONE_TABLE_COLUMNS,
+  );
 
   // 「구글캘린더」: only events within 2 weeks from save (KST), one row per event
   // (multi-day → full range in 「언제」). No 「캘린더」/「출처」 columns.

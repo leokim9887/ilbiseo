@@ -31,8 +31,8 @@ CHEER_SRC = "04-baby.png"
 DOG_SRC = "02-dog-new.png"
 # Face + tan cap framing (mobile / shared default)
 BABY_BIAS = (0.52, 0.30)
-# PC-only: less cropped — full face (both cheeks + chin + hat brim), not a tight zoom
-BABY_BIAS_PC = (0.50, 0.38)
+# Gemini-inspired PC/mobile Ace: more face in frame (cheeks readable, not ultra-tight)
+BABY_BIAS_PC = (0.50, 0.36)
 # Original cheer crop bias (pre Ace-cap replace)
 CHEER_BIAS = (0.50, 0.14)
 # New dog: face-forward Maltese; bias keeps eyes in upper-center of square crop
@@ -377,22 +377,37 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Baby/Ace — rollback to pre full-face look (aca895e): tight cover crop,
-    # soft blend; pets drawn AFTER Ace so they overlap cheeks (matches UI ref).
+    # Gemini-inspired layout (real sources only — never paste Gemini mock):
+    # Ace more face-visible with soft glow; pets lower so cheeks stay clear.
+    bw, bh = 580, 640
     baby = night_grade(
-        cover_crop(load(BABY_SRC), 560, 610, bias=BABY_BIAS), strength=0.34
+        cover_crop(load(BABY_SRC), bw, bh, bias=BABY_BIAS_PC), strength=0.22
     )
-    paste_masked(canvas, baby, (1045, -15), radial_mask((560, 610), soft=0.52), 0.98)
+    # Soft halo behind Ace (ref has gentle circular glow)
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gx, gy = 1310, 280
+    for r, a in ((320, 18), (240, 28), (170, 38)):
+        gd.ellipse([gx - r, gy - r, gx + r, gy + r], fill=(240, 230, 210, a))
+    canvas.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=48)))
+    paste_masked(
+        canvas,
+        baby,
+        (1035, -20),
+        radial_mask((bw, bh), soft=0.68, rx_scale=1.18, ry_scale=1.08),
+        0.99,
+    )
 
+    # Pets after Ace but lower — overlap chest/neck, not cheeks (Gemini balance)
     dog = night_grade(
-        cover_crop(load_dog(), 470, 470, bias=DOG_BIAS), strength=0.36
+        cover_crop(load_dog(), 420, 420, bias=DOG_BIAS), strength=0.32
     )
-    paste_masked(canvas, dog, (880, 255), radial_mask((470, 470), soft=0.46), 0.97)
+    paste_masked(canvas, dog, (860, 370), radial_mask((420, 420), soft=0.50), 0.96)
 
     cat = night_grade(
-        cover_crop(load("03-cat.png"), 450, 450, bias=(0.52, 0.32)), strength=0.34
+        cover_crop(load("03-cat.png"), 400, 400, bias=(0.52, 0.32)), strength=0.30
     )
-    paste_masked(canvas, cat, (1310, 255), radial_mask((450, 450), soft=0.48), 0.97)
+    paste_masked(canvas, cat, (1340, 365), radial_mask((400, 400), soft=0.52), 0.96)
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)
@@ -426,20 +441,27 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
     # Negative x fills empty dark left; positive y keeps chin above bottom fade
     paste_masked(canvas, family, (-96, 12), combined, 1.0)
 
+    # Mobile: same Gemini-inspired balance — Ace face clearer, pets lower
     baby = night_grade(
-        cover_crop(load(BABY_SRC), 470, 515, bias=BABY_BIAS), strength=0.30
+        cover_crop(load(BABY_SRC), 480, 530, bias=BABY_BIAS_PC), strength=0.22
     )
-    paste_masked(canvas, baby, (695, 12), radial_mask((470, 515), soft=0.54), 0.98)
+    paste_masked(
+        canvas,
+        baby,
+        (690, 8),
+        radial_mask((480, 530), soft=0.66, rx_scale=1.15, ry_scale=1.06),
+        0.99,
+    )
 
     dog = night_grade(
-        cover_crop(load_dog(), 385, 385, bias=DOG_BIAS), strength=0.32
+        cover_crop(load_dog(), 360, 360, bias=DOG_BIAS), strength=0.30
     )
-    paste_masked(canvas, dog, (620, 400), radial_mask((385, 385), soft=0.46), 0.97)
+    paste_masked(canvas, dog, (600, 430), radial_mask((360, 360), soft=0.50), 0.96)
 
     cat = night_grade(
-        cover_crop(load("03-cat.png"), 370, 370, bias=(0.52, 0.30)), strength=0.30
+        cover_crop(load("03-cat.png"), 350, 350, bias=(0.52, 0.30)), strength=0.28
     )
-    paste_masked(canvas, cat, (845, 355), radial_mask((370, 370), soft=0.48), 0.97)
+    paste_masked(canvas, cat, (860, 410), radial_mask((350, 350), soft=0.52), 0.96)
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)

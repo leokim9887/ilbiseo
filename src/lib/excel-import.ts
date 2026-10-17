@@ -3,6 +3,12 @@ import { createId } from "./id";
 import { clampPriority } from "./priority";
 import { inferGroupKey } from "./sort";
 import {
+  findSimilarActiveTasks,
+  buildSimilarityAlertMessage,
+  type SimilarityHit,
+} from "./text-similarity";
+import {
+  CATEGORY_LABEL,
   parseTaskCategory,
   type Task,
   type TaskCategory,
@@ -124,9 +130,40 @@ export type MappedPreviewRow = {
   importance: number;
   done: boolean;
   category: TaskCategory;
+  categoryLabel: string;
   /** empty title / unusable */
   skip: boolean;
+  /** Peers already in the app that look similar (2+ shared words / near-dupe) */
+  similarHits: SimilarityHit[];
 };
+
+/** True when mapping includes an Excel 「틀」 column. */
+export function mappingHasCategory(mapping: ColumnMapping): boolean {
+  return Object.values(sanitizeMapping(mapping)).includes("category");
+}
+
+/**
+ * Father-visible summary when imported rows overlap existing tasks.
+ * Uses the same similarity engine as in-app edit alerts (no false loose singles).
+ */
+export function summarizeImportSimilarities(
+  preview: MappedPreviewRow[],
+): { count: number; message: string } | null {
+  const withHits = preview.filter((r) => !r.skip && r.similarHits.length > 0);
+  if (withHits.length === 0) return null;
+  const sample = withHits[0];
+  const peerMsg = buildSimilarityAlertMessage(sample.similarHits);
+  if (withHits.length === 1 && peerMsg) {
+    return {
+      count: 1,
+      message: `비슷한 할 일 ${withHits.length}건 — ${peerMsg.replace(/^비슷한 할 일이 있습니다:\s*/, "")}`,
+    };
+  }
+  return {
+    count: withHits.length,
+    message: `비슷한 할 일 ${withHits.length}건이 이미 있습니다. 아래 미리보기에서 확인한 뒤 추가하세요.`,
+  };
+}
 
 function normalizeHeader(raw: string): string {
   return raw
@@ -271,32 +308,119 @@ export function applySavedOrAuto(
   return sanitizeMapping(out);
 }
 
+/** Excel serial → YYYY-MM-DD (SheetJS SSF). */
+function excelSerialToIso(serial: number): string | null {
+  if (!Number.isFinite(serial) || serial < 20000 || serial > 80000) return null;
+  try {
+    const parsed = XLSX.SSF.parse_date_code(serial);
+    if (parsed && parsed.y) {
+      return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+    }
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+/** Date → YYYY-MM-DD using UTC (export writes UTC midnight). */
+function dateToIsoUtc(d: Date): string | null {
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function cellToString(v: unknown): string {
   if (v == null) return "";
   if (v instanceof Date) {
-    const y = v.getFullYear();
-    const m = String(v.getMonth() + 1).padStart(2, "0");
-    const d = String(v.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    return dateToIsoUtc(v) ?? "";
   }
   if (typeof v === "number" && Number.isFinite(v)) {
-    // Excel serial date (rough): 1 = 1899-12-31; SheetJS may already convert with cellDates
-    if (v > 20000 && v < 80000) {
-      try {
-        const parsed = XLSX.SSF.parse_date_code(v);
-        if (parsed && parsed.y) {
-          return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
-        }
-      } catch {
-        /* fall through */
-      }
-    }
+    const iso = excelSerialToIso(v);
+    if (iso) return iso;
     return String(v);
   }
-  return String(v).trim();
+  const s = String(v).trim();
+  // sheet_to_json(raw:false) may stringify serials — recover them
+  if (/^\d{5}(\.\d+)?$/.test(s)) {
+    const iso = excelSerialToIso(Number(s));
+    if (iso) return iso;
+  }
+  return s;
 }
 
-function parseDeadline(raw: string): {
+function isoFromYmd(
+  y: string | number,
+  m: string | number,
+  d: string | number,
+): string | null {
+  const yy = Number(y);
+  const mm = Number(m);
+  const dd = Number(d);
+  if (
+    !Number.isFinite(yy) ||
+    !Number.isFinite(mm) ||
+    !Number.isFinite(dd) ||
+    mm < 1 ||
+    mm > 12 ||
+    dd < 1 ||
+    dd > 31
+  ) {
+    return null;
+  }
+  // 2-digit year → 2000–2099 (father Excel locale m/d/yy)
+  const year = yy < 100 ? 2000 + yy : yy;
+  if (year < 1990 || year > 2100) return null;
+  return `${year}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
+/** Parse one calendar day from common Excel / father text forms. */
+function parseOneDate(raw: string): string | null {
+  const s = raw.replace(/\u00a0/g, " ").trim();
+  if (!s) return null;
+
+  // ISO datetime from SheetJS raw Date stringification
+  const isoDt = s.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/,
+  );
+  if (isoDt) return isoFromYmd(isoDt[1], isoDt[2], isoDt[3]);
+
+  // 2026년 10월 17일
+  const ko = s.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?/);
+  if (ko) return isoFromYmd(ko[1], ko[2], ko[3]);
+
+  // 2026-10-17 / 2026.10.17 / 2026/10/17 (optional spaces after sep)
+  const ymd = s.match(
+    /(\d{4})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{1,2})/,
+  );
+  if (ymd) return isoFromYmd(ymd[1], ymd[2], ymd[3]);
+
+  // 10/17/2026 or 10/17/26 (US-style Excel locale)
+  const mdy = s.match(
+    /^(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})$/,
+  );
+  if (mdy) {
+    const a = Number(mdy[1]);
+    const b = Number(mdy[2]);
+    const c = Number(mdy[3]);
+    // If first part > 12, treat as D/M/Y; else M/D/Y (Excel US default)
+    if (a > 12 && b <= 12) return isoFromYmd(c, b, a);
+    return isoFromYmd(c, a, b);
+  }
+
+  // Bare Excel serial
+  if (/^\d{5}(\.\d+)?$/.test(s)) return excelSerialToIso(Number(s));
+
+  return null;
+}
+
+/**
+ * Parse 「마감목표」 from Excel export / father-edited cells.
+ * Handles: Date serials, YYYY-MM-DD, ranges `A ~ B`, locale m/d/yy,
+ * Korean 년월일, ISO datetime. Empty / 「언젠가」 → someday (no fake dates).
+ */
+export function parseDeadline(raw: string): {
   startDate: string | null;
   targetDate: string | null;
   kind: TaskKind;
@@ -304,29 +428,65 @@ function parseDeadline(raw: string): {
 } {
   const s = raw.replace(/\u00a0/g, " ").trim();
   if (!s || /^언젠가$/i.test(s) || /^someday$/i.test(s)) {
-    return { startDate: null, targetDate: null, kind: "someday", label: "언젠가" };
-  }
-  const range = s.match(
-    /(\d{4})[./-](\d{1,2})[./-](\d{1,2})\s*[~～\-–—]\s*(\d{4})[./-](\d{1,2})[./-](\d{1,2})/,
-  );
-  if (range) {
-    const start = `${range[1]}-${range[2].padStart(2, "0")}-${range[3].padStart(2, "0")}`;
-    const end = `${range[4]}-${range[5].padStart(2, "0")}-${range[6].padStart(2, "0")}`;
-    const kind: TaskKind = start === end ? "spot" : "ongoing";
     return {
-      startDate: start,
-      targetDate: end,
-      kind,
-      label: start === end ? start : `${start} ~ ${end}`,
+      startDate: null,
+      targetDate: null,
+      kind: "someday",
+      label: "언젠가",
     };
   }
-  const single = s.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
-  if (single) {
-    const iso = `${single[1]}-${single[2].padStart(2, "0")}-${single[3].padStart(2, "0")}`;
-    return { startDate: iso, targetDate: iso, kind: "spot", label: iso };
+
+  // Range: start ~ end (various dashes / tildes; allow spaced dots)
+  const rangeParts = s.split(/\s*[~～〜]\s*|\s+[–—]\s+/);
+  if (rangeParts.length === 2) {
+    const start = parseOneDate(rangeParts[0]);
+    const end = parseOneDate(rangeParts[1]);
+    if (start && end) {
+      const kind: TaskKind = start === end ? "spot" : "ongoing";
+      return {
+        startDate: start,
+        targetDate: end,
+        kind,
+        label: start === end ? start : `${start} ~ ${end}`,
+      };
+    }
   }
+
+  // Also: 2026-10-17 - 2026-10-20 (hyphen between full dates)
+  const hyphenRange = s.match(
+    /^(.+?)\s+-\s+(.+)$/,
+  );
+  if (hyphenRange) {
+    const start = parseOneDate(hyphenRange[1]);
+    const end = parseOneDate(hyphenRange[2]);
+    if (start && end) {
+      const kind: TaskKind = start === end ? "spot" : "ongoing";
+      return {
+        startDate: start,
+        targetDate: end,
+        kind,
+        label: start === end ? start : `${start} ~ ${end}`,
+      };
+    }
+  }
+
+  const single = parseOneDate(s);
+  if (single) {
+    return {
+      startDate: single,
+      targetDate: single,
+      kind: "spot",
+      label: single,
+    };
+  }
+
   // Unparsed text — treat as someday, keep label for display
-  return { startDate: null, targetDate: null, kind: "someday", label: s || "언젠가" };
+  return {
+    startDate: null,
+    targetDate: null,
+    kind: "someday",
+    label: s || "언젠가",
+  };
 }
 
 function parseDone(raw: string): boolean {
@@ -352,6 +512,7 @@ export function buildPreviewRows(
   sheet: ParsedSheet,
   mapping: ColumnMapping,
   defaultCategory: TaskCategory,
+  existingTasks: readonly Task[] = [],
 ): MappedPreviewRow[] {
   const clean = sanitizeMapping(mapping);
   const fieldOf = (field: ImportField): string | null => {
@@ -364,6 +525,7 @@ export function buildPreviewRows(
   const importanceCol = fieldOf("importance");
   const doneCol = fieldOf("done");
   const categoryCol = fieldOf("category");
+  const peers = existingTasks.filter((t) => t.status === "active");
 
   return sheet.rows.map((row) => {
     const titleRaw = titleCol ? cellToString(row[titleCol]) : "";
@@ -381,6 +543,10 @@ export function buildPreviewRows(
     const category = categoryCol
       ? parseTaskCategory(cellToString(row[categoryCol]))
       : defaultCategory;
+    const similarHits =
+      title && !done
+        ? findSimilarActiveTasks({ title, memo }, peers)
+        : [];
 
     return {
       title,
@@ -389,7 +555,9 @@ export function buildPreviewRows(
       importance,
       done,
       category,
+      categoryLabel: CATEGORY_LABEL[category],
       skip: !title,
+      similarHits,
     };
   });
 }
@@ -457,30 +625,54 @@ export function sheetToTasks(
     .filter((t): t is Task => t != null);
 }
 
-function sheetFromAoA(name: string, aoa: unknown[][]): ParsedSheet | null {
-  if (!aoa.length) return null;
-  const headerRow = aoa[0] ?? [];
-  const headers = headerRow.map((c, i) => {
-    const s = cellToString(c);
-    return s || `열${i + 1}`;
-  });
+/**
+ * Prefer raw Date/serial over locale-formatted text (avoids m/d/yy → 「언젠가」).
+ * Keep formatted `w` when it encodes a range (`~`) from our export numFmt.
+ */
+function extractSheetCell(cell: XLSX.CellObject | undefined): unknown {
+  if (!cell) return "";
+  const w = typeof cell.w === "string" ? cell.w.trim() : "";
+  if (w && /[~～〜]/.test(w)) return w;
+  if (cell.v instanceof Date) return cell.v;
+  if (typeof cell.v === "number" && Number.isFinite(cell.v)) return cell.v;
+  if (typeof cell.v === "boolean") return cell.v ? "true" : "";
+  if (typeof cell.v === "string") return cell.v;
+  if (w) return w;
+  return cell.v ?? "";
+}
+
+function sheetFromWorksheet(
+  name: string,
+  ws: XLSX.WorkSheet,
+): ParsedSheet | null {
+  const ref = ws["!ref"];
+  if (!ref) return null;
+  const range = XLSX.utils.decode_range(ref);
+  const headerRow: string[] = [];
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const addr = XLSX.utils.encode_cell({ r: range.s.r, c });
+    const raw = extractSheetCell(ws[addr]);
+    const s = cellToString(raw);
+    headerRow.push(s || `열${c - range.s.c + 1}`);
+  }
   // Deduplicate headers
   const seen = new Map<string, number>();
-  const uniqueHeaders = headers.map((h) => {
+  const uniqueHeaders = headerRow.map((h) => {
     const n = seen.get(h) ?? 0;
     seen.set(h, n + 1);
     return n === 0 ? h : `${h} (${n + 1})`;
   });
 
   const rows: Record<string, unknown>[] = [];
-  for (let r = 1; r < aoa.length; r++) {
-    const line = aoa[r] ?? [];
+  for (let r = range.s.r + 1; r <= range.e.r; r++) {
     const obj: Record<string, unknown> = {};
     let any = false;
-    for (let c = 0; c < uniqueHeaders.length; c++) {
-      const v = line[c];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const v = extractSheetCell(ws[addr]);
+      const h = uniqueHeaders[c - range.s.c];
       if (v != null && cellToString(v) !== "") any = true;
-      obj[uniqueHeaders[c]] = v ?? "";
+      obj[h] = v ?? "";
     }
     if (any) rows.push(obj);
   }
@@ -506,10 +698,12 @@ export async function parseExcelFile(file: File): Promise<ParsedWorkbook> {
   const buf = await file.arrayBuffer();
   let wb: XLSX.WorkBook;
   try {
+    // raw:true keeps Date/serial — we format ourselves (locale w is lossy)
     wb = XLSX.read(buf, {
       type: "array",
       cellDates: true,
-      raw: false,
+      raw: true,
+      cellText: true,
     });
   } catch {
     throw new Error(
@@ -525,13 +719,7 @@ export async function parseExcelFile(file: File): Promise<ParsedWorkbook> {
   for (const sheetName of wb.SheetNames) {
     const ws = wb.Sheets[sheetName];
     if (!ws) continue;
-    const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, {
-      header: 1,
-      defval: "",
-      blankrows: false,
-      raw: false,
-    }) as unknown[][];
-    const parsed = sheetFromAoA(sheetName, aoa);
+    const parsed = sheetFromWorksheet(sheetName, ws);
     if (parsed && parsed.headers.length > 0) sheets.push(parsed);
   }
 

@@ -218,6 +218,25 @@ export function useAppState() {
     [persist, state],
   );
 
+  /**
+   * Replace by each task's own 틀 (Excel 「틀」 column).
+   * Only categories present in `tasks` are cleared — others stay.
+   */
+  const replaceByTaskCategories = useCallback(
+    (tasks: Task[]) => {
+      if (tasks.length === 0) return;
+      const normalized = tasks.map((t) => ({
+        ...t,
+        urgency: clampPriority(t.urgency),
+        importance: clampPriority(t.importance),
+      }));
+      const cats = new Set(normalized.map((t) => t.category));
+      const kept = state.tasks.filter((t) => !cats.has(t.category));
+      persist({ ...state, tasks: [...kept, ...normalized] });
+    },
+    [persist, state],
+  );
+
   const updateTask = useCallback(
     (id: string, patch: Partial<Task>) => {
       persist({
@@ -515,6 +534,7 @@ export function useAppState() {
     addTask,
     addMany,
     replaceCategoryTasks,
+    replaceByTaskCategories,
     updateTask,
     completeTask,
     completeTasks,

@@ -202,6 +202,8 @@ interface ExcelWorkbookProps {
   onImport: (tasks: Task[]) => void;
   /** 현재 틀 할 일·한 일을 가져온 목록으로 교체 (엑셀 불러오기 명시 확인 후) */
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
+  /** 엑셀 「틀」칸별 교체 */
+  onReplaceByCategories?: (tasks: Task[]) => void;
   calendarEvents?: CalendarEvent[];
 }
 
@@ -222,6 +224,7 @@ export function ExcelWorkbook({
   onAdd,
   onImport,
   onReplaceCategory,
+  onReplaceByCategories,
   calendarEvents = [],
 }: ExcelWorkbookProps) {
   const isGcal = frame === "gcal";
@@ -792,11 +795,14 @@ export function ExcelWorkbook({
                 행 추가
               </Button>
             ) : null}
-            {sheet === "todo" && isTaskCategory(frame) ? (
+            {sheet === "todo" && (isTaskCategory(frame) || isAll) ? (
               <ToolbarExtras
-                category={frame}
+                category={isTaskCategory(frame) ? frame : "work"}
                 onImport={onImport}
                 onReplaceCategory={onReplaceCategory}
+                onReplaceByCategories={onReplaceByCategories}
+                existingTasks={similarityPeers}
+                excelOnly={isAll}
               />
             ) : null}
             {selectedCount > 0 && sheet === "todo" ? (

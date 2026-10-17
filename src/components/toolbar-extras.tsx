@@ -18,6 +18,10 @@ interface ToolbarExtrasProps {
   category: TaskCategory;
   onImport: (tasks: Task[]) => void;
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
+  onReplaceByCategories?: (tasks: Task[]) => void;
+  existingTasks?: Task[];
+  /** 「전체」에서는 엑셀만 (메모·OCR은 틀이 필요) */
+  excelOnly?: boolean;
 }
 
 /** 작은 「추가 기능」— 엑셀·메모·OCR은 클릭 시에만 메뉴에서 연다 */
@@ -25,6 +29,9 @@ export function ToolbarExtras({
   category,
   onImport,
   onReplaceCategory,
+  onReplaceByCategories,
+  existingTasks,
+  excelOnly = false,
 }: ToolbarExtrasProps) {
   const [excelOpen, setExcelOpen] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);
@@ -57,22 +64,26 @@ export function ToolbarExtras({
             <FileSpreadsheet className="size-3.5" />
             엑셀 불러오기
           </DropdownMenuItem>
-          <DropdownMenuItem
-            className="cursor-pointer gap-2 py-2 text-[14px]"
-            onClick={() => setMemoOpen(true)}
-            data-toolbar-extras-memo
-          >
-            <StickyNote className="size-3.5" />
-            메모 붙여넣기
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="cursor-pointer gap-2 py-2 text-[14px]"
-            onClick={() => setOcrOpen(true)}
-            data-toolbar-extras-ocr
-          >
-            <ImageIcon className="size-3.5" />
-            사진 OCR
-          </DropdownMenuItem>
+          {!excelOnly ? (
+            <>
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 py-2 text-[14px]"
+                onClick={() => setMemoOpen(true)}
+                data-toolbar-extras-memo
+              >
+                <StickyNote className="size-3.5" />
+                메모 붙여넣기
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer gap-2 py-2 text-[14px]"
+                onClick={() => setOcrOpen(true)}
+                data-toolbar-extras-ocr
+              >
+                <ImageIcon className="size-3.5" />
+                사진 OCR
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -80,24 +91,30 @@ export function ToolbarExtras({
         category={category}
         onImport={onImport}
         onReplaceCategory={onReplaceCategory}
+        onReplaceByCategories={onReplaceByCategories}
+        existingTasks={existingTasks}
         showTrigger={false}
         open={excelOpen}
         onOpenChange={setExcelOpen}
       />
-      <MemoImport
-        category={category}
-        onImport={onImport}
-        showTrigger={false}
-        open={memoOpen}
-        onOpenChange={setMemoOpen}
-      />
-      <OcrImport
-        category={category}
-        onImport={onImport}
-        showTrigger={false}
-        open={ocrOpen}
-        onOpenChange={setOcrOpen}
-      />
+      {!excelOnly ? (
+        <>
+          <MemoImport
+            category={category}
+            onImport={onImport}
+            showTrigger={false}
+            open={memoOpen}
+            onOpenChange={setMemoOpen}
+          />
+          <OcrImport
+            category={category}
+            onImport={onImport}
+            showTrigger={false}
+            open={ocrOpen}
+            onOpenChange={setOcrOpen}
+          />
+        </>
+      ) : null}
     </>
   );
 }

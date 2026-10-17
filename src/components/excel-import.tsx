@@ -19,17 +19,19 @@ import {
   isImportTargetField,
   isIlbiseoTemplate,
   loadSavedMapping,
+  mappingHasCategory,
   mappingHasTitle,
   parseExcelFile,
   pickDefaultSheetIndex,
   saveMapping,
   sheetToTasks,
+  summarizeImportSimilarities,
   type ColumnMapping,
   type ImportField,
   type ParsedSheet,
   type ParsedWorkbook,
 } from "@/lib/excel-import";
-import type { Task, TaskCategory } from "@/lib/types";
+import { CATEGORY_LABEL, type Task, type TaskCategory } from "@/lib/types";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 
 type Step = "pick" | "sheet" | "map" | "preview";
@@ -38,7 +40,11 @@ type ImportMode = "merge" | "replace";
 interface ExcelImportProps {
   onImport: (tasks: Task[]) => void;
   onReplaceCategory?: (category: TaskCategory, tasks: Task[]) => void;
+  /** Replace by each row's 틀 (Excel 「틀」) — preferred when 틀 column present */
+  onReplaceByCategories?: (tasks: Task[]) => void;
   category: TaskCategory;
+  /** Active tasks already in the app — for similar-content notice */
+  existingTasks?: Task[];
   /** false면 툴바 트리거 없이 open/onOpenChange로만 연다 */
   showTrigger?: boolean;
   open?: boolean;
@@ -48,7 +54,9 @@ interface ExcelImportProps {
 export function ExcelImport({
   onImport,
   onReplaceCategory,
+  onReplaceByCategories,
   category,
+  existingTasks = [],
   showTrigger = true,
   open: openProp,
   onOpenChange,
@@ -69,13 +77,27 @@ export function ExcelImport({
   const open = controlled ? openProp : uncontrolledOpen;
 
   const sheet: ParsedSheet | null = workbook?.sheets[sheetIndex] ?? null;
+  const hasFrameCol = mappingHasCategory(mapping);
 
   const preview = useMemo(() => {
     if (!sheet) return [];
-    return buildPreviewRows(sheet, mapping, category);
-  }, [sheet, mapping, category]);
+    return buildPreviewRows(sheet, mapping, category, existingTasks);
+  }, [sheet, mapping, category, existingTasks]);
 
   const usableCount = preview.filter((r) => !r.skip).length;
+  const similaritySummary = useMemo(
+    () => summarizeImportSimilarities(preview),
+    [preview],
+  );
+
+  const frameCounts = useMemo(() => {
+    const counts = new Map<TaskCategory, number>();
+    for (const r of preview) {
+      if (r.skip) continue;
+      counts.set(r.category, (counts.get(r.category) ?? 0) + 1);
+    }
+    return [...counts.entries()];
+  }, [preview]);
 
   const reset = () => {
     setStep("pick");
@@ -165,7 +187,9 @@ export function ExcelImport({
         setError("바꾸려면 「정말 바꿀게요」를 체크해 주세요.");
         return;
       }
-      if (!onReplaceCategory) {
+      const canReplace =
+        (hasFrameCol && onReplaceByCategories) || onReplaceCategory;
+      if (!canReplace) {
         setError("바꾸기를 쓸 수 없습니다.");
         return;
       }
@@ -178,8 +202,12 @@ export function ExcelImport({
         return;
       }
       saveMapping(mapping);
-      if (mode === "replace" && onReplaceCategory) {
-        onReplaceCategory(category, tasks);
+      if (mode === "replace") {
+        if (hasFrameCol && onReplaceByCategories) {
+          onReplaceByCategories(tasks);
+        } else if (onReplaceCategory) {
+          onReplaceCategory(category, tasks);
+        }
       } else {
         onImport(tasks);
       }
@@ -188,6 +216,10 @@ export function ExcelImport({
       setError(e instanceof Error ? e.message : "가져오기 실패");
     }
   };
+
+  const description = hasFrameCol
+    ? "엑셀 「틀」칸대로 업무·개인·과제·팀원에 넣습니다. 「전체」에서도 보입니다."
+    : `틀 열이 없으면 「${CATEGORY_LABEL[category]}」에 추가합니다.`;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -210,9 +242,7 @@ export function ExcelImport({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>엑셀 불러오기</DialogTitle>
-          <DialogDescription>
-            현재 틀에 추가합니다. (.xlsx · .xls · .csv)
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -343,18 +373,51 @@ export function ExcelImport({
                 {usableCount}건 · 기존 목록에 추가
               </p>
 
+              {hasFrameCol && frameCounts.length > 0 ? (
+                <p
+                  className="text-[13px] text-[var(--ink-muted)]"
+                  data-excel-import-frames
+                >
+                  틀:{" "}
+                  {frameCounts
+                    .map(
+                      ([cat, n]) => `${CATEGORY_LABEL[cat]} ${n}건`,
+                    )
+                    .join(" · ")}
+                </p>
+              ) : (
+                <p className="text-[13px] text-[var(--ink-muted)]">
+                  → {CATEGORY_LABEL[category]}
+                </p>
+              )}
+
+              {similaritySummary ? (
+                <div
+                  className="rounded-sm border border-[#b42318]/35 bg-[#fff8f7] px-2.5 py-2 text-[13px] text-[#7a1f16]"
+                  role="status"
+                  data-excel-import-similar
+                >
+                  {similaritySummary.message}
+                </div>
+              ) : null}
+
               {usableCount === 0 ? (
                 <div className="rounded-sm border border-dashed border-[#9aa5ad] bg-[#f7f8f9] px-3 py-6 text-center text-[14px] text-[var(--ink-muted)]">
                   가져올 행이 없습니다.
                 </div>
               ) : (
-                <div className="max-h-44 overflow-auto rounded-sm border border-[#9aa5ad]">
-                  <table className="w-full min-w-[360px] text-left text-[13px]">
+                <div className="max-h-52 overflow-auto rounded-sm border border-[#9aa5ad]">
+                  <table className="w-full min-w-[400px] text-left text-[13px]">
                     <thead className="sticky top-0 bg-[#f3f3f3]">
                       <tr>
                         <th className="border-b border-[#9aa5ad] px-2 py-1">
                           할 일
                         </th>
+                        {hasFrameCol ? (
+                          <th className="border-b border-[#9aa5ad] px-2 py-1">
+                            틀
+                          </th>
+                        ) : null}
                         <th className="border-b border-[#9aa5ad] px-2 py-1">
                           마감
                         </th>
@@ -371,10 +434,23 @@ export function ExcelImport({
                           <tr
                             key={`${r.title}-${i}`}
                             className="border-b border-[#e0e4e7]"
+                            data-excel-import-similar-row={
+                              r.similarHits.length > 0 ? "1" : undefined
+                            }
                           >
-                            <td className="max-w-[12rem] truncate px-2 py-1">
+                            <td className="max-w-[10rem] truncate px-2 py-1">
                               {r.title}
+                              {r.similarHits.length > 0 ? (
+                                <span className="ml-1 text-[11px] text-[#b42318]">
+                                  (비슷함)
+                                </span>
+                              ) : null}
                             </td>
+                            {hasFrameCol ? (
+                              <td className="whitespace-nowrap px-2 py-1">
+                                {r.categoryLabel}
+                              </td>
+                            ) : null}
                             <td className="whitespace-nowrap px-2 py-1">
                               {r.deadlineLabel}
                             </td>
@@ -419,7 +495,11 @@ export function ExcelImport({
                         setError(null);
                       }}
                     />
-                    <span>현재 틀을 이 목록으로 바꾸기</span>
+                    <span>
+                      {hasFrameCol
+                        ? "엑셀에 있는 틀만 이 목록으로 바꾸기"
+                        : "현재 틀을 이 목록으로 바꾸기"}
+                    </span>
                   </label>
                   {mode === "replace" ? (
                     <label className="flex cursor-pointer items-start gap-2 text-[13px] text-[#b42318]">
@@ -480,6 +560,7 @@ export function ExcelImport({
               className="h-11 touch-manipulation bg-[#217346] text-white hover:bg-[#1a5c38]"
               disabled={usableCount === 0 || busy}
               onClick={handleCommit}
+              data-excel-import-commit
             >
               {mode === "replace"
                 ? `${usableCount}건으로 바꾸기`

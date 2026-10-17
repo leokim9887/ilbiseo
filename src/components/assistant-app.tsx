@@ -293,6 +293,7 @@ export function AssistantApp() {
                 }
                 onImport={app.addMany}
                 onReplaceCategory={app.replaceCategoryTasks}
+                onReplaceByCategories={app.replaceByTaskCategories}
               />
               {/* PC: 지침 | 습관 side-by-side · 모바일: 세로 스택 */}
               <div

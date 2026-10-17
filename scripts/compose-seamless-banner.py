@@ -402,7 +402,8 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     dog = night_grade(
         cover_crop(load_dog(), 310, 310, bias=DOG_BIAS), strength=0.26
     )
-    paste_masked(canvas, dog, (940, 440), radial_mask((310, 310), soft=0.40), 0.95)
+    # Nudge left toward Ace left cheek (user: 강아지만 살짝 왼쪽)
+    paste_masked(canvas, dog, (880, 440), radial_mask((310, 310), soft=0.40), 0.95)
 
     cat = night_grade(
         cover_crop(load("03-cat.png"), 300, 300, bias=(0.52, 0.32)), strength=0.24
@@ -462,7 +463,7 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
     dog = night_grade(
         cover_crop(load_dog(), 260, 260, bias=DOG_BIAS), strength=0.24
     )
-    paste_masked(canvas, dog, (610, 475), radial_mask((260, 260), soft=0.38), 0.95)
+    paste_masked(canvas, dog, (560, 475), radial_mask((260, 260), soft=0.38), 0.95)
 
     cat = night_grade(
         cover_crop(load("03-cat.png"), 250, 250, bias=(0.52, 0.30)), strength=0.22

@@ -155,7 +155,7 @@ await page.locator('select[aria-label="틀"]').selectOption("work");
 await page.waitForTimeout(250);
 
 const workTitles = await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
+  .locator('textarea[aria-label="할 일"]')
   .evaluateAll((els) => els.map((e) => e.value));
 
 const pastStillInTodo = workTitles.includes("지난회의준비");
@@ -189,7 +189,7 @@ await page.waitForTimeout(400);
 await page.locator('select[aria-label="틀"]').selectOption("work");
 await page.waitForTimeout(250);
 const doneTitles = await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
+  .locator('textarea[aria-label="할 일"]')
   .evaluateAll((els) => els.map((e) => e.value));
 const pastNotInDone = !doneTitles.includes("지난회의준비");
 
@@ -204,7 +204,7 @@ await page.locator("[data-excel-bulk-complete]").click();
 await page.waitForTimeout(400);
 
 const afterCompleteTodo = await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
+  .locator('textarea[aria-label="할 일"]')
   .evaluateAll((els) => els.map((e) => e.value));
 const pastGoneAfterManual = !afterCompleteTodo.includes("지난회의준비");
 
@@ -213,7 +213,7 @@ await page.waitForTimeout(300);
 await page.locator('select[aria-label="틀"]').selectOption("work");
 await page.waitForTimeout(200);
 const afterCompleteDone = await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
+  .locator('textarea[aria-label="할 일"]')
   .evaluateAll((els) => els.map((e) => e.value));
 const pastInDoneAfterManual = afterCompleteDone.includes("지난회의준비");
 

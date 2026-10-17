@@ -239,7 +239,7 @@ if (nativeDialogs.length > 0) {
 }
 
 // Title similarity → polished dialog
-const titleB = rowB.locator('textarea[aria-label="할일 LIST UP"]');
+const titleB = rowB.locator('textarea[aria-label="할 일"]');
 await titleB.fill("병원 진료 예약 점검");
 await titleB.blur();
 await page.waitForTimeout(900);

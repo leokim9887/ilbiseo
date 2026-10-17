@@ -25,7 +25,7 @@ const NAV: {
   { id: "done", label: "한 일", short: "한 일", icon: CheckSquare },
   { id: "calendar", label: "캘린더", short: "일정", icon: CalendarDays },
   { id: "briefing", label: "오늘 브리핑", short: "브리핑", icon: Newspaper },
-  { id: "settings", label: "설정·엑셀", short: "설정", icon: Settings2 },
+  { id: "settings", label: "설정", short: "설정", icon: Settings2 },
 ];
 
 interface AppNavProps {

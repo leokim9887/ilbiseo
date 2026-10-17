@@ -262,7 +262,7 @@ export function CalendarPanel({
               {` · 이 달 ${monthEventCount}건`}
             </p>
           ) : configured ? (
-            <p className="text-[var(--ink)]">연결을 누르면 Google 로그인합니다.</p>
+            <p className="text-[var(--ink)]">연결을 누르면 로그인합니다.</p>
           ) : (
             <p className="text-[var(--ink-muted)]">
               Google 캘린더 연결을 준비 중입니다. 잠시 후 다시 확인해 주세요.
@@ -286,8 +286,8 @@ export function CalendarPanel({
             title="캘린더 일정이 없습니다"
             description={
               configured
-                ? "Google 캘린더를 연결하면 일정이 여기에 표시됩니다."
-                : "연결이 준비되면 Google 캘린더 일정을 볼 수 있습니다."
+                ? "연결하면 일정이 여기에 보입니다."
+                : "잠시 후 다시 확인해 주세요."
             }
             action={
               configured && !connected ? (

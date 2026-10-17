@@ -32,7 +32,7 @@ for (const frame of frames) {
   await page.getByRole("button", { name: "행 추가" }).first().click();
   await page.waitForTimeout(350);
 
-  const title = page.locator('textarea[aria-label="할일 LIST UP"]').first();
+  const title = page.locator('textarea[aria-label="할 일"]').first();
   await title.click();
   await title.fill(`메모테스트-${frame}`);
 
@@ -115,7 +115,7 @@ for (const frame of frames) {
 await page.locator('select[aria-label="틀"]').selectOption("personal");
 await page.getByRole("button", { name: "행 추가" }).first().click();
 await page.waitForTimeout(300);
-await page.locator('textarea[aria-label="할일 LIST UP"]').first().fill("스크린샷용 할일");
+await page.locator('textarea[aria-label="할 일"]').first().fill("스크린샷용 할일");
 const memoShot = page.locator('input[aria-label="메모"]').first();
 await memoShot.click();
 await memoShot.fill("클릭해서 입력한 메모입니다");

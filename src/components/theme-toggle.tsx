@@ -19,10 +19,6 @@ export function ThemeToggle() {
       data-theme-settings
     >
       <p className="text-[15px] font-semibold text-[var(--ink)]">화면 밝기</p>
-      <p className="mt-1 text-[14px] leading-relaxed text-[var(--ink-muted)]">
-        밝은 화면 · 어두운 화면을 고르면 이 기기에서 기억합니다. 처음에는
-        휴대폰·컴퓨터 설정을 따릅니다.
-      </p>
       <div
         className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"
         role="group"

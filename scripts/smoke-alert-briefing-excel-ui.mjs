@@ -179,7 +179,7 @@ await page.locator('select[aria-label="틀"]').selectOption("work");
 await page.waitForTimeout(200);
 
 const row = page.locator('tr[data-excel-row="t-edit"]');
-const title = row.locator('textarea[aria-label="할일 LIST UP"]');
+const title = row.locator('textarea[aria-label="할 일"]');
 const memo = row.locator('textarea[aria-label="메모"]');
 
 await title.fill("출장 준비 체크리스트");

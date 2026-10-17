@@ -38,7 +38,7 @@ export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
         일비서
       </p>
       <p className="mt-2 text-[15px] leading-relaxed text-[var(--ink-muted)]">
-        할 일·한 일 시트와 틀(업무·개인·과제·팀원)로 일정을 정리합니다.
+        할 일과 일정을 한곳에서 정리합니다.
       </p>
       <div className="mt-4">
         <Button

@@ -113,7 +113,7 @@ const COLS_TODO: {
   { key: "order", label: "순서", shortLabel: "순", width: "48px" },
   {
     key: "listup",
-    label: "할일 LIST UP",
+    label: "할 일",
     shortLabel: "할일",
     width: "48%",
   },
@@ -141,7 +141,7 @@ const COLS_DONE: {
   { key: "order", label: "순서", shortLabel: "순", width: "48px" },
   {
     key: "listup",
-    label: "할일 LIST UP",
+    label: "할 일",
     shortLabel: "할일",
     width: "46%",
   },
@@ -170,7 +170,7 @@ const COLS_GCAL: {
   { key: "order", label: "순서", shortLabel: "순", width: "56px" },
   {
     key: "listup",
-    label: "할일 LIST UP",
+    label: "할 일",
     shortLabel: "일정",
     width: "55%",
   },
@@ -896,21 +896,10 @@ export function ExcelWorkbook({
           </div>
         ) : null}
         <span className="text-[13px] leading-snug text-[#454d48] dark:text-[#a8b3ad] sm:ml-auto">
-          {FRAME_LABEL[frame]} · {rows.length}행
-          {isGcal && calCount > 0 ? ` (캘린더)` : ""}
-          {!isGcal && filterActive ? ` · 필터 적용` : ""}
-          {isGcal && sheet === "todo"
-            ? gcalFilterActive
-              ? ` · 기간 필터`
-              : gcalChip === "all"
-                ? ` · 전체`
-                : ` · 오늘부터`
-            : ""}
-          {columnSort
-            ? ` · ${columnSortLabel(columnSort)}`
-            : isAll && !isGcal
-              ? ` · 시작일 내림차순▼`
-              : ""}
+          {FRAME_LABEL[frame]} · {taskCount + (isGcal ? calCount : 0)}줄
+          {!isGcal && filterActive ? " · 기간" : ""}
+          {isGcal && sheet === "todo" && gcalFilterActive ? " · 기간" : ""}
+          {columnSort ? ` · ${columnSortLabel(columnSort)}` : ""}
         </span>
       </div>
 
@@ -1062,9 +1051,6 @@ export function ExcelWorkbook({
       </div>
       ) : null}
 
-      <p className="excel-hscroll-hint" aria-hidden>
-        좁은 화면용 압축 표 · 모든 열을 한눈에
-      </p>
       <div className="excel-scroll-wrap excel-fit-mobile-wrap">
       <div
         ref={tableScrollRef}
@@ -1145,14 +1131,8 @@ export function ExcelWorkbook({
                         className={`flex min-h-9 w-full items-center justify-center gap-0.5 px-0.5 py-1.5 text-[12.5px] font-bold text-black hover:bg-[#e8efe9] active:bg-[#dce8de] dark:text-[#e8ece9] dark:hover:bg-[#2a3a32] dark:active:bg-[#31443a] sm:min-h-11 sm:px-1 sm:py-2 sm:text-[16px] ${
                           active ? "bg-[#e4efe6] dark:bg-[#2a3a32]" : ""
                         }`}
-                        aria-label={`${c.label} 정렬 (${
-                          !active
-                            ? "기본"
-                            : active.dir === "asc"
-                              ? "오름차순"
-                              : "내림차순"
-                        }) · 누르면 바뀜`}
-                        title="클릭: 없음 → 오름차순 → 내림차순 → 기본"
+                        aria-label={`${c.label} 정렬`}
+                        title="누르면 정렬이 바뀝니다"
                       >
                         <span>{labelNode}</span>
                         <span
@@ -1187,18 +1167,17 @@ export function ExcelWorkbook({
                 >
                   {filterActive && !isGcal && sheet === "todo" ? (
                     <p>
-                      이 기간에 겹치는 할 일이 없습니다. 「전체」를 누르세요.
+                      이 기간에 할 일이 없습니다.
                     </p>
                   ) : filterActive && !isGcal && sheet === "done" ? (
                     <p>
-                      이 기간에 한 일이 없습니다. 날짜를 비우거나 「필터 지우기」로
-                      전체를 봅니다.
+                      이 기간에 한 일이 없습니다.
                     </p>
                   ) : isGcal && sheet === "todo" ? (
                     <p>
                       {gcalChip === "all"
                         ? "일정이 없습니다."
-                        : "이 기간에 일정이 없습니다. 「전체」를 누르면 가져온 일정을 모두 봅니다."}
+                        : "이 기간에 일정이 없습니다."}
                     </p>
                   ) : sheet === "todo" ? (
                     <p>할 일이 없습니다.</p>
@@ -1224,7 +1203,7 @@ export function ExcelWorkbook({
                           className="text-[13px] font-bold tracking-wide text-[#6b4423] dark:text-[#e8d4b8] sm:text-[15px]"
                           data-excel-past-separator-label
                         >
-                          지난 일정 — 아래로 모아 둠
+                          지난 일정
                         </span>
                       </td>
                     </tr>
@@ -1342,7 +1321,7 @@ export function ExcelWorkbook({
                     <td
                       className="border border-black px-0.5 py-0.5 text-center align-middle select-none sm:px-1"
                       data-excel-select-cell={task.id}
-                      title="클릭하거나 드래그해서 여러 행 선택"
+                      title="여러 줄 선택"
                       onMouseDown={(e) => {
                         // Paint-select from checkbox column only — never steal text edits
                         if (e.button !== 0) return;
@@ -1431,7 +1410,7 @@ export function ExcelWorkbook({
                               ? "cursor-default opacity-90 text-[#5a635e]"
                               : ""
                           }`}
-                          aria-label="할일 LIST UP"
+                          aria-label="할 일"
                           placeholder="할 일 제목"
                         />
                         <label className="flex flex-col gap-0">
@@ -1512,7 +1491,7 @@ export function ExcelWorkbook({
                               tabIndex={0}
                               className="px-0.5 text-center text-[13px] leading-snug text-[#454d48] outline-none"
                             >
-                              기한 없음 · 칩을 다시 누르면 날짜 선택
+                              기한 없음
                             </p>
                           ) : (
                             <>
@@ -1691,7 +1670,7 @@ export function ExcelWorkbook({
                             }}
                             aria-label={`${task.title || "할 일"} 수정`}
                             data-excel-edit={task.id}
-                            title="수정하려면 누르세요"
+                            title="수정"
                           >
                             <Pencil className="size-3 sm:size-3.5" aria-hidden />
                             수정
@@ -1709,7 +1688,7 @@ export function ExcelWorkbook({
                             }}
                             aria-label={`${task.title || "할 일"} 수정 끝내기`}
                             data-excel-edit-done={task.id}
-                            title="수정 끝 — 다시 잠금"
+                            title="수정 끝"
                           >
                             <Check className="size-3 sm:size-3.5" aria-hidden />
                             수정 끝

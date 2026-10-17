@@ -157,7 +157,7 @@ await page.waitForTimeout(300);
 
 const titles = await page.locator("[data-excel-row]").evaluateAll((rows) =>
   rows.map((r) => {
-    const ta = r.querySelector("textarea[aria-label='할일 LIST UP']");
+    const ta = r.querySelector("textarea[aria-label='할 일']");
     return (ta?.value || ta?.textContent || "").trim();
   }),
 );

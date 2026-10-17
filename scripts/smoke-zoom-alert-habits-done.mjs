@@ -137,7 +137,7 @@ await page.waitForTimeout(200);
 
 // Self-row: same title+memo on one row → no alert
 const rowEdit = page.locator('tr[data-excel-row="t-edit"]');
-const titleEdit = rowEdit.locator('textarea[aria-label="할일 LIST UP"]');
+const titleEdit = rowEdit.locator('textarea[aria-label="할 일"]');
 const memoEdit = rowEdit.locator('textarea[aria-label="메모"]');
 await titleEdit.fill("혼자만 쓰는 긴문구알파");
 await memoEdit.fill("혼자만 쓰는 긴문구알파");

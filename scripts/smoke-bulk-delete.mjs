@@ -41,7 +41,7 @@ for (const frame of frames) {
     await page.getByRole("button", { name: "행 추가" }).first().click();
     await page.waitForTimeout(100);
   }
-  const titlesLoc = page.locator('textarea[aria-label="할일 LIST UP"]');
+  const titlesLoc = page.locator('textarea[aria-label="할 일"]');
   await page.waitForTimeout(150);
   const rowCount = await titlesLoc.count();
   if (rowCount < 3)
@@ -113,7 +113,7 @@ for (let i = 1; i <= 2; i++) {
   await page.getByRole("button", { name: "행 추가" }).first().click();
   await page.waitForTimeout(100);
   await page
-    .locator('textarea[aria-label="할일 LIST UP"]')
+    .locator('textarea[aria-label="할 일"]')
     .first()
     .fill(`전체선택-${i}`);
 }
@@ -229,7 +229,7 @@ await page.locator('select[aria-label="틀"]').selectOption("work");
 await page.waitForTimeout(200);
 await page.getByRole("button", { name: "행 추가" }).first().click();
 await page.waitForTimeout(150);
-const titleTa = page.locator('textarea[aria-label="할일 LIST UP"]').first();
+const titleTa = page.locator('textarea[aria-label="할 일"]').first();
 const memoTa = page.locator('textarea[aria-label="메모"]').first();
 const h0 = await titleTa.evaluate((el) => el.getBoundingClientRect().height);
 await titleTa.fill(

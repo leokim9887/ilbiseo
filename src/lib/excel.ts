@@ -113,7 +113,7 @@ function styleHeader(row: ExcelJS.Row) {
 const TODO_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
   { name: "순서", filterButton: false },
   { name: "틀", filterButton: true },
-  { name: "할일 LIST UP", filterButton: false },
+  { name: "할 일", filterButton: false },
   { name: "마감목표", filterButton: true },
   { name: "중요도", filterButton: true },
 ];

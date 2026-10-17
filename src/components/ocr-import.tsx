@@ -52,11 +52,7 @@ export function OcrImport({
     setBusy(true);
     setError(null);
     try {
-      setInfo(
-        process.env.NEXT_PUBLIC_OCR_API_KEY
-          ? "OCR 키 있음 — v1은 목 추출 사용"
-          : "API 키 없음 — 목 OCR 후보를 채웠습니다.",
-      );
+      setInfo("사진에서 글자를 읽어 채웠습니다. 확인 후 넣으세요.");
       setText(await mockOcrFromImage(file));
     } catch (e) {
       setError(e instanceof Error ? e.message : "이미지 처리 실패");

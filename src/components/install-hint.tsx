@@ -146,7 +146,6 @@ export function InstallHint() {
           <p className="mt-0.5 text-[12px] text-white/85">{copy.body}</p>
           {deferred ? (
             <p className="mt-0.5 text-[12px] text-white/85">
-              오른쪽 「지금 설치」를 누르면 바로 설치됩니다.
             </p>
           ) : null}
         </div>
@@ -168,7 +167,7 @@ export function InstallHint() {
             variant="ghost"
             className="text-white hover:bg-white/15 hover:text-white"
             onClick={dismiss}
-            aria-label="닫기 · 잠시 숨기기"
+            aria-label="닫기"
           >
             <X className="size-4" />
           </Button>

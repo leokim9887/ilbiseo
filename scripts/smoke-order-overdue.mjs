@@ -78,16 +78,16 @@ await page.locator('select[aria-label="틀"]').selectOption("work");
 await page.waitForTimeout(300);
 
 const titlesBefore = await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
+  .locator('textarea[aria-label="할 일"]')
   .evaluateAll((els) => els.map((e) => e.value));
 
-const first = page.locator('textarea[aria-label="할일 LIST UP"]').first();
+const first = page.locator('textarea[aria-label="할 일"]').first();
 await first.click();
 await first.fill("첫번째-타이핑중-가나다라마바사");
 await page.waitForTimeout(200);
 
 const titlesAfter = await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
+  .locator('textarea[aria-label="할 일"]')
   .evaluateAll((els) => els.map((e) => e.value));
 
 const orderStable =

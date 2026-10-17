@@ -38,7 +38,7 @@ export const IMPORT_FIELD_LABEL: Record<ImportField, string> = {
   urgency: "시급성",
   done: "완료여부",
   category: "틀",
-  skip: "(사용 안 함)",
+  skip: "안 씀",
 };
 
 /** 매핑 UI「우리 칸」옵션 (시급성 제외 — 예전 파일 열은 자동 skip) */

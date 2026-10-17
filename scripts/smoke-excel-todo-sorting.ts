@@ -138,7 +138,7 @@ async function main() {
   const wantFilter: Record<string, boolean> = {
     순서: false,
     틀: true,
-    "할일 LIST UP": false,
+    "할 일": false,
     마감목표: true,
     중요도: true,
   };
@@ -166,7 +166,7 @@ async function main() {
     );
     ok(
       `no-sort-cols-hidden-${name}`,
-      buttons["순서"] === false && buttons["할일 LIST UP"] === false,
+      buttons["순서"] === false && buttons["할 일"] === false,
       buttons,
     );
     ok(

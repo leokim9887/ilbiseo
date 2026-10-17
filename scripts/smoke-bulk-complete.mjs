@@ -40,7 +40,7 @@ for (const frame of frames) {
     await page.getByRole("button", { name: "행 추가" }).first().click();
     await page.waitForTimeout(100);
   }
-  const titlesLoc = page.locator('textarea[aria-label="할일 LIST UP"]');
+  const titlesLoc = page.locator('textarea[aria-label="할 일"]');
   await page.waitForTimeout(150);
   const rowCount = await titlesLoc.count();
   if (rowCount < 3)
@@ -134,7 +134,7 @@ await page.waitForTimeout(200);
 await page.getByRole("button", { name: "행 추가" }).first().click();
 await page.waitForTimeout(150);
 await page
-  .locator('textarea[aria-label="할일 LIST UP"]')
+  .locator('textarea[aria-label="할 일"]')
   .first()
   .fill("완료버튼-스크린샷");
 await page.locator("input[data-excel-row-check]").first().check();

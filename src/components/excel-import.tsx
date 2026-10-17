@@ -238,7 +238,7 @@ export function ExcelImport({
     if (mode === "merge" && applyCount === 0) {
       setError(
         plan.combined.unchanged > 0 || plan.combined.blocked > 0
-          ? "바꿀 내용이 없습니다. (그대로이거나 같은 내용만 있음)"
+          ? "바꿀 내용이 없습니다."
           : "가져올 행이 없습니다.",
       );
       return;
@@ -260,14 +260,14 @@ export function ExcelImport({
             } else if (onReplaceCategory) {
               onReplaceCategory(category, tasks);
             } else {
-              setError("바꾸기를 쓸 수 없습니다.");
+              setError("지금은 바꿀 수 없습니다.");
               return;
             }
           }
         }
         if (plan.guideline) {
           if (!onReplaceSide) {
-            setError("지침 바꾸기를 쓸 수 없습니다.");
+            setError("지침은 지금은 바꿀 수 없습니다.");
             return;
           }
           const items = previewToReplaceSideItems(plan.guideline.preview);
@@ -275,7 +275,7 @@ export function ExcelImport({
         }
         if (plan.habit) {
           if (!onReplaceSide) {
-            setError("습관 바꾸기를 쓸 수 없습니다.");
+            setError("습관은 지금은 바꿀 수 없습니다.");
             return;
           }
           const items = previewToReplaceSideItems(plan.habit.preview);
@@ -299,7 +299,7 @@ export function ExcelImport({
           onImport(todo.add);
           did = true;
         } else {
-          setError("할 일 변경 반영을 쓸 수 없습니다.");
+          setError("할 일은 지금은 바꿀 수 없습니다.");
           return;
         }
       }
@@ -324,14 +324,14 @@ export function ExcelImport({
 
       if (guideline.add.length > 0 || guideline.update.length > 0) {
         if (!applySide("guideline", guideline)) {
-          setError("지침 가져오기를 쓸 수 없습니다.");
+          setError("지침을 가져오지 못했습니다.");
           return;
         }
         did = true;
       }
       if (habit.add.length > 0 || habit.update.length > 0) {
         if (!applySide("habit", habit)) {
-          setError("습관 가져오기를 쓸 수 없습니다.");
+          setError("습관을 가져오지 못했습니다.");
           return;
         }
         did = true;
@@ -343,7 +343,7 @@ export function ExcelImport({
       }
       handleOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "가져오기 실패");
+      setError(e instanceof Error ? e.message : "가져오지 못했습니다");
     }
   };
 
@@ -383,8 +383,7 @@ export function ExcelImport({
         <DialogHeader>
           <DialogTitle>엑셀 불러오기</DialogTitle>
           <DialogDescription>
-            「할 일」·「지침」·「습관」을 한 번에 가져옵니다. 프로그램 값이
-            기본이며, 새로 넣거나 바꾼 행만 반영합니다.
+            엑셀의 할 일·지침·습관을 가져옵니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -417,17 +416,17 @@ export function ExcelImport({
           {step === "map" && todoSheetForMap ? (
             <div className="space-y-2">
               <p className="text-[13px] text-[var(--ink-muted)]">
-                「할 일」시트 · 아빠 열 → 우리 칸
+                엑셀 열을 어디에 넣을지 고르세요
               </p>
               <div className="overflow-x-auto rounded-sm border border-[#9aa5ad] dark:border-[#4a5c52]">
                 <table className="w-full min-w-[280px] text-left text-[14px]">
                   <thead className="bg-[#f3f3f3] dark:bg-[#24302a]">
                     <tr>
                       <th className="border-b border-[#9aa5ad] px-2 py-1.5 font-semibold dark:border-[#4a5c52]">
-                        아빠 열
+                        엑셀 열
                       </th>
                       <th className="border-b border-[#9aa5ad] px-2 py-1.5 font-semibold dark:border-[#4a5c52]">
-                        우리 칸
+                        일비서
                       </th>
                     </tr>
                   </thead>
@@ -453,7 +452,7 @@ export function ExcelImport({
                               )
                             }
                             className={`${SELECT_CLASS} h-9 min-w-[7.5rem] text-[14px]`}
-                            aria-label={`${h} 매핑`}
+                            aria-label={`${h} 넣을 곳`}
                           >
                             <option value="skip">
                               {IMPORT_FIELD_LABEL.skip}
@@ -550,7 +549,7 @@ export function ExcelImport({
                         setError(null);
                       }}
                     />
-                    <span>새·바뀐 행만 반영 (기본)</span>
+                    <span>새·바뀐 것만 넣기 (기본)</span>
                   </label>
                   <label className="flex cursor-pointer items-start gap-2 text-[13px]">
                     <input
@@ -562,7 +561,7 @@ export function ExcelImport({
                         setError(null);
                       }}
                     />
-                    <span>있는 시트를 이 목록으로 바꾸기</span>
+                    <span>목록 통째로 바꾸기</span>
                   </label>
                   {mode === "replace" ? (
                     <label className="flex cursor-pointer items-start gap-2 text-[13px] text-[#b42318] dark:text-[#f0a8a0]">

@@ -107,7 +107,7 @@ export function applyColumnSort(
 }
 
 export function columnSortLabel(sort: ColumnSort | null): string {
-  if (!sort) return "기본(추가순)";
+  if (!sort) return "기본";
   const name = sort.key === "deadline" ? "마감목표" : "중요도";
   return `${name} ${sort.dir === "asc" ? "오름차순▲" : "내림차순▼"}`;
 }

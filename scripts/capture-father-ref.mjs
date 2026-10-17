@@ -43,7 +43,7 @@ async function main() {
 
   await desktop.getByRole("button", { name: "행 추가" }).click();
   await desktop.waitForTimeout(250);
-  const listup = desktop.locator('textarea[aria-label="할일 LIST UP"]').first();
+  const listup = desktop.locator('textarea[aria-label="할 일"]').first();
   await listup.fill("아버지 표 형식 스모크 — LIST UP 칸");
   await desktop.waitForTimeout(200);
   await desktop

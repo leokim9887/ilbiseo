@@ -66,7 +66,7 @@ export function AssistantApp() {
     if (gcal === "connected") {
       setGcalBanner({
         kind: "ok",
-        text: "Google 캘린더에 연결되었습니다. 일정을 불러오는 중입니다.",
+        text: "연결되었습니다. 일정을 불러오는 중…",
       });
     } else if (gcal === "error") {
       setGcalBanner({
@@ -123,7 +123,7 @@ export function AssistantApp() {
   if (app.status === "error") {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-4 py-24 text-center">
-        <p className="text-lg font-semibold">데이터를 열 수 없습니다</p>
+        <p className="text-lg font-semibold">불러오지 못했습니다</p>
         <p className="text-sm text-destructive">{app.error}</p>
         <Button type="button" size="lg" onClick={() => window.location.reload()}>
           다시 시도
@@ -301,7 +301,7 @@ export function AssistantApp() {
           ) : null}
 
           {view === "settings" ? (
-            <PanelShell title="설정 · 엑셀">
+            <PanelShell title="설정">
               <div className="space-y-5">
                 <ThemeToggle />
                 <DeviceSyncPanel
@@ -319,29 +319,15 @@ export function AssistantApp() {
                   </p>
                   <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-[var(--ink-muted)]">
                     <li>
-                      <strong>Windows/Mac</strong>: Chrome·Edge → 주소창 설치
-                      아이콘 또는 메뉴 → 앱 설치
+                      <strong>Windows/Mac</strong>: 메뉴 → 앱 설치
                     </li>
                     <li>
-                      <strong>안드로이드</strong>: Chrome 메뉴(⋮) → 앱 설치 /
-                      홈 화면에 추가
+                      <strong>안드로이드</strong>: 메뉴 → 홈 화면에 추가
                     </li>
                     <li>
-                      <strong>아이폰</strong>: Safari → 공유 → 홈 화면에 추가
+                      <strong>아이폰</strong>: 공유 → 홈 화면에 추가
                     </li>
                   </ul>
-                  <p className="mt-2 text-[14px] text-[var(--ink-muted)]">
-                    폰 사용 안내:{" "}
-                    <a
-                      className="font-medium text-[var(--brand)] underline underline-offset-2"
-                      href="https://fleet-nitrogen-6wxfp18.vercel.app"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      fleet-nitrogen-6wxfp18.vercel.app
-                    </a>
-                    을 연 뒤 위 순서대로 홈 화면에 추가하세요.
-                  </p>
                 </div>
                 <ExcelLinker
                   state={app.state}
@@ -352,7 +338,7 @@ export function AssistantApp() {
                 />
                 <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
                   <p className="text-[15px] font-semibold text-[var(--ink)]">
-                    데이터
+                    초기화
                   </p>
                   <Button
                     type="button"
@@ -362,7 +348,7 @@ export function AssistantApp() {
                     onClick={app.clearAllData}
                   >
                     <RotateCcw className="size-4" />
-                    데이터 비우기
+                    모두 지우기
                   </Button>
                 </div>
               </div>

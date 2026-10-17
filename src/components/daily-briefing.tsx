@@ -113,7 +113,7 @@ export function DailyBriefingPanel({
       }).then((r) => {
         setSyncNote(
           r.ok
-            ? `서버 동기화됨 · ${r.message ?? ""}`
+            ? `${r.message ? `메일용 저장됨 · ${r.message}` : "메일용 저장됨"}`
             : `동기화 실패 · ${r.error || r.message || ""}`,
         );
       });
@@ -161,7 +161,7 @@ export function DailyBriefingPanel({
         briefing?: { plaintext?: string };
       };
       if (!res.ok || !data.ok) {
-        throw new Error(data.error || "API 호출 실패");
+        throw new Error(data.error || "메일 요청에 실패했습니다");
       }
       setBriefing(
         buildDailyBriefing(
@@ -178,7 +178,7 @@ export function DailyBriefingPanel({
           : `미리보기 · ${data.delivery?.message ?? "발송하지 않음"}`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "API 호출 실패");
+      setError(e instanceof Error ? e.message : "메일 요청에 실패했습니다");
     } finally {
       setBusy("none");
     }
@@ -196,7 +196,7 @@ export function DailyBriefingPanel({
       });
       setSyncNote(
         r.ok
-          ? `서버 동기화됨 · ${r.message ?? ""}`
+          ? `${r.message ? `메일용 저장됨 · ${r.message}` : "메일용 저장됨"}`
           : `동기화 실패 · ${r.error || r.message || ""}`,
       );
       if (!r.ok) setError(r.error || r.message || "동기화 실패");
@@ -207,15 +207,15 @@ export function DailyBriefingPanel({
 
   return (
     <PanelShell
-      title="오늘 브리핑 · 매일 메일"
-      description="매일 아침 08:00(한국 시간) 네이버 메일."
+      title="오늘 브리핑"
+      description="매일 아침 8시 메일"
       icon={<Newspaper className="size-5" />}
     >
       <div className="space-y-5">
         <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/50 px-4 py-4 space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="work-email" className="text-[14px]">
-              아버지 메일 (고정)
+              받는 메일
             </Label>
             <Input
               id="work-email"
@@ -225,9 +225,6 @@ export function DailyBriefingPanel({
               aria-readonly="true"
               className="h-11 bg-[var(--sheet-header)] text-[var(--ink)]"
             />
-            <p className="text-[13px] text-[var(--ink-muted)]">
-              발신·수신 모두 {FATHER_EMAIL}
-            </p>
           </div>
 
           <label className="flex items-start gap-3 text-sm text-[var(--ink)]">
@@ -243,9 +240,9 @@ export function DailyBriefingPanel({
               }
             />
             <span>
-              <span className="font-semibold">매일 08:00(KST) 자동 발송</span>
+              <span className="font-semibold">매일 아침 8시 자동 발송</span>
               <span className="mt-0.5 block text-[13px] text-[var(--ink-muted)]">
-                켜면 이 기기의 할 일·캘린더를 서버에 맞춰 아침 메일을 보냅니다.
+                켜면 아침마다 메일을 보냅니다.
               </span>
             </span>
           </label>
@@ -263,10 +260,7 @@ export function DailyBriefingPanel({
               }
             />
             <span>
-              <span className="font-semibold">엑셀(xlsx) 첨부</span>
-              <span className="mt-0.5 block text-[13px] text-[var(--ink-muted)]">
-                당일 스냅샷 파일을 메일 첨부합니다.
-              </span>
+              <span className="font-semibold">엑셀 첨부</span>
             </span>
           </label>
 
@@ -299,7 +293,7 @@ export function DailyBriefingPanel({
               onClick={() => callApi(false)}
               disabled={busy !== "none"}
             >
-              미리보기(발송 안 함)
+              미리보기
             </Button>
             <Button
               type="button"
@@ -312,7 +306,7 @@ export function DailyBriefingPanel({
               {busy === "sync" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : null}
-              서버에 지금 동기화
+              지금 맞춰 두기
             </Button>
           </div>
 
@@ -355,7 +349,7 @@ export function DailyBriefingPanel({
                 【할 일】
               </h4>
               {preview.sections.length === 0 ? (
-                <p className="text-sm text-[var(--ink-muted)]">활성 할 일 없음</p>
+                <p className="text-sm text-[var(--ink-muted)]">할 일 없음</p>
               ) : (
                 preview.sections.map((section) => (
                   <div key={section.kind} className="mb-3">

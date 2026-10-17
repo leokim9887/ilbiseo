@@ -208,7 +208,7 @@ export function SideListSection({
           data-side-add={kind}
         >
           <Plus className="size-3.5" />
-          항목 추가
+          추가
         </Button>
       </div>
 
@@ -219,7 +219,7 @@ export function SideListSection({
       >
         {ordered.length === 0 ? (
           <p className="px-2 py-5 text-center text-[13px] text-[#666] dark:text-[#a8b3ad]">
-            {label}이 비어 있습니다. 「항목 추가」로 적으세요.
+            아직 없습니다.
           </p>
         ) : (
           <ul ref={listRef} className="space-y-1">
@@ -239,7 +239,7 @@ export function SideListSection({
                   <div
                     className="mt-1 flex shrink-0 items-center justify-center select-none"
                     data-side-select-cell={item.id}
-                    title="클릭하거나 드래그해서 여러 항목 선택"
+                    title="여러 줄 선택"
                     onMouseDown={(e) => {
                       if (e.button !== 0) return;
                       e.preventDefault();

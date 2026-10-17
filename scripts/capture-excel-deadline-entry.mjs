@@ -64,7 +64,7 @@ const html = `<!doctype html>
     <table>
       <thead>
         <tr>
-          <th>순서</th><th>틀</th><th>할일 LIST UP</th>
+          <th>순서</th><th>틀</th><th>할 일</th>
           <th>마감목표 <span class="badge">▾ 목록</span></th><th>중요도</th>
         </tr>
       </thead>

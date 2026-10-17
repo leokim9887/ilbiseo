@@ -44,14 +44,19 @@ function styleHeader(row: ExcelJS.Row) {
   row.height = 24;
 }
 
-/** Father can click header ▾ arrows — no macros. */
-function enableAutoFilter(sheet: ExcelJS.Worksheet, columnCount: number) {
-  const lastRow = Math.max(sheet.rowCount, 1);
-  sheet.autoFilter = {
-    from: { row: 1, column: 1 },
-    to: { row: lastRow, column: columnCount },
-  };
-}
+/**
+ * Excel Table with per-column filter arrows.
+ * ▾ only on 틀 · 마감목표 · 중요도 — 순서 / 할일 LIST UP / 완료여부 have
+ * filterButton:false (OOXML hiddenButton) so father cannot sort those cols.
+ */
+const TODO_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
+  { name: "순서", filterButton: false },
+  { name: "틀", filterButton: true },
+  { name: "할일 LIST UP", filterButton: false },
+  { name: "마감목표", filterButton: true },
+  { name: "중요도", filterButton: true },
+  { name: "완료여부", filterButton: false },
+];
 
 /** 마감목표: real Excel date (start) so Oldest/Newest sort works. */
 function writeDeadlineCell(
@@ -65,6 +70,62 @@ function writeDeadlineCell(
     return;
   }
   cell.value = parts.value;
+}
+
+function deadlineCellValue(
+  task: Pick<Task, "startDate" | "targetDate" | "kind">,
+): Date | string {
+  const parts = deadlineExcelParts(task);
+  return parts.value;
+}
+
+function enableSortableTodoTable(
+  sheet: ExcelJS.Worksheet,
+  tableName: string,
+  dataRows: ExcelJS.CellValue[][],
+  tasksForDeadlineFmt: Pick<Task, "startDate" | "targetDate" | "kind">[],
+) {
+  // Clear any sheet-level AutoFilter — table owns filter arrows
+  sheet.autoFilter = undefined;
+  sheet.addTable({
+    name: tableName,
+    ref: "A1",
+    headerRow: true,
+    totalsRow: false,
+    style: {
+      // Light theme; we re-apply classic gray header below
+      theme: "TableStyleMedium1",
+      showRowStripes: false,
+      showColumnStripes: false,
+    },
+    columns: TODO_TABLE_COLUMNS,
+    rows: dataRows,
+  });
+  styleHeader(sheet.getRow(1));
+  sheet.getColumn(1).width = 8;
+  sheet.getColumn(2).width = 10;
+  sheet.getColumn(3).width = 48;
+  sheet.getColumn(4).width = 22;
+  sheet.getColumn(5).width = 10;
+  sheet.getColumn(6).width = 10;
+  sheet.getColumn(3).alignment = { wrapText: true, vertical: "top" };
+  sheet.getColumn(4).alignment = {
+    wrapText: true,
+    vertical: "middle",
+    horizontal: "center",
+  };
+  sheet.getColumn(2).alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  sheet.getColumn(5).alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  // addTable overwrites cells — restore date numFmt (incl. range display)
+  tasksForDeadlineFmt.forEach((t, i) => {
+    writeDeadlineCell(sheet.getRow(i + 2).getCell(4), t);
+  });
 }
 
 export type WorkbookPayload = {
@@ -114,89 +175,35 @@ export async function buildWorkbook(
   wb.creator = "일비서";
   wb.created = new Date();
 
-  // Father TO DO LIST headers: 순서 · 할일 LIST UP · 마감목표 · 중요도 · 완료여부
+  // Father TO DO LIST: Excel Table — ▾ only on 틀 · 마감목표 · 중요도
   // (시급성 열은 제거 — 기존 파일 불러오기는 excel-import에서 선택 매핑)
   const todo = wb.addWorksheet("할 일", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
-  todo.columns = [
-    { header: "순서", key: "order", width: 8 },
-    { header: "틀", key: "frame", width: 10 },
-    { header: "할일 LIST UP", key: "listup", width: 48 },
-    { header: "마감목표", key: "deadline", width: 22 },
-    { header: "중요도", key: "importance", width: 10 },
-    { header: "완료여부", key: "done", width: 10 },
-  ];
-  styleHeader(todo.getRow(1));
-  sortTasks(tasks).forEach((t, i) => {
-    const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
-    const row = todo.addRow({
-      order: i + 1,
-      // plain text — AutoFilter 그룹/정렬용 (업무용·개인용·과제용·팀원용)
-      frame: CATEGORY_LABEL[t.category],
-      listup,
-      deadline: null,
-      // number 1–3 so Excel sorts ascending/descending by value
-      importance: Number(t.importance) || 0,
-      done: "",
-    });
-    writeDeadlineCell(row.getCell(4), t); // 마감목표
-  });
-  todo.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
-  todo.getColumn("deadline").alignment = {
-    wrapText: true,
-    vertical: "middle",
-    horizontal: "center",
-  };
-  todo.getColumn("frame").alignment = {
-    vertical: "middle",
-    horizontal: "center",
-  };
-  todo.getColumn("importance").alignment = {
-    vertical: "middle",
-    horizontal: "center",
-  };
-  enableAutoFilter(todo, 6);
+  const activeTasks = sortTasks(tasks);
+  const todoRows: ExcelJS.CellValue[][] = activeTasks.map((t, i) => [
+    i + 1,
+    CATEGORY_LABEL[t.category],
+    t.memo ? `${t.title}\n${t.memo}` : t.title,
+    deadlineCellValue(t),
+    Number(t.importance) || 0,
+    "",
+  ]);
+  enableSortableTodoTable(todo, "IlbiseoTodo", todoRows, activeTasks);
 
   const done = wb.addWorksheet("한 일", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
-  done.columns = [
-    { header: "순서", key: "order", width: 8 },
-    { header: "틀", key: "frame", width: 10 },
-    { header: "할일 LIST UP", key: "listup", width: 48 },
-    { header: "마감목표", key: "deadline", width: 22 },
-    { header: "중요도", key: "importance", width: 10 },
-    { header: "완료여부", key: "done", width: 10 },
-  ];
-  styleHeader(done.getRow(1));
-  sortCompleted(tasks).forEach((t, i) => {
-    const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
-    const row = done.addRow({
-      order: i + 1,
-      frame: CATEGORY_LABEL[t.category],
-      listup,
-      deadline: null,
-      importance: Number(t.importance) || 0,
-      done: "완료",
-    });
-    writeDeadlineCell(row.getCell(4), t); // 마감목표
-  });
-  done.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
-  done.getColumn("deadline").alignment = {
-    wrapText: true,
-    vertical: "middle",
-    horizontal: "center",
-  };
-  done.getColumn("frame").alignment = {
-    vertical: "middle",
-    horizontal: "center",
-  };
-  done.getColumn("importance").alignment = {
-    vertical: "middle",
-    horizontal: "center",
-  };
-  enableAutoFilter(done, 6);
+  const completedTasks = sortCompleted(tasks);
+  const doneRows: ExcelJS.CellValue[][] = completedTasks.map((t, i) => [
+    i + 1,
+    CATEGORY_LABEL[t.category],
+    t.memo ? `${t.title}\n${t.memo}` : t.title,
+    deadlineCellValue(t),
+    Number(t.importance) || 0,
+    "완료",
+  ]);
+  enableSortableTodoTable(done, "IlbiseoDone", doneRows, completedTasks);
 
   // 「구글캘린더」: only events within 2 weeks from save (KST), one row per event
   // (multi-day → full range in 「언제」). No 「캘린더」/「출처」 columns.

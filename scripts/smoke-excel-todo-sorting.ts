@@ -130,10 +130,50 @@ async function main() {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
 
+  const wantFilter: Record<string, boolean> = {
+    순서: false,
+    틀: true,
+    "할일 LIST UP": false,
+    마감목표: true,
+    중요도: true,
+    완료여부: false,
+  };
+
+  const tableNameBySheet: Record<string, string> = {
+    "할 일": "IlbiseoTodo",
+    "한 일": "IlbiseoDone",
+  };
+
   for (const name of ["할 일", "한 일"] as const) {
     const sh = wb.getWorksheet(name);
     ok(`sheet-${name}`, Boolean(sh), null);
-    ok(`autofilter-${name}`, Boolean(sh!.autoFilter), sh!.autoFilter);
+    const table = sh!.getTable(tableNameBySheet[name]);
+    ok(`table-${name}`, Boolean(table), tableNameBySheet[name]);
+    const buttons: Record<string, boolean> = {};
+    for (let i = 0; i < 6; i++) {
+      const col = table.getColumn(i);
+      buttons[col.name] = Boolean(col.filterButton);
+    }
+    ok(
+      `filter-buttons-${name}`,
+      Object.keys(wantFilter).every((k) => buttons[k] === wantFilter[k]),
+      buttons,
+    );
+    // Arrows via Table column hiddenButton — not sheet-level AutoFilter
+    ok(
+      `no-sort-cols-hidden-${name}`,
+      buttons["순서"] === false &&
+        buttons["할일 LIST UP"] === false &&
+        buttons["완료여부"] === false,
+      buttons,
+    );
+    ok(
+      `sortable-cols-shown-${name}`,
+      buttons["틀"] === true &&
+        buttons["마감목표"] === true &&
+        buttons["중요도"] === true,
+      buttons,
+    );
   }
 
   const todo = wb.getWorksheet("할 일")!;

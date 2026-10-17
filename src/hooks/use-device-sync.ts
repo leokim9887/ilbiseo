@@ -16,6 +16,12 @@ import {
   type DeviceSyncPrefs,
 } from "@/lib/device-sync";
 
+/** ~10 minutes while the app stays open (connected sync code). */
+export const AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+
+/** Re-sync when tab becomes visible after this long hidden. */
+const VISIBLE_RESYNC_AFTER_MS = 5 * 60 * 1000;
+
 type SyncToast = {
   kind: "ok" | "error" | "info";
   text: string;
@@ -31,10 +37,11 @@ type UseDeviceSyncArgs = {
 };
 
 /**
- * PC↔폰 동기화 — 수동 우선.
- * - 페이지 로드 시 1회 pull(토스트 없음)
- * - 「지금 동기화」클릭 시에만 push/pull + 「동기화됨」토스트
- * - 편집·저장마다 자동 push / 탭 전환 auto-pull 없음
+ * PC↔폰 동기화
+ * - 로드 시 1회 quiet pull
+ * - ~10분마다 quiet pull+push (편집마다 아님)
+ * - 탭을 오래 숨겼다 다시 보이면 quiet 1회
+ * - 「지금 동기화」만 토스트
  */
 export function useDeviceSync({
   ready,
@@ -61,6 +68,8 @@ export function useDeviceSync({
   const localUpdatedAtRef = useRef(localUpdatedAt);
   const prefsRef = useRef(prefs);
   const pulledOnceRef = useRef(false);
+  const syncInFlightRef = useRef(false);
+  const hiddenAtRef = useRef<number | null>(null);
 
   stateRef.current = state;
   localUpdatedAtRef.current = localUpdatedAt;
@@ -80,28 +89,39 @@ export function useDeviceSync({
     saveSyncPrefs(next);
   }, []);
 
-  /** Background / load pull — never shows 「동기화됨」 toast. */
-  const runPull = useCallback(
-    async (opts?: { code?: string }) => {
+  /**
+   * Quiet pull+push (LWW). No toast.
+   * Used by: interval, visibility resume, initial seed path.
+   */
+  const runQuietRoundtrip = useCallback(
+    async (opts?: { code?: string; pullOnly?: boolean }) => {
       const current = prefsRef.current;
       const code = opts?.code ?? current.code;
       if (!code) return;
       if (!opts?.code && !current.enabled) return;
+      if (syncInFlightRef.current) return;
+      if (skipRemotePushRef.current) {
+        skipRemotePushRef.current = false;
+      }
+      syncInFlightRef.current = true;
       setBusy(true);
       try {
-        const result = await pullRemoteState(
-          code,
-          localUpdatedAtRef.current,
-        );
-        if (result.status === "applied") {
-          hydrateFromRemote(result.state, result.updatedAt);
+        const pull = await pullRemoteState(code, localUpdatedAtRef.current);
+        if (pull.status === "applied") {
+          hydrateFromRemote(pull.state, pull.updatedAt);
           writePrefs({
             ...prefsRef.current,
-            lastSyncedAt: result.updatedAt,
-            localUpdatedAt: result.updatedAt,
+            lastSyncedAt: pull.updatedAt,
+            localUpdatedAt: pull.updatedAt,
           });
-        } else if (result.status === "empty") {
-          // First device: quietly seed remote with local workbook.
+          if (opts?.pullOnly) return;
+          // After applying remote, local matches remote — skip push.
+          return;
+        }
+        if (pull.status === "error") return;
+        if (opts?.pullOnly) return;
+
+        if (pull.status === "empty") {
           const updatedAt =
             localUpdatedAtRef.current ?? new Date().toISOString();
           const push = await pushLocalState(
@@ -116,13 +136,37 @@ export function useDeviceSync({
               localUpdatedAt: push.updatedAt,
             });
           }
+          return;
         }
-        // same / skipped-local-newer / error — silent on background pull
+
+        // same / skipped-local-newer → push local if needed
+        const updatedAt =
+          localUpdatedAtRef.current ?? new Date().toISOString();
+        const push = await pushLocalState(
+          code,
+          stateRef.current,
+          updatedAt,
+        );
+        if (push.status === "ok") {
+          writePrefs({
+            ...prefsRef.current,
+            lastSyncedAt: push.updatedAt,
+            localUpdatedAt: push.updatedAt,
+          });
+        } else if (push.status === "conflict") {
+          hydrateFromRemote(push.state, push.updatedAt);
+          writePrefs({
+            ...prefsRef.current,
+            lastSyncedAt: push.updatedAt,
+            localUpdatedAt: push.updatedAt,
+          });
+        }
       } finally {
+        syncInFlightRef.current = false;
         setBusy(false);
       }
     },
-    [hydrateFromRemote, writePrefs],
+    [hydrateFromRemote, skipRemotePushRef, writePrefs],
   );
 
   /** Explicit 「지금 동기화」— toast only here. */
@@ -138,6 +182,11 @@ export function useDeviceSync({
     if (skipRemotePushRef.current) {
       skipRemotePushRef.current = false;
     }
+    if (syncInFlightRef.current) {
+      showToast({ kind: "info", text: "동기화 중입니다. 잠시만요." });
+      return;
+    }
+    syncInFlightRef.current = true;
     setBusy(true);
     try {
       const pull = await pullRemoteState(
@@ -190,22 +239,61 @@ export function useDeviceSync({
         showToast({ kind: "error", text: push.message });
       }
     } finally {
+      syncInFlightRef.current = false;
       setBusy(false);
     }
   }, [hydrateFromRemote, showToast, skipRemotePushRef, writePrefs]);
 
-  // Initial pull on load / when sync first enabled — no toast
+  // Initial quiet pull on load / when sync first enabled
   useEffect(() => {
     if (!ready || !prefs.enabled || !prefs.code) return;
     if (pulledOnceRef.current) return;
     pulledOnceRef.current = true;
-    void runPull();
-  }, [ready, prefs.enabled, prefs.code, runPull]);
+    void runQuietRoundtrip({ pullOnly: true });
+  }, [ready, prefs.enabled, prefs.code, runQuietRoundtrip]);
 
-  // Reset pulledOnce when sync turned off so next enable pulls again
   useEffect(() => {
     if (!prefs.enabled) pulledOnceRef.current = false;
   }, [prefs.enabled]);
+
+  // ~10 min quiet roundtrip while app is open
+  useEffect(() => {
+    if (!ready || !prefs.enabled || !prefs.code) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void runQuietRoundtrip();
+    }, AUTO_SYNC_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [ready, prefs.enabled, prefs.code, runQuietRoundtrip]);
+
+  // Tab visible again after long hide → one quiet sync (no toast)
+  useEffect(() => {
+    if (!ready || !prefs.enabled || !prefs.code) return;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+      const hiddenAt = hiddenAtRef.current;
+      hiddenAtRef.current = null;
+      if (hiddenAt == null) return;
+      if (Date.now() - hiddenAt < VISIBLE_RESYNC_AFTER_MS) return;
+      void runQuietRoundtrip();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [ready, prefs.enabled, prefs.code, runQuietRoundtrip]);
+
+  /** Connect flow: quiet pull with explicit code (no toast). */
+  const runPull = useCallback(
+    async (opts?: { code?: string }) => {
+      await runQuietRoundtrip({
+        code: opts?.code,
+        pullOnly: Boolean(opts?.code),
+      });
+    },
+    [runQuietRoundtrip],
+  );
 
   return {
     prefs,

@@ -96,12 +96,15 @@ export function DeviceSyncPanel({
               <strong className="font-semibold text-[var(--ink)]">
                 동기화 코드
               </strong>
-              로 맞춥니다. 글자를 고칠 때마다 올라가지 않습니다.{" "}
+              로 맞춥니다. 글자 입력마다 올리지 않습니다. 앱을 켠 동안{" "}
+              <strong className="font-semibold text-[var(--ink)]">
+                약 10분마다 자동
+              </strong>
+              으로 맞추고, 바로 맞추려면{" "}
               <strong className="font-semibold text-[var(--ink)]">
                 「지금 동기화」
               </strong>
-              를 누를 때(또는 페이지를 새로 열 때)만 맞춥니다. Google 캘린더와는
-              별개입니다.
+              또는 페이지 새로고침을 쓰세요. Google 캘린더와는 별개입니다.
             </p>
           </div>
 

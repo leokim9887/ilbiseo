@@ -120,11 +120,18 @@ def unsharp(im: Image.Image, percent: int = 115, radius: float = 1.2) -> Image.I
     )
 
 
-def radial_mask(size: tuple[int, int], soft: float = 0.45) -> Image.Image:
+def radial_mask(
+    size: tuple[int, int],
+    soft: float = 0.45,
+    *,
+    rx_scale: float = 1.0,
+    ry_scale: float = 1.0,
+) -> Image.Image:
+    """Elliptical vignette. rx_scale>1 widens horizontal so cheeks stay opaque."""
     w, h = size
     mask = Image.new("L", (w, h), 0)
     cx, cy = (w - 1) / 2.0, (h - 1) / 2.0
-    rx, ry = max(w / 2.0, 1), max(h / 2.0, 1)
+    rx, ry = max(w / 2.0, 1) * rx_scale, max(h / 2.0, 1) * ry_scale
     px = mask.load()
     for y in range(h):
         for x in range(w):
@@ -370,33 +377,32 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Pets first (same assets/slots), then Ace on top so full face/cheeks aren't covered
+    # Pets lower/outward — clear of Ace cheeks (PC only)
     dog = night_grade(
-        cover_crop(load_dog(), 470, 470, bias=DOG_BIAS), strength=0.36
+        cover_crop(load_dog(), 340, 340, bias=DOG_BIAS), strength=0.36
     )
-    paste_masked(canvas, dog, (880, 255), radial_mask((470, 470), soft=0.46), 0.97)
+    paste_masked(canvas, dog, (700, 480), radial_mask((340, 340), soft=0.55), 0.92)
 
     cat = night_grade(
-        cover_crop(load("03-cat.png"), 450, 450, bias=(0.52, 0.32)), strength=0.34
+        cover_crop(load("03-cat.png"), 320, 320, bias=(0.52, 0.32)), strength=0.34
     )
-    paste_masked(canvas, cat, (1310, 255), radial_mask((450, 450), soft=0.48), 0.97)
+    paste_masked(canvas, cat, (1410, 475), radial_mask((320, 320), soft=0.55), 0.92)
 
-    # Baby/Ace — PC zoom-OUT (contain, not cover): entire face like source photo
-    # Mobile path unchanged. Soft vignette keeps cheeks; Ace drawn above pets.
-    bw, bh = 700, 720
+    # Baby/Ace — portrait nearly fills plane; wide soft ellipse keeps BOTH cheeks
+    # fully opaque (soft fade only on outer photo rim). Ace on top. Mobile unchanged.
+    bw, bh = 720, 760
     baby_src = load(BABY_SRC)
     sw, sh = baby_src.size
-    scale = min(bw / sw, bh / sh) * 0.72
+    scale = min(bw / sw, bh / sh) * 0.82
     nw, nh = max(1, int(sw * scale + 0.5)), max(1, int(sh * scale + 0.5))
-    resized = baby_src.resize((nw, nh), Image.Resampling.LANCZOS)
-    baby_plane = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
-    ox = (bw - nw) // 2
-    oy = max(0, (bh - nh) // 2 - 12)
-    baby_plane.paste(resized, (ox, oy), resized)
-    baby = night_grade(baby_plane, strength=0.18)
-    paste_masked(
-        canvas, baby, (1000, -45), radial_mask((bw, bh), soft=0.94), 0.99
+    resized = night_grade(
+        baby_src.resize((nw, nh), Image.Resampling.LANCZOS), strength=0.12
     )
+    baby_plane = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    ox, oy = (bw - nw) // 2, max(0, (bh - nh) // 2 - 2)
+    baby_plane.paste(resized, (ox, oy), resized)
+    ace_mask = radial_mask((bw, bh), soft=0.62, rx_scale=1.48, ry_scale=1.18)
+    paste_masked(canvas, baby_plane, (960, -40), ace_mask, 0.99)
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)

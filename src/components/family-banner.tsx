@@ -28,7 +28,7 @@ export function FamilyBanner({
       <div className="relative aspect-[1170/780] w-full sm:aspect-[1680/700]">
         {/* Mobile asset */}
         <Image
-          src="/ilbiseo-family-banner-mobile.jpg?v=28"
+          src="/ilbiseo-family-banner-mobile.jpg?v=29"
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority
@@ -38,7 +38,7 @@ export function FamilyBanner({
         />
         {/* PC asset */}
         <Image
-          src="/ilbiseo-family-banner-pc.jpg?v=28"
+          src="/ilbiseo-family-banner-pc.jpg?v=29"
           alt="가족과 반려 — 해변 셀피, 아기, 강아지, 고양이"
           fill
           priority

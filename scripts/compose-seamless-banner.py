@@ -31,8 +31,8 @@ CHEER_SRC = "04-baby.png"
 DOG_SRC = "02-dog-new.png"
 # Face + tan cap framing (mobile / shared default)
 BABY_BIAS = (0.52, 0.30)
-# PC-only: face-centered — a bit lower so eyes+cheeks read clearly under the cap
-BABY_BIAS_PC = (0.50, 0.42)
+# PC-only: less cropped — full face (both cheeks + chin + hat brim), not a tight zoom
+BABY_BIAS_PC = (0.50, 0.38)
 # Original cheer crop bias (pre Ace-cap replace)
 CHEER_BIAS = (0.50, 0.14)
 # New dog: face-forward Maltese; bias keeps eyes in upper-center of square crop
@@ -370,13 +370,7 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Baby/Ace — PC: modestly larger + face-centered crop (mobile unchanged)
-    bw, bh = 610, 660
-    baby = night_grade(
-        cover_crop(load(BABY_SRC), bw, bh, bias=BABY_BIAS_PC), strength=0.28
-    )
-    paste_masked(canvas, baby, (1015, -28), radial_mask((bw, bh), soft=0.56), 0.99)
-
+    # Pets first (same assets/slots), then Ace on top so full face/cheeks aren't covered
     dog = night_grade(
         cover_crop(load_dog(), 470, 470, bias=DOG_BIAS), strength=0.36
     )
@@ -386,6 +380,23 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
         cover_crop(load("03-cat.png"), 450, 450, bias=(0.52, 0.32)), strength=0.34
     )
     paste_masked(canvas, cat, (1310, 255), radial_mask((450, 450), soft=0.48), 0.97)
+
+    # Baby/Ace — PC zoom-OUT (contain, not cover): entire face like source photo
+    # Mobile path unchanged. Soft vignette keeps cheeks; Ace drawn above pets.
+    bw, bh = 700, 720
+    baby_src = load(BABY_SRC)
+    sw, sh = baby_src.size
+    scale = min(bw / sw, bh / sh) * 0.72
+    nw, nh = max(1, int(sw * scale + 0.5)), max(1, int(sh * scale + 0.5))
+    resized = baby_src.resize((nw, nh), Image.Resampling.LANCZOS)
+    baby_plane = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    ox = (bw - nw) // 2
+    oy = max(0, (bh - nh) // 2 - 12)
+    baby_plane.paste(resized, (ox, oy), resized)
+    baby = night_grade(baby_plane, strength=0.18)
+    paste_masked(
+        canvas, baby, (1000, -45), radial_mask((bw, bh), soft=0.94), 0.99
+    )
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)

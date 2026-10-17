@@ -16,6 +16,10 @@ import {
   deadlineExcelParts,
   todayIsoKst,
 } from "./date-range";
+import {
+  repairExcelJsTableXml,
+  sanitizeExcelText,
+} from "./excel-xlsx-repair";
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
@@ -66,6 +70,12 @@ const TODO_DONE_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
   { name: "완료여부", filterButton: false },
 ];
 
+function listUpCell(task: Pick<Task, "title" | "memo">): string {
+  const title = sanitizeExcelText(String(task.title ?? ""));
+  const memo = sanitizeExcelText(String(task.memo ?? ""));
+  return memo ? `${title}\n${memo}` : title;
+}
+
 /** 마감목표: single day = Date; range/언젠가 = text (exact round-trip). */
 function writeDeadlineCell(
   cell: ExcelJS.Cell,
@@ -73,6 +83,10 @@ function writeDeadlineCell(
 ) {
   const parts = deadlineExcelParts(task);
   if (parts.kind === "date") {
+    if (Number.isNaN(parts.value.getTime())) {
+      cell.value = parts.start;
+      return;
+    }
     cell.value = parts.value;
     cell.numFmt = parts.numFmt;
     return;
@@ -84,38 +98,34 @@ function deadlineCellValue(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
 ): Date | string {
   const parts = deadlineExcelParts(task);
+  if (parts.kind === "date") {
+    if (Number.isNaN(parts.value.getTime())) return parts.start;
+    return parts.value;
+  }
   return parts.value;
 }
 
-function enableSortableTodoTable(
+function colLetter(n: number): string {
+  let s = "";
+  let x = n;
+  while (x > 0) {
+    const r = (x - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    x = Math.floor((x - 1) / 26);
+  }
+  return s;
+}
+
+function applyTodoColumnLayout(
   sheet: ExcelJS.Worksheet,
-  tableName: string,
-  dataRows: ExcelJS.CellValue[][],
-  tasksForDeadlineFmt: Pick<Task, "startDate" | "targetDate" | "kind">[],
-  columns: ExcelJS.TableColumnProperties[],
+  columnCount: number,
 ) {
-  // Clear any sheet-level AutoFilter — table owns filter arrows
-  sheet.autoFilter = undefined;
-  sheet.addTable({
-    name: tableName,
-    ref: "A1",
-    headerRow: true,
-    totalsRow: false,
-    style: {
-      theme: "TableStyleMedium1",
-      showRowStripes: false,
-      showColumnStripes: false,
-    },
-    columns,
-    rows: dataRows,
-  });
-  styleHeader(sheet.getRow(1));
   sheet.getColumn(1).width = 8;
   sheet.getColumn(2).width = 10;
   sheet.getColumn(3).width = 48;
   sheet.getColumn(4).width = 22;
   sheet.getColumn(5).width = 10;
-  if (columns.length >= 6) sheet.getColumn(6).width = 10;
+  if (columnCount >= 6) sheet.getColumn(6).width = 10;
   sheet.getColumn(3).alignment = { wrapText: true, vertical: "top" };
   sheet.getColumn(4).alignment = {
     wrapText: true,
@@ -130,9 +140,54 @@ function enableSortableTodoTable(
     vertical: "middle",
     horizontal: "center",
   };
+}
+
+/**
+ * Sortable todo sheet.
+ * - With rows: Excel Table (filter ▾ on 틀·마감·중요도). XML repaired after write
+ *   (ExcelJS totalsRowShown bug).
+ * - Empty: header row only — **no Table** (header-only tables trigger Office repair).
+ */
+function enableSortableTodoTable(
+  sheet: ExcelJS.Worksheet,
+  tableName: string,
+  dataRows: ExcelJS.CellValue[][],
+  tasksForDeadlineFmt: Pick<Task, "startDate" | "targetDate" | "kind">[],
+  columns: ExcelJS.TableColumnProperties[],
+) {
+  sheet.autoFilter = undefined;
+
+  if (dataRows.length === 0) {
+    // Header-only — skip Table XML entirely (Office often repairs A1:E1 tables)
+    sheet.addRow(columns.map((c) => c.name));
+    styleHeader(sheet.getRow(1));
+    applyTodoColumnLayout(sheet, columns.length);
+    return;
+  }
+
+  sheet.addTable({
+    name: tableName,
+    ref: "A1",
+    headerRow: true,
+    totalsRow: false,
+    style: {
+      theme: "TableStyleMedium1",
+      showRowStripes: false,
+      showColumnStripes: false,
+    },
+    columns,
+    rows: dataRows,
+  });
+  styleHeader(sheet.getRow(1));
+  applyTodoColumnLayout(sheet, columns.length);
   tasksForDeadlineFmt.forEach((t, i) => {
     writeDeadlineCell(sheet.getRow(i + 2).getCell(4), t);
   });
+  // Ensure dimension covers table (defensive)
+  const lastCol = colLetter(columns.length);
+  const lastRow = 1 + dataRows.length;
+  void lastCol;
+  void lastRow;
 }
 
 export type WorkbookPayload = {
@@ -161,15 +216,15 @@ function addSideSheet(
   items.forEach((item, i) => {
     sheet.addRow({
       order: i + 1,
-      title: item.title,
-      memo: item.memo,
+      title: sanitizeExcelText(item.title ?? ""),
+      memo: sanitizeExcelText(item.memo ?? ""),
     });
   });
 }
 
 export async function buildWorkbook(
   payload: WorkbookPayload,
-): Promise<ExcelJS.Buffer> {
+): Promise<ArrayBuffer> {
   const {
     tasks,
     calendarEvents,
@@ -190,7 +245,7 @@ export async function buildWorkbook(
   const todoRows: ExcelJS.CellValue[][] = activeTasks.map((t, i) => [
     i + 1,
     CATEGORY_LABEL[t.category],
-    t.memo ? `${t.title}\n${t.memo}` : t.title,
+    listUpCell(t),
     deadlineCellValue(t),
     Number(t.importance) || 0,
   ]);
@@ -209,7 +264,7 @@ export async function buildWorkbook(
   const doneRows: ExcelJS.CellValue[][] = completedTasks.map((t, i) => [
     i + 1,
     CATEGORY_LABEL[t.category],
-    t.memo ? `${t.title}\n${t.memo}` : t.title,
+    listUpCell(t),
     deadlineCellValue(t),
     Number(t.importance) || 0,
     "완료",
@@ -244,9 +299,9 @@ export async function buildWorkbook(
     a.start.localeCompare(b.start),
   )) {
     cal.addRow({
-      when: formatCalendarWhen(e),
-      title: e.title,
-      notes: e.notes,
+      when: sanitizeExcelText(formatCalendarWhen(e)),
+      title: sanitizeExcelText(e.title ?? ""),
+      notes: sanitizeExcelText(e.notes ?? ""),
     });
   }
   cal.getColumn("when").alignment = {
@@ -260,20 +315,22 @@ export async function buildWorkbook(
   if (briefing) {
     const summary = wb.addWorksheet("브리핑요약");
     summary.getColumn(1).width = 88;
-    summary.addRow([briefing.headline]);
+    summary.addRow([sanitizeExcelText(briefing.headline)]);
     summary.getRow(1).font = {
       bold: true,
       size: 14,
       color: { argb: "FF163F39" },
     };
-    summary.addRow([briefing.summaryLine]);
+    summary.addRow([sanitizeExcelText(briefing.summaryLine)]);
     summary.addRow([]);
     for (const line of briefing.plaintext.split("\n")) {
-      summary.addRow([line]);
+      summary.addRow([sanitizeExcelText(line)]);
     }
   }
 
-  return wb.xlsx.writeBuffer();
+  const raw = await wb.xlsx.writeBuffer();
+  // ExcelJS Table bug → Office「이 파일에 오류가 생겼습니다」repair dialog
+  return repairExcelJsTableXml(raw);
 }
 
 /** @deprecated alias */

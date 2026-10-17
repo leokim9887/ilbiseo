@@ -1,14 +1,31 @@
 /** Minimal File System Access API typings */
 interface FileSystemWritableFileStream extends WritableStream {
-  write(data: BufferSource | Blob | string): Promise<void>;
+  write(
+    data:
+      | BufferSource
+      | Blob
+      | string
+      | {
+          type: "write";
+          position?: number;
+          data: BufferSource | Blob | string;
+        }
+      | { type: "seek"; position: number }
+      | { type: "truncate"; size: number },
+  ): Promise<void>;
+  truncate(size: number): Promise<void>;
+  seek(position: number): Promise<void>;
   close(): Promise<void>;
+  abort(): Promise<void>;
 }
 
 interface FileSystemFileHandle {
   readonly kind: "file";
   readonly name: string;
   getFile(): Promise<File>;
-  createWritable(): Promise<FileSystemWritableFileStream>;
+  createWritable(options?: {
+    keepExistingData?: boolean;
+  }): Promise<FileSystemWritableFileStream>;
   queryPermission?(descriptor: {
     mode?: "read" | "readwrite";
   }): Promise<PermissionState>;

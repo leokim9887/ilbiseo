@@ -239,9 +239,20 @@ export async function writeBufferToHandle(
       { name: "NotAllowedError" },
     );
   }
-  const writable = await handle.createWritable();
+  // Fully materialize bytes first — never stream a partial workbook.
+  const data = toArrayBuffer(buffer);
+  if (data.byteLength < 32) {
+    throw new Error("엑셀 데이터가 비어 있어 저장하지 않았습니다.");
+  }
+  /**
+   * keepExistingData: true — avoid truncating to 0 before the write succeeds.
+   * Default createWritable() truncates immediately; a failed mid-write left a
+   * 0-byte / half-written .xlsx that Excel reports as「이 파일에 오류가 생겼습니다」.
+   */
+  const writable = await handle.createWritable({ keepExistingData: true });
   try {
-    await writable.write(toArrayBuffer(buffer));
+    await writable.write({ type: "write", position: 0, data });
+    await writable.truncate(data.byteLength);
     await writable.close();
   } catch (e) {
     try {

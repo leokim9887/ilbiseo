@@ -21,6 +21,64 @@ import {
   sanitizeExcelText,
 } from "./excel-xlsx-repair";
 
+/** Father-facing 마감목표 entry formats (Excel dropdown + comment). */
+export const DEADLINE_ENTRY_HELP =
+  "마감목표 입력 안내\n" +
+  "· 언젠가 — 기한 없음 (앱「언젠가」와 동일)\n" +
+  "· 2026-10-17 — 하루\n" +
+  "· 2026-10-17 ~ 2026-10-24 — 구간\n" +
+  "목록에서 고르거나 위 형식으로 직접 입력하세요. 불러오면 앱과 똑같이 맞춰집니다.";
+
+/** Dropdown list formula for Excel data validation (comma-separated). */
+export function deadlineValidationListFormula(
+  today: string = todayIsoKst(),
+): string {
+  const tomorrow = addDaysIso(today, 1);
+  const weekEnd = addDaysIso(today, 6);
+  const twoWeekEnd = addDaysIso(today, 13);
+  const items = [
+    "언젠가",
+    today,
+    tomorrow,
+    `${today} ~ ${weekEnd}`,
+    `${today} ~ ${twoWeekEnd}`,
+  ];
+  return `"${items.join(",")}"`;
+}
+
+function applyDeadlineEntryAids(
+  sheet: ExcelJS.Worksheet,
+  dataRowCount: number,
+) {
+  const today = todayIsoKst();
+  const endRow = Math.max(dataRowCount + 40, 50);
+  const validation: ExcelJS.DataValidation = {
+    type: "list",
+    allowBlank: true,
+    formulae: [deadlineValidationListFormula(today)],
+    // Soft: father may type any date/range not in the short list
+    showErrorMessage: false,
+    showInputMessage: true,
+    promptTitle: "마감목표",
+    prompt:
+      "「언젠가」· YYYY-MM-DD · YYYY-MM-DD ~ YYYY-MM-DD — 목록에서 고르거나 직접 입력",
+  };
+  // ExcelJS runtime has dataValidations; typings omit it on Worksheet
+  (
+    sheet as ExcelJS.Worksheet & {
+      dataValidations: { add: (address: string, v: ExcelJS.DataValidation) => void };
+    }
+  ).dataValidations.add(`D2:D${endRow}`, validation);
+  sheet.getCell(1, 4).note = {
+    texts: [
+      {
+        font: { size: 11, name: "Malgun Gothic", family: 2 },
+        text: DEADLINE_ENTRY_HELP,
+      },
+    ],
+  };
+}
+
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
   pattern: "solid",
@@ -152,6 +210,7 @@ function enableSortableTodoTable(
     sheet.addRow(columns.map((c) => c.name));
     styleHeader(sheet.getRow(1));
     applyTodoColumnLayout(sheet, columns.length);
+    applyDeadlineEntryAids(sheet, 0);
     return;
   }
 
@@ -173,6 +232,7 @@ function enableSortableTodoTable(
   tasksForDeadlineFmt.forEach((t, i) => {
     writeDeadlineCell(sheet.getRow(i + 2).getCell(4), t);
   });
+  applyDeadlineEntryAids(sheet, dataRows.length);
   // Ensure dimension covers table (defensive)
   const lastCol = colLetter(columns.length);
   const lastRow = 1 + dataRows.length;

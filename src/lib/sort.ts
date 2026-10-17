@@ -1,3 +1,4 @@
+import { isPastUnfinishedTask, todayIsoKst } from "./date-range";
 import type { Task, TaskCategory, TaskKind } from "./types";
 
 const KIND_ORDER: Record<TaskKind, number> = {
@@ -7,8 +8,27 @@ const KIND_ORDER: Record<TaskKind, number> = {
 };
 
 function score(task: Task): number {
-  // 중요도만 (시급성 열 제거 후)
+    // 중요도만 (시급성 열 제거 후)
   return task.importance;
+}
+
+/**
+ * Keep overdue active tasks in the list, but push them to the end
+ * (same 틀 — never auto-move to 한 일). Relative order within each
+ * partition is preserved.
+ */
+export function sinkPastUnfinishedTasksLast(
+  tasks: Task[],
+  today: string = todayIsoKst(),
+): Task[] {
+  const current: Task[] = [];
+  const past: Task[] = [];
+  for (const t of tasks) {
+    if (isPastUnfinishedTask(t, today)) past.push(t);
+    else current.push(t);
+  }
+  if (past.length === 0) return current;
+  return [...current, ...past];
 }
 
 export function sortTasks(tasks: Task[], category?: TaskCategory): Task[] {
@@ -35,7 +55,7 @@ export function sortTasks(tasks: Task[], category?: TaskCategory): Task[] {
     compareTasks(a.representative, b.representative),
   );
 
-  return groupEntries.flatMap((g) => g.items);
+  return sinkPastUnfinishedTasksLast(groupEntries.flatMap((g) => g.items));
 }
 
 function compareWithinGroup(a: Task, b: Task): number {

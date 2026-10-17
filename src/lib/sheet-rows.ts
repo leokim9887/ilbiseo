@@ -1,16 +1,19 @@
 import type { CalendarEvent, Task } from "./types";
 import {
   filterByPeriod,
+  isPastUnfinishedTask,
   sortByPeriod,
   taskDateRange,
   todayIso,
+  todayIsoKst,
 } from "./date-range";
 import { eventInclusiveDayRange, eventOccursOnDay } from "./calendar-span";
 import { filterEventsByPeriod } from "./unified";
 
 export type SheetRow =
   | { kind: "task"; id: string; task: Task; sortKey: string }
-  | { kind: "calendar"; id: string; event: CalendarEvent; sortKey: string };
+  | { kind: "calendar"; id: string; event: CalendarEvent; sortKey: string }
+  | { kind: "past-separator"; id: "past-separator" };
 
 function taskSortKey(task: Task): string {
   const r = taskDateRange(task);
@@ -97,6 +100,34 @@ export function buildTaskOnlyRows(
 }
 
 /**
+ * Push past unfinished tasks to the end of the sheet list and insert a
+ * visual separator when both current and past rows exist.
+ * Does not auto-move to 한 일 — only reorders within the same 틀 view.
+ */
+export function sinkPastSheetRowsLast(
+  rows: SheetRow[],
+  today: string = todayIsoKst(),
+): SheetRow[] {
+  const current: SheetRow[] = [];
+  const past: SheetRow[] = [];
+  for (const row of rows) {
+    if (row.kind === "past-separator") continue;
+    if (row.kind === "task" && isPastUnfinishedTask(row.task, today)) {
+      past.push(row);
+    } else {
+      current.push(row);
+    }
+  }
+  if (past.length === 0) return current;
+  if (current.length === 0) return past;
+  return [
+    ...current,
+    { kind: "past-separator", id: "past-separator" },
+    ...past,
+  ];
+}
+
+/**
  * Google Calendar 틀 — calendar events only.
  * - showAll: 가져온 일정 전체
  * - 기간 시작~종료: 구간에 겹치는 일정
@@ -159,6 +190,10 @@ export function buildTodoSheetRows(
       sortKey: eventSortKey(event),
     });
   }
-  rows.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  rows.sort((a, b) => {
+    const ka = a.kind === "past-separator" ? "zzzz" : a.sortKey;
+    const kb = b.kind === "past-separator" ? "zzzz" : b.sortKey;
+    return ka.localeCompare(kb);
+  });
   return rows;
 }

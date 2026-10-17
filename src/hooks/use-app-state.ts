@@ -25,7 +25,7 @@ import {
   writeBufferToHandle,
 } from "@/lib/excel-link";
 import { clampPriority } from "@/lib/priority";
-import { isPastUnfinishedTask, todayIsoKst } from "@/lib/date-range";
+import { todayIsoKst } from "@/lib/date-range";
 import { loadSyncPrefs, saveSyncPrefs } from "@/lib/device-sync";
 
 type Status = "loading" | "ready" | "error";
@@ -359,31 +359,6 @@ export function useAppState() {
     [persist, state],
   );
 
-  /**
-   * Move overdue active user tasks → 한 일 (same as complete).
-   * 「언젠가」 never; GCal is not in tasks. Returns moved tasks (empty if none).
-   */
-  const autoCompleteOverdueTasks = useCallback((): Task[] => {
-    const today = todayIsoKst();
-    const overdue = state.tasks.filter((t) => isPastUnfinishedTask(t, today));
-    if (overdue.length === 0) return [];
-    const complete = new Set(overdue.map((t) => t.id));
-    const completedAt = new Date().toISOString();
-    persist({
-      ...state,
-      tasks: state.tasks.map((t) =>
-        complete.has(t.id) && t.status !== "completed"
-          ? {
-              ...t,
-              status: "completed",
-              completedAt,
-            }
-          : t,
-      ),
-    });
-    return overdue;
-  }, [persist, state]);
-
   const restoreTask = useCallback(
     (id: string) => {
       persist({
@@ -620,7 +595,6 @@ export function useAppState() {
     updateTask,
     completeTask,
     completeTasks,
-    autoCompleteOverdueTasks,
     restoreTask,
     deleteTask,
     deleteTasks,

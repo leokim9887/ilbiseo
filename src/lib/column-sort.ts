@@ -50,6 +50,9 @@ function deadlineKey(row: SheetRow): { empty: boolean; value: string } {
     const v = row.event.start.slice(0, 10);
     return { empty: !v, value: v || "" };
   }
+  if (row.kind === "past-separator") {
+    return { empty: true, value: "" };
+  }
   // 「언젠가」·날짜 없음 → always last (ASC/DESC)
   if (isSomedayDeadline(row.task)) {
     return { empty: true, value: "" };
@@ -61,7 +64,7 @@ function deadlineKey(row: SheetRow): { empty: boolean; value: string } {
 }
 
 function importanceKey(row: SheetRow): { empty: boolean; value: number } {
-  if (row.kind === "calendar") {
+  if (row.kind === "calendar" || row.kind === "past-separator") {
     return { empty: true, value: 0 };
   }
   const v = row.task.importance;

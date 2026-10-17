@@ -23,31 +23,9 @@ import {
   isAllFrame,
   isTaskCategory,
   type FrameId,
-  type Task,
   type TaskCategory,
 } from "@/lib/types";
 import { Loader2, RotateCcw } from "lucide-react";
-
-const AUTO_DONE_TITLE_LIMIT = 8;
-
-/** Concise father-friendly alert after overdue → 한 일. */
-function formatAutoDoneAlert(moved: Task[]): string {
-  const n = moved.length;
-  const lines = moved.slice(0, AUTO_DONE_TITLE_LIMIT).map((t, i) => {
-    const title = (t.title || "(제목 없음)").trim() || "(제목 없음)";
-    const short = title.length > 40 ? `${title.slice(0, 40)}…` : title;
-    return `${i + 1}. ${short}`;
-  });
-  const extra =
-    n > AUTO_DONE_TITLE_LIMIT
-      ? `\n… 외 ${n - AUTO_DONE_TITLE_LIMIT}건`
-      : "";
-  return (
-    `기한이 지난 할 일 ${n}건을 「한 일」로 옮겼습니다.\n\n` +
-    lines.join("\n") +
-    extra
-  );
-}
 
 function readViewFromUrl(): MainView | null {
   if (typeof window === "undefined") return null;
@@ -80,20 +58,6 @@ export function AssistantApp() {
     kind: "ok" | "error";
     text: string;
   } | null>(null);
-  /** Session: already-alerted auto-complete task ids (no spam). */
-  const autoDoneAlertedRef = useRef<Set<string>>(new Set());
-  const autoCompleteRef = useRef(app.autoCompleteOverdueTasks);
-  autoCompleteRef.current = app.autoCompleteOverdueTasks;
-
-  const runAutoCompleteOverdue = useCallback(() => {
-    const moved = autoCompleteRef.current();
-    if (moved.length === 0) return;
-    const fresh = moved.filter((t) => !autoDoneAlertedRef.current.has(t.id));
-    if (fresh.length === 0) return;
-    for (const t of fresh) autoDoneAlertedRef.current.add(t.id);
-    window.alert(formatAutoDoneAlert(fresh));
-  }, []);
-
   useEffect(() => {
     const fromUrl = readViewFromUrl();
     if (fromUrl) setView(fromUrl);
@@ -119,25 +83,9 @@ export function AssistantApp() {
     }
   }, []);
 
-  // Overdue → 한 일 on load / tab visible / window (not only when opening a sheet)
-  useEffect(() => {
-    if (app.status !== "ready") return;
-    runAutoCompleteOverdue();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") runAutoCompleteOverdue();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", runAutoCompleteOverdue);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", runAutoCompleteOverdue);
-    };
-  }, [app.status, runAutoCompleteOverdue]);
-
   const hardReloadCountRef = useRef(0);
   const handlePullRefresh = useCallback(async () => {
     app.reloadFromStorage();
-    runAutoCompleteOverdue();
     if (sync.prefs.enabled && sync.prefs.code) {
       try {
         await sync.syncNow();
@@ -157,7 +105,7 @@ export function AssistantApp() {
       return true;
     }
     return false;
-  }, [app, runAutoCompleteOverdue, sync]);
+  }, [app, sync]);
 
   const { pullPx, refreshing, threshold } = usePullToRefresh({
     onRefresh: handlePullRefresh,

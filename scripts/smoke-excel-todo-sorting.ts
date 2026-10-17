@@ -5,8 +5,13 @@ import fs from "fs";
 import path from "path";
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
-import { buildWorkbook } from "../src/lib/excel";
-import { deadlineExcelParts } from "../src/lib/date-range";
+import {
+  buildWorkbook,
+  DEADLINE_ENTRY_HELP,
+  deadlineValidationListFormula,
+} from "../src/lib/excel";
+import { deadlineExcelParts, todayIsoKst } from "../src/lib/date-range";
+import { parseDeadline } from "../src/lib/excel-import";
 import type { Task } from "../src/lib/types";
 
 const OUT =
@@ -260,6 +265,84 @@ async function main() {
     deadlineTexts.some((t) => t === "언젠가"),
     deadlineTexts,
   );
+
+  // Excel-native 마감목표 entry aids (list validation + header note)
+  {
+    const formula = deadlineValidationListFormula(todayIsoKst());
+    ok(
+      "deadline-list-has-언젠가",
+      formula.includes("언젠가") && formula.startsWith('"') && formula.endsWith('"'),
+      formula,
+    );
+    const dvModel = (todo as unknown as { dataValidations?: { model?: Record<string, unknown> } })
+      .dataValidations?.model;
+    const dvEntries = dvModel ? Object.entries(dvModel) : [];
+    ok("deadline-validation-present", dvEntries.length >= 1, dvEntries.map(([k]) => k));
+    const hasList = dvEntries.some(([, v]) => {
+      const dv = v as { type?: string; formulae?: string[] };
+      return (
+        dv.type === "list" &&
+        Array.isArray(dv.formulae) &&
+        String(dv.formulae[0] ?? "").includes("언젠가")
+      );
+    });
+    ok("deadline-validation-list-언젠가", hasList, dvEntries);
+    const note = todo.getCell(1, 4).note;
+    const noteText =
+      typeof note === "string"
+        ? note
+        : Array.isArray((note as { texts?: { text?: string }[] })?.texts)
+          ? ((note as { texts: { text?: string }[] }).texts)
+              .map((t) => t.text ?? "")
+              .join("")
+          : "";
+    ok(
+      "deadline-header-note",
+      noteText.includes("언젠가") &&
+        (noteText.includes("~") || noteText.includes("구간")),
+      { noteText: noteText.slice(0, 200), help: DEADLINE_ENTRY_HELP.slice(0, 80) },
+    );
+    ok(
+      "deadline-help-mentions-언젠가",
+      DEADLINE_ENTRY_HELP.includes("언젠가"),
+      DEADLINE_ENTRY_HELP.slice(0, 120),
+    );
+  }
+
+  // Import round-trip: list options → exact app 마감 shape
+  {
+    const someday = parseDeadline("언젠가");
+    ok(
+      "import-언젠가",
+      someday.kind === "someday" &&
+        someday.startDate === null &&
+        someday.targetDate === null,
+      someday,
+    );
+    const day = parseDeadline("2026-10-17");
+    ok(
+      "import-single-day",
+      day.kind === "spot" &&
+        day.startDate === "2026-10-17" &&
+        day.targetDate === "2026-10-17",
+      day,
+    );
+    const range = parseDeadline("2026-10-17 ~ 2026-10-24");
+    ok(
+      "import-range",
+      range.kind === "ongoing" &&
+        range.startDate === "2026-10-17" &&
+        range.targetDate === "2026-10-24",
+      range,
+    );
+    // Real date must not become 언젠가
+    const notCorrupt = parseDeadline("2026-11-01");
+    ok(
+      "import-date-not-언젠가",
+      notCorrupt.kind === "spot" && notCorrupt.startDate === "2026-11-01",
+      notCorrupt,
+    );
+  }
 
   const result = {
     ok: checks.every((c) => c.ok),

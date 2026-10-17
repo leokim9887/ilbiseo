@@ -1,6 +1,6 @@
 /**
  * Smoke: stable LIST UP order while typing + start min=today(KST).
- * Overdue rows are auto-completed to 한 일 (see smoke-all-no-add-auto-done.mjs).
+ * Overdue stay-in-틀 / separator: see smoke-all-no-add-auto-done.mjs.
  */
 import { chromium } from "playwright";
 import { mkdirSync } from "fs";

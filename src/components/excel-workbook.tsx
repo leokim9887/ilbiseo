@@ -28,11 +28,13 @@ import {
   buildTaskOnlyRows,
   calendarListUpTitle,
   formatEventDeadline,
+  sinkPastSheetRowsLast,
   type SheetRow,
 } from "@/lib/sheet-rows";
 import {
   formatDeadlineRange,
   formatDeadlineRangeCompact,
+  isPastUnfinishedTask,
   isSomedayDeadline,
   monthRangeContaining,
   todayIso,
@@ -339,7 +341,12 @@ export function ExcelWorkbook({
       (isAll && !isGcal
         ? ({ key: "deadline", dir: "desc" } as ColumnSort)
         : null);
-    return applyColumnSort(built, effectiveSort);
+    const sorted = applyColumnSort(built, effectiveSort);
+    // 할 일: 지난 일정은 같은 틀에 두고 맨 아래로 + 구분선 (자동→한 일 없음)
+    if (sheet === "todo" && !isGcal) {
+      return sinkPastSheetRowsLast(sorted, todayKst);
+    }
+    return sorted;
   }, [
     isGcal,
     isAll,
@@ -352,6 +359,7 @@ export function ExcelWorkbook({
     filterStart,
     filterEnd,
     columnSort,
+    todayKst,
   ]);
 
   const onHeaderSort = (key: ColKey) => {
@@ -1201,9 +1209,33 @@ export function ExcelWorkbook({
               </tr>
             ) : (
               rows.map((row, idx) => {
+                if (row.kind === "past-separator") {
+                  return (
+                    <tr
+                      key="past-separator"
+                      data-excel-past-separator="1"
+                      aria-label="지난 일정 구분"
+                    >
+                      <td
+                        colSpan={emptyColSpan}
+                        className="border border-black border-t-[3px] border-t-[#8a5a2b] bg-[#f7f0e6] px-2 py-2 text-center dark:border-t-[#c4a574] dark:bg-[#2a241c] sm:px-3 sm:py-2.5"
+                      >
+                        <span
+                          className="text-[13px] font-bold tracking-wide text-[#6b4423] dark:text-[#e8d4b8] sm:text-[15px]"
+                          data-excel-past-separator-label
+                        >
+                          지난 일정 — 아래로 모아 둠
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                }
                 if (row.kind === "calendar") {
                   const ev = row.event;
-                  const order = idx + 1;
+                  const order =
+                    rows
+                      .slice(0, idx + 1)
+                      .filter((r) => r.kind !== "past-separator").length;
                   return (
                     <tr
                       key={row.id}
@@ -1231,13 +1263,19 @@ export function ExcelWorkbook({
                 }
 
                 const task = row.task;
-                const order = idx + 1;
+                const order =
+                  rows
+                    .slice(0, idx + 1)
+                    .filter((r) => r.kind === "task" || r.kind === "calendar")
+                    .length;
                 const checked = selectedIds.has(task.id);
                 const editingDone = editingDoneIds.has(task.id);
                 const locked = isDoneSheet && !editingDone;
                 const active = activeRow === task.id || checked;
                 const zebra = order % 2 === 0;
                 const someday = isSomedayDeadline(task);
+                const past =
+                  sheet === "todo" && isPastUnfinishedTask(task, todayKst);
                 const deadlineFocused =
                   !locked &&
                   focus?.rowId === task.id &&
@@ -1279,21 +1317,26 @@ export function ExcelWorkbook({
                     data-excel-row={task.id}
                     data-excel-row-selected={checked ? "1" : "0"}
                     data-excel-row-locked={locked ? "1" : "0"}
+                    data-excel-overdue={past ? "1" : "0"}
                     data-excel-row-editing={
                       isDoneSheet && editingDone ? "1" : "0"
                     }
                     className={
                       checked
                         ? "bg-[#dcefe3] dark:bg-[#1e332d]"
-                        : locked
+                        : past
                           ? zebra
-                            ? "bg-[#f2f6f3] dark:bg-[#1c2621]"
-                            : "bg-[#f7faf8] dark:bg-[#1a221e]"
-                          : active
-                            ? "bg-[#e8f5ee] dark:bg-[#1e332d]"
-                            : zebra
-                              ? "bg-[#fafafa] dark:bg-[#1c2621]"
-                              : "bg-white dark:bg-[#1a221e]"
+                            ? "bg-[#f3ebe0] dark:bg-[#2a241c]"
+                            : "bg-[#f8f1e8] dark:bg-[#241f1a]"
+                          : locked
+                            ? zebra
+                              ? "bg-[#f2f6f3] dark:bg-[#1c2621]"
+                              : "bg-[#f7faf8] dark:bg-[#1a221e]"
+                            : active
+                              ? "bg-[#e8f5ee] dark:bg-[#1e332d]"
+                              : zebra
+                                ? "bg-[#fafafa] dark:bg-[#1c2621]"
+                                : "bg-white dark:bg-[#1a221e]"
                     }
                   >
                     <td

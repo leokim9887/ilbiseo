@@ -377,35 +377,22 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Pets lower/outward — well clear of Ace cheeks (PC only)
-    dog = night_grade(
-        cover_crop(load_dog(), 320, 320, bias=DOG_BIAS), strength=0.36
+    # Baby/Ace — rollback to pre full-face look (aca895e): tight cover crop,
+    # soft blend; pets drawn AFTER Ace so they overlap cheeks (matches UI ref).
+    baby = night_grade(
+        cover_crop(load(BABY_SRC), 560, 610, bias=BABY_BIAS), strength=0.34
     )
-    paste_masked(canvas, dog, (680, 500), radial_mask((320, 320), soft=0.55), 0.90)
+    paste_masked(canvas, baby, (1045, -15), radial_mask((560, 610), soft=0.52), 0.98)
+
+    dog = night_grade(
+        cover_crop(load_dog(), 470, 470, bias=DOG_BIAS), strength=0.36
+    )
+    paste_masked(canvas, dog, (880, 255), radial_mask((470, 470), soft=0.46), 0.97)
 
     cat = night_grade(
-        cover_crop(load("03-cat.png"), 300, 300, bias=(0.52, 0.32)), strength=0.34
+        cover_crop(load("03-cat.png"), 450, 450, bias=(0.52, 0.32)), strength=0.34
     )
-    paste_masked(canvas, cat, (1425, 500), radial_mask((300, 300), soft=0.55), 0.90)
-
-    # Baby/Ace — AGGRESSIVE zoom-out: visibly smaller face, full cheeks + hat
-    # sides + shoulders/garment like source. Contain << 0.82. Soft ellipse keeps
-    # entire portrait (incl. both cheeks) fully opaque. Ace on top. Mobile unchanged.
-    bw, bh = 820, 860
-    baby_src = load(BABY_SRC)
-    sw, sh = baby_src.size
-    scale = min(bw / sw, bh / sh) * 0.48  # much smaller face in slot
-    nw, nh = max(1, int(sw * scale + 0.5)), max(1, int(sh * scale + 0.5))
-    resized = night_grade(
-        baby_src.resize((nw, nh), Image.Resampling.LANCZOS), strength=0.10
-    )
-    baby_plane = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
-    ox, oy = (bw - nw) // 2, max(0, (bh - nh) // 2)
-    baby_plane.paste(resized, (ox, oy), resized)
-    # soft high + wide rx → whole photo inside opaque zone (cheeks never clipped)
-    ace_mask = radial_mask((bw, bh), soft=0.88, rx_scale=1.35, ry_scale=1.20)
-    # right edge 870+820=1690 → slight clip OK; keep centered on right half
-    paste_masked(canvas, baby_plane, (870, -50), ace_mask, 0.99)
+    paste_masked(canvas, cat, (1310, 255), radial_mask((450, 450), soft=0.48), 0.97)
 
     bridge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bridge)

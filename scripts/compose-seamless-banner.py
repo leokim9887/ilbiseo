@@ -28,14 +28,69 @@ TEAL = (22, 63, 57)
 # Banner insets use the new Ace (tan-cap) photo; cheer overlay keeps original baby face
 BABY_SRC = "04-baby-ace-new.png"
 CHEER_SRC = "04-baby.png"
+DOG_SRC = "02-dog-new.png"
 # Face + tan cap framing (slight right bias away from holder's black sleeve)
 BABY_BIAS = (0.52, 0.30)
 # Original cheer crop bias (pre Ace-cap replace)
 CHEER_BIAS = (0.50, 0.14)
+# New dog: face-forward Maltese; bias keeps eyes in upper-center of square crop
+DOG_BIAS = (0.50, 0.28)
 
 
 def load(name: str) -> Image.Image:
     return ImageOps.exif_transpose(Image.open(SRC / name)).convert("RGBA")
+
+
+def enhance_dog_hq(im: Image.Image) -> Image.Image:
+    """Practical HQ pass for small/noisy dog source — no invented detail.
+
+    Pipeline (documented for handoff):
+    1) Mild OpenCV bilateral denoise (preserves edges, softens JPEG grain)
+    2) Stepwise LANCZOS upscale if short side < 600 (max ~2×)
+    3) Mild UnsharpMask after upscale
+    4) Slight contrast / brightness for night-grade collage
+    """
+    import numpy as np
+
+    try:
+        import cv2
+    except ImportError:  # pragma: no cover
+        cv2 = None
+
+    rgb = im.convert("RGB")
+    arr = np.asarray(rgb)
+
+    if cv2 is not None:
+        # d=5, sigmaColor/Space modest — denoise without plastic look
+        arr = cv2.bilateralFilter(arr, d=5, sigmaColor=35, sigmaSpace=35)
+        rgb = Image.fromarray(arr)
+    else:
+        rgb = rgb.filter(ImageFilter.MedianFilter(size=3))
+
+    w, h = rgb.size
+    short = min(w, h)
+    if short < 600:
+        # Cap at 2× so we don't fabricate fine fur detail
+        target_short = min(600, short * 2)
+        scale = target_short / short
+        nw, nh = int(w * scale + 0.5), int(h * scale + 0.5)
+        # Two-step LANCZOS when scale > 1.5 for gentler interp
+        if scale > 1.5:
+            mid = (
+                int(w * (scale**0.5) + 0.5),
+                int(h * (scale**0.5) + 0.5),
+            )
+            rgb = rgb.resize(mid, Image.Resampling.LANCZOS)
+        rgb = rgb.resize((nw, nh), Image.Resampling.LANCZOS)
+
+    rgb = unsharp(rgb, percent=110, radius=1.1)
+    rgb = ImageEnhance.Contrast(rgb).enhance(1.04)
+    rgb = ImageEnhance.Brightness(rgb).enhance(1.02)
+    return rgb.convert("RGBA")
+
+
+def load_dog() -> Image.Image:
+    return enhance_dog_hq(load(DOG_SRC))
 
 
 def cover_crop(im: Image.Image, tw: int, th: int, bias=(0.5, 0.35)) -> Image.Image:
@@ -320,7 +375,7 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     paste_masked(canvas, baby, (1045, -15), radial_mask((560, 610), soft=0.52), 0.98)
 
     dog = night_grade(
-        cover_crop(load("02-dog.png"), 470, 470, bias=(0.5, 0.36)), strength=0.36
+        cover_crop(load_dog(), 470, 470, bias=DOG_BIAS), strength=0.36
     )
     paste_masked(canvas, dog, (880, 255), radial_mask((470, 470), soft=0.46), 0.97)
 
@@ -367,7 +422,7 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
     paste_masked(canvas, baby, (695, 12), radial_mask((470, 515), soft=0.54), 0.98)
 
     dog = night_grade(
-        cover_crop(load("02-dog.png"), 385, 385, bias=(0.5, 0.36)), strength=0.32
+        cover_crop(load_dog(), 385, 385, bias=DOG_BIAS), strength=0.32
     )
     paste_masked(canvas, dog, (620, 400), radial_mask((385, 385), soft=0.46), 0.97)
 

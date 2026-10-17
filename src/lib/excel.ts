@@ -11,7 +11,11 @@ import {
   filterCalendarEventsInWindow,
   formatCalendarWhen,
 } from "./calendar-data";
-import { addDaysIso, formatDeadlineRange, todayIsoKst } from "./date-range";
+import {
+  addDaysIso,
+  deadlineExcelParts,
+  todayIsoKst,
+} from "./date-range";
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
@@ -38,6 +42,29 @@ function styleHeader(row: ExcelJS.Row) {
     cell.border = THIN_BLACK;
   });
   row.height = 24;
+}
+
+/** Father can click header ▾ arrows — no macros. */
+function enableAutoFilter(sheet: ExcelJS.Worksheet, columnCount: number) {
+  const lastRow = Math.max(sheet.rowCount, 1);
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: lastRow, column: columnCount },
+  };
+}
+
+/** 마감목표: real Excel date (start) so Oldest/Newest sort works. */
+function writeDeadlineCell(
+  cell: ExcelJS.Cell,
+  task: Pick<Task, "startDate" | "targetDate" | "kind">,
+) {
+  const parts = deadlineExcelParts(task);
+  if (parts.kind === "date") {
+    cell.value = parts.value;
+    cell.numFmt = parts.numFmt;
+    return;
+  }
+  cell.value = parts.value;
 }
 
 export type WorkbookPayload = {
@@ -103,14 +130,17 @@ export async function buildWorkbook(
   styleHeader(todo.getRow(1));
   sortTasks(tasks).forEach((t, i) => {
     const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
-    todo.addRow({
+    const row = todo.addRow({
       order: i + 1,
+      // plain text — AutoFilter 그룹/정렬용 (업무용·개인용·과제용·팀원용)
       frame: CATEGORY_LABEL[t.category],
       listup,
-      deadline: formatDeadlineRange(t),
-      importance: t.importance,
+      deadline: null,
+      // number 1–3 so Excel sorts ascending/descending by value
+      importance: Number(t.importance) || 0,
       done: "",
     });
+    writeDeadlineCell(row.getCell(4), t); // 마감목표
   });
   todo.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
   todo.getColumn("deadline").alignment = {
@@ -122,6 +152,11 @@ export async function buildWorkbook(
     vertical: "middle",
     horizontal: "center",
   };
+  todo.getColumn("importance").alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  enableAutoFilter(todo, 6);
 
   const done = wb.addWorksheet("한 일", {
     views: [{ state: "frozen", ySplit: 1 }],
@@ -137,14 +172,15 @@ export async function buildWorkbook(
   styleHeader(done.getRow(1));
   sortCompleted(tasks).forEach((t, i) => {
     const listup = t.memo ? `${t.title}\n${t.memo}` : t.title;
-    done.addRow({
+    const row = done.addRow({
       order: i + 1,
       frame: CATEGORY_LABEL[t.category],
       listup,
-      deadline: formatDeadlineRange(t),
-      importance: t.importance,
+      deadline: null,
+      importance: Number(t.importance) || 0,
       done: "완료",
     });
+    writeDeadlineCell(row.getCell(4), t); // 마감목표
   });
   done.getColumn("listup").alignment = { wrapText: true, vertical: "top" };
   done.getColumn("deadline").alignment = {
@@ -156,6 +192,11 @@ export async function buildWorkbook(
     vertical: "middle",
     horizontal: "center",
   };
+  done.getColumn("importance").alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  enableAutoFilter(done, 6);
 
   // 「구글캘린더」: only events within 2 weeks from save (KST), one row per event
   // (multi-day → full range in 「언제」). No 「캘린더」/「출처」 columns.

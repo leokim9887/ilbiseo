@@ -148,6 +148,52 @@ export function formatDeadlineRange(
 }
 
 /**
+ * Excel date for a calendar day (UTC midnight).
+ * Used so 「마감목표」 sorts as a real date in Excel AutoFilter.
+ */
+export function excelDateFromIso(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+/**
+ * Excel 「마감목표」 sort/display rule:
+ * - Sort key = **시작일** (app column-sort와 동일)
+ * - 구간은 셀 값은 시작일(Date), 표시 서식에 ` ~ 종료일` 리터럴
+ * - 「언젠가」·날짜 없음 → 텍스트 `"언젠가"` (날짜 정렬 시 텍스트 그룹)
+ */
+export function deadlineExcelParts(
+  task: Pick<Task, "startDate" | "targetDate" | "kind">,
+):
+  | { kind: "someday"; value: string }
+  | { kind: "empty"; value: "" }
+  | { kind: "date"; value: Date; numFmt: string; start: string; end: string } {
+  if (isSomedayDeadline(task)) {
+    return { kind: "someday", value: "언젠가" };
+  }
+  const r = taskDateRange(task);
+  if (!r) return { kind: "empty", value: "" };
+  const value = excelDateFromIso(r.start);
+  if (r.start === r.end) {
+    return {
+      kind: "date",
+      value,
+      numFmt: "yyyy-mm-dd",
+      start: r.start,
+      end: r.end,
+    };
+  }
+  return {
+    kind: "date",
+    value,
+    // Display keeps `YYYY-MM-DD ~ YYYY-MM-DD`; serial date = start for sort
+    numFmt: `yyyy-mm-dd" ~ ${r.end}"`,
+    start: r.start,
+    end: r.end,
+  };
+}
+
+/**
  * Compact phone 마감 — keep year visible (YY.M.D), not MM/DD alone.
  * e.g. `26.10.16` or `26.10.1~26.10.30`
  */

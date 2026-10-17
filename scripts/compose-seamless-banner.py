@@ -29,8 +29,10 @@ TEAL = (22, 63, 57)
 BABY_SRC = "04-baby-ace-new.png"
 CHEER_SRC = "04-baby.png"
 DOG_SRC = "02-dog-new.png"
-# Face + tan cap framing (slight right bias away from holder's black sleeve)
+# Face + tan cap framing (mobile / shared default)
 BABY_BIAS = (0.52, 0.30)
+# PC-only: face-centered — a bit lower so eyes+cheeks read clearly under the cap
+BABY_BIAS_PC = (0.50, 0.42)
 # Original cheer crop bias (pre Ace-cap replace)
 CHEER_BIAS = (0.50, 0.14)
 # New dog: face-forward Maltese; bias keeps eyes in upper-center of square crop
@@ -368,11 +370,12 @@ def compose_pc(fam_src: Image.Image) -> Image.Image:
     fam_mask = soft_right_fade((fw, fh), fade_start=0.84)
     paste_masked(canvas, family, (-48, 0), fam_mask, 1.0)
 
-    # Baby/Ace — largest inset (shared new photo)
+    # Baby/Ace — PC: modestly larger + face-centered crop (mobile unchanged)
+    bw, bh = 610, 660
     baby = night_grade(
-        cover_crop(load(BABY_SRC), 560, 610, bias=BABY_BIAS), strength=0.34
+        cover_crop(load(BABY_SRC), bw, bh, bias=BABY_BIAS_PC), strength=0.28
     )
-    paste_masked(canvas, baby, (1045, -15), radial_mask((560, 610), soft=0.52), 0.98)
+    paste_masked(canvas, baby, (1015, -28), radial_mask((bw, bh), soft=0.56), 0.99)
 
     dog = night_grade(
         cover_crop(load_dog(), 470, 470, bias=DOG_BIAS), strength=0.36

@@ -217,9 +217,12 @@ export function ExcelImport({
     }
   };
 
-  const description = hasFrameCol
-    ? "엑셀 「틀」칸대로 업무·개인·과제·팀원에 넣습니다. 「전체」에서도 보입니다."
-    : `틀 열이 없으면 「${CATEGORY_LABEL[category]}」에 추가합니다.`;
+  const description =
+    step === "pick" || step === "sheet"
+      ? "「할 일」시트를 고르면 엑셀 「틀」칸대로 넣습니다. (.xlsx · .xls · .csv)"
+      : hasFrameCol
+        ? "엑셀 「틀」칸대로 업무·개인·과제·팀원에 넣습니다. 「전체」에서도 보입니다."
+        : `틀 열이 없으면 「${CATEGORY_LABEL[category]}」에 추가합니다.`;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

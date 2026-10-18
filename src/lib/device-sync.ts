@@ -24,8 +24,8 @@ export type DeviceSyncPrefs = {
 export type SyncPullResult =
   | { status: "empty" }
   | { status: "same"; updatedAt: string }
-  | { status: "applied"; state: AppState; updatedAt: string }
-  | { status: "skipped-local-newer"; remoteUpdatedAt: string }
+  /** Remote blob decrypted — caller must merge with local (not blind replace). */
+  | { status: "remote"; state: AppState; updatedAt: string }
   | { status: "error"; message: string };
 
 export type SyncPushResult =
@@ -118,27 +118,21 @@ export async function pullRemoteState(
     if ("error" in remote) return { status: "error", message: remote.error };
     if (remote.empty) return { status: "empty" };
 
-    if (
-      localUpdatedAt &&
-      Date.parse(localUpdatedAt) > Date.parse(remote.updatedAt)
-    ) {
-      return {
-        status: "skipped-local-newer",
-        remoteUpdatedAt: remote.updatedAt,
-      };
-    }
-
+    // Same revision marker → skip decrypt. (Local edits bump localUpdatedAt,
+    // so this only hits after a successful sync with no further edits.)
     if (localUpdatedAt && localUpdatedAt === remote.updatedAt) {
       return { status: "same", updatedAt: remote.updatedAt };
     }
 
+    // Always decrypt when timestamps differ — even if local clock is ahead.
+    // Blind "skipped-local-newer" used to drop sibling-only items forever.
     const payload = await decryptJson<SyncPayload>(code, remote.blob);
     const state = normalizeState(payload.state);
     if (!state) {
       return { status: "error", message: "원격 데이터를 해석하지 못했습니다." };
     }
     return {
-      status: "applied",
+      status: "remote",
       state,
       updatedAt: payload.updatedAt || remote.updatedAt,
     };
@@ -167,6 +161,7 @@ export async function pushLocalState(
     const res = await fetch("/api/sync", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      cache: "no-store",
       body: JSON.stringify({
         codeHash,
         ciphertext: blob.ciphertext,

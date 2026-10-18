@@ -92,7 +92,7 @@ export function DeviceSyncPanel({
               PC ↔ 폰 동기화
             </p>
             <p className="mt-1 text-[14px] leading-relaxed text-[var(--ink-muted)]">
-              같은 코드로 PC와 폰 할 일을 맞춥니다. 약 10분마다 자동 · 「지금 동기화」로 바로.
+              같은 코드로 PC와 폰 할 일을 맞춥니다. 편집·화면 전환 시 바로 · 약 10분마다 자동 · 「지금 동기화」.
             </p>
           </div>
 

@@ -15,12 +15,16 @@ import {
   saveSyncPrefs,
   type DeviceSyncPrefs,
 } from "@/lib/device-sync";
+import { mergeForSync } from "@/lib/sync-merge";
 
-/** ~10 minutes while the app stays open (connected sync code). */
+/** Background cadence while the app stays open (connected sync code). */
 export const AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000;
 
-/** Re-sync when tab becomes visible after this long hidden. */
-const VISIBLE_RESYNC_AFTER_MS = 5 * 60 * 1000;
+/** Debounce local edits before push+merge roundtrip (not minutes). */
+export const EDIT_PUSH_DEBOUNCE_MS = 2_000;
+
+/** Short settle after focus / visibility / online before pull. */
+const RESUME_PULL_DEBOUNCE_MS = 400;
 
 type SyncToast = {
   kind: "ok" | "error" | "info";
@@ -36,18 +40,27 @@ type UseDeviceSyncArgs = {
   hydrateFromRemote: (state: AppState, updatedAt: string) => void;
 };
 
+type RoundtripOpts = {
+  code?: string;
+  /** Toast success/error (manual 「지금 동기화」). */
+  loud?: boolean;
+  /** Why this roundtrip ran (for quiet error surfacing). */
+  reason?: "interval" | "edit" | "resume" | "connect" | "online" | "manual";
+};
+
 /**
- * PC↔폰 동기화
- * - 로드 시 1회 quiet pull
- * - ~10분마다 quiet pull+push (편집마다 아님)
- * - 탭을 오래 숨겼다 다시 보이면 quiet 1회
- * - 「지금 동기화」만 토스트
+ * PC↔폰 동기화 (reliable)
+ * - Connect / focus / visibility / online → pull+merge promptly
+ * - Local edits → debounced push (~2s)
+ * - ~10분 quiet cadence kept as backup
+ * - Entity-level merge (no blind whole-state wipe)
+ * - 「지금 동기화」 success/error toasts; quiet failures also surfaced
  */
 export function useDeviceSync({
   ready,
   state,
   localUpdatedAt,
-  persistEpoch: _persistEpoch,
+  persistEpoch,
   skipRemotePushRef,
   hydrateFromRemote,
 }: UseDeviceSyncArgs) {
@@ -69,7 +82,8 @@ export function useDeviceSync({
   const prefsRef = useRef(prefs);
   const pulledOnceRef = useRef(false);
   const syncInFlightRef = useRef(false);
-  const hiddenAtRef = useRef<number | null>(null);
+  const pendingAfterInFlightRef = useRef(false);
+  const lastErrorToastAtRef = useRef(0);
 
   stateRef.current = state;
   localUpdatedAtRef.current = localUpdatedAt;
@@ -79,9 +93,24 @@ export function useDeviceSync({
     setToast(next);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     if (next) {
-      toastTimer.current = setTimeout(() => setToast(null), 3200);
+      const ms = next.kind === "error" ? 4500 : 3200;
+      toastTimer.current = setTimeout(() => setToast(null), ms);
     }
   }, []);
+
+  const showQuietError = useCallback(
+    (message: string) => {
+      const now = Date.now();
+      // Avoid toast spam on rapid resume/edit retries.
+      if (now - lastErrorToastAtRef.current < 8_000) return;
+      lastErrorToastAtRef.current = now;
+      showToast({
+        kind: "error",
+        text: message || "동기화에 실패했습니다. 잠시 후 「지금 동기화」를 눌러 주세요.",
+      });
+    },
+    [showToast],
+  );
 
   const writePrefs = useCallback((next: DeviceSyncPrefs) => {
     prefsRef.current = next;
@@ -89,87 +118,202 @@ export function useDeviceSync({
     saveSyncPrefs(next);
   }, []);
 
+  const pushMerged = useCallback(
+    async (
+      code: string,
+      merged: AppState,
+      updatedAt: string,
+      loud: boolean,
+    ): Promise<"ok" | "error" | "conflict-resolved"> => {
+      const push = await pushLocalState(code, merged, updatedAt);
+      if (push.status === "ok") {
+        writePrefs({
+          ...prefsRef.current,
+          lastSyncedAt: push.updatedAt,
+          localUpdatedAt: push.updatedAt,
+        });
+        return "ok";
+      }
+      if (push.status === "conflict") {
+        // Server won the race — merge again with conflict payload and retry once.
+        const again = mergeForSync({
+          local: stateRef.current,
+          remote: push.state,
+          localUpdatedAt: localUpdatedAtRef.current,
+          remoteUpdatedAt: push.updatedAt,
+        });
+        hydrateFromRemote(again.merged, again.mergedUpdatedAt);
+        const retryAt = new Date(
+          Math.max(Date.now(), Date.parse(push.updatedAt) + 1),
+        ).toISOString();
+        const retry = await pushLocalState(code, again.merged, retryAt);
+        if (retry.status === "ok") {
+          writePrefs({
+            ...prefsRef.current,
+            lastSyncedAt: retry.updatedAt,
+            localUpdatedAt: retry.updatedAt,
+          });
+          return "conflict-resolved";
+        }
+        if (loud) {
+          showToast({
+            kind: "error",
+            text: retry.status === "error" ? retry.message : "동기화 충돌을 풀지 못했습니다.",
+          });
+        } else {
+          showQuietError(
+            retry.status === "error" ? retry.message : "동기화 충돌을 풀지 못했습니다.",
+          );
+        }
+        return "error";
+      }
+      if (loud) {
+        showToast({ kind: "error", text: push.message });
+      } else {
+        showQuietError(push.message);
+      }
+      return "error";
+    },
+    [hydrateFromRemote, showQuietError, showToast, writePrefs],
+  );
+
   /**
-   * Quiet pull+push (LWW). No toast.
-   * Used by: interval, visibility resume, initial seed path.
+   * Pull → entity merge → hydrate → push when local contributed.
    */
-  const runQuietRoundtrip = useCallback(
-    async (opts?: { code?: string; pullOnly?: boolean }) => {
+  const runRoundtrip = useCallback(
+    async (opts?: RoundtripOpts) => {
       const current = prefsRef.current;
       const code = opts?.code ?? current.code;
+      const loud = Boolean(opts?.loud);
       if (!code) return;
       if (!opts?.code && !current.enabled) return;
-      if (syncInFlightRef.current) return;
+
       if (skipRemotePushRef.current) {
         skipRemotePushRef.current = false;
       }
+
+      if (syncInFlightRef.current) {
+        pendingAfterInFlightRef.current = true;
+        if (loud) {
+          showToast({ kind: "info", text: "동기화 중입니다. 잠시만요." });
+        }
+        return;
+      }
+
       syncInFlightRef.current = true;
       setBusy(true);
       try {
         const pull = await pullRemoteState(code, localUpdatedAtRef.current);
-        if (pull.status === "applied") {
-          hydrateFromRemote(pull.state, pull.updatedAt);
+
+        if (pull.status === "error") {
+          if (loud) showToast({ kind: "error", text: pull.message });
+          else showQuietError(pull.message);
+          return;
+        }
+
+        if (pull.status === "empty") {
+          const updatedAt =
+            localUpdatedAtRef.current ?? new Date().toISOString();
+          const result = await pushMerged(
+            code,
+            stateRef.current,
+            updatedAt,
+            loud,
+          );
+          if (loud && result === "ok") {
+            showToast({ kind: "ok", text: "동기화됨 · 이 기기 내용을 올렸습니다" });
+          }
+          return;
+        }
+
+        if (pull.status === "same") {
+          // Local may still be ahead if clocks matched after a prior sync but
+          // persist bumped localUpdatedAt incorrectly — check and push if needed.
+          const localT = localUpdatedAtRef.current
+            ? Date.parse(localUpdatedAtRef.current)
+            : 0;
+          const remoteT = Date.parse(pull.updatedAt);
+          if (localT > remoteT) {
+            const result = await pushMerged(
+              code,
+              stateRef.current,
+              localUpdatedAtRef.current!,
+              loud,
+            );
+            if (loud && (result === "ok" || result === "conflict-resolved")) {
+              showToast({ kind: "ok", text: "동기화됨" });
+            }
+            return;
+          }
           writePrefs({
             ...prefsRef.current,
             lastSyncedAt: pull.updatedAt,
             localUpdatedAt: pull.updatedAt,
           });
-          if (opts?.pullOnly) return;
-          // After applying remote, local matches remote — skip push.
-          return;
-        }
-        if (pull.status === "error") return;
-        if (opts?.pullOnly) return;
-
-        if (pull.status === "empty") {
-          const updatedAt =
-            localUpdatedAtRef.current ?? new Date().toISOString();
-          const push = await pushLocalState(
-            code,
-            stateRef.current,
-            updatedAt,
-          );
-          if (push.status === "ok") {
-            writePrefs({
-              ...prefsRef.current,
-              lastSyncedAt: push.updatedAt,
-              localUpdatedAt: push.updatedAt,
-            });
+          if (loud) {
+            showToast({ kind: "ok", text: "이미 최신입니다" });
           }
           return;
         }
 
-        // same / skipped-local-newer → push local if needed
-        const updatedAt =
-          localUpdatedAtRef.current ?? new Date().toISOString();
-        const push = await pushLocalState(
-          code,
-          stateRef.current,
-          updatedAt,
-        );
-        if (push.status === "ok") {
+        // pull.status === "remote"
+        const { merged, mergedUpdatedAt, shouldPush } = mergeForSync({
+          local: stateRef.current,
+          remote: pull.state,
+          localUpdatedAt: localUpdatedAtRef.current,
+          remoteUpdatedAt: pull.updatedAt,
+        });
+
+        hydrateFromRemote(merged, shouldPush ? mergedUpdatedAt : pull.updatedAt);
+
+        if (shouldPush) {
+          const result = await pushMerged(
+            code,
+            merged,
+            mergedUpdatedAt,
+            loud,
+          );
+          if (loud && (result === "ok" || result === "conflict-resolved")) {
+            showToast({
+              kind: "ok",
+              text: "동기화됨 · 양쪽 내용을 합쳤습니다",
+            });
+          }
+        } else {
           writePrefs({
             ...prefsRef.current,
-            lastSyncedAt: push.updatedAt,
-            localUpdatedAt: push.updatedAt,
+            lastSyncedAt: pull.updatedAt,
+            localUpdatedAt: pull.updatedAt,
           });
-        } else if (push.status === "conflict") {
-          hydrateFromRemote(push.state, push.updatedAt);
-          writePrefs({
-            ...prefsRef.current,
-            lastSyncedAt: push.updatedAt,
-            localUpdatedAt: push.updatedAt,
-          });
+          if (loud) {
+            showToast({
+              kind: "ok",
+              text: "동기화됨 · 다른 기기 내용을 가져왔습니다",
+            });
+          }
         }
       } finally {
         syncInFlightRef.current = false;
         setBusy(false);
+        if (pendingAfterInFlightRef.current) {
+          pendingAfterInFlightRef.current = false;
+          // Coalesce bursts (typing + visibility) into one follow-up.
+          window.setTimeout(() => {
+            void runRoundtrip({ reason: "edit" });
+          }, EDIT_PUSH_DEBOUNCE_MS);
+        }
       }
     },
-    [hydrateFromRemote, skipRemotePushRef, writePrefs],
+    [
+      hydrateFromRemote,
+      pushMerged,
+      showQuietError,
+      showToast,
+      skipRemotePushRef,
+      writePrefs,
+    ],
   );
 
-  /** Explicit 「지금 동기화」— toast only here. */
   const syncNow = useCallback(async () => {
     const current = prefsRef.current;
     if (!current.enabled || !current.code) {
@@ -179,120 +323,89 @@ export function useDeviceSync({
       });
       return;
     }
-    if (skipRemotePushRef.current) {
-      skipRemotePushRef.current = false;
-    }
-    if (syncInFlightRef.current) {
-      showToast({ kind: "info", text: "동기화 중입니다. 잠시만요." });
-      return;
-    }
-    syncInFlightRef.current = true;
-    setBusy(true);
-    try {
-      const pull = await pullRemoteState(
-        current.code,
-        localUpdatedAtRef.current,
-      );
-      if (pull.status === "applied") {
-        hydrateFromRemote(pull.state, pull.updatedAt);
-        writePrefs({
-          ...prefsRef.current,
-          lastSyncedAt: pull.updatedAt,
-          localUpdatedAt: pull.updatedAt,
-        });
-        showToast({
-          kind: "ok",
-          text: "동기화됨 · 다른 기기 내용을 가져왔습니다",
-        });
-        return;
-      }
-      if (pull.status === "error") {
-        showToast({ kind: "error", text: pull.message });
-        return;
-      }
-      const updatedAt =
-        localUpdatedAtRef.current ?? new Date().toISOString();
-      const push = await pushLocalState(
-        current.code,
-        stateRef.current,
-        updatedAt,
-      );
-      if (push.status === "ok") {
-        writePrefs({
-          ...prefsRef.current,
-          lastSyncedAt: push.updatedAt,
-          localUpdatedAt: push.updatedAt,
-        });
-        showToast({ kind: "ok", text: "동기화됨" });
-      } else if (push.status === "conflict") {
-        hydrateFromRemote(push.state, push.updatedAt);
-        writePrefs({
-          ...prefsRef.current,
-          lastSyncedAt: push.updatedAt,
-          localUpdatedAt: push.updatedAt,
-        });
-        showToast({
-          kind: "ok",
-          text: "동기화됨 · 서버의 최신 내용을 반영했습니다",
-        });
-      } else {
-        showToast({ kind: "error", text: push.message });
-      }
-    } finally {
-      syncInFlightRef.current = false;
-      setBusy(false);
-    }
-  }, [hydrateFromRemote, showToast, skipRemotePushRef, writePrefs]);
+    await runRoundtrip({ loud: true, reason: "manual" });
+  }, [runRoundtrip, showToast]);
 
-  // Initial quiet pull on load / when sync first enabled
+  // Initial pull+merge+push on load / when sync first enabled
   useEffect(() => {
     if (!ready || !prefs.enabled || !prefs.code) return;
     if (pulledOnceRef.current) return;
     pulledOnceRef.current = true;
-    void runQuietRoundtrip({ pullOnly: true });
-  }, [ready, prefs.enabled, prefs.code, runQuietRoundtrip]);
+    void runRoundtrip({ reason: "connect" });
+  }, [ready, prefs.enabled, prefs.code, runRoundtrip]);
 
   useEffect(() => {
     if (!prefs.enabled) pulledOnceRef.current = false;
   }, [prefs.enabled]);
 
-  // ~10 min quiet roundtrip while app is open
+  // Local edits → debounced roundtrip (not minutes of lag)
+  useEffect(() => {
+    if (!ready || !prefs.enabled || !prefs.code) return;
+    if (persistEpoch <= 0) return;
+    if (skipRemotePushRef.current) {
+      skipRemotePushRef.current = false;
+      return;
+    }
+    const id = window.setTimeout(() => {
+      void runRoundtrip({ reason: "edit" });
+    }, EDIT_PUSH_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [
+    persistEpoch,
+    ready,
+    prefs.enabled,
+    prefs.code,
+    runRoundtrip,
+    skipRemotePushRef,
+  ]);
+
+  // ~10 min quiet cadence while visible (backup, not sole path)
   useEffect(() => {
     if (!ready || !prefs.enabled || !prefs.code) return;
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      void runQuietRoundtrip();
+      void runRoundtrip({ reason: "interval" });
     }, AUTO_SYNC_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [ready, prefs.enabled, prefs.code, runQuietRoundtrip]);
+  }, [ready, prefs.enabled, prefs.code, runRoundtrip]);
 
-  // Tab visible again after long hide → one quiet sync (no toast)
+  // Focus / visibility / online → prompt pull+merge
   useEffect(() => {
     if (!ready || !prefs.enabled || !prefs.code) return;
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        hiddenAtRef.current = Date.now();
-        return;
-      }
-      const hiddenAt = hiddenAtRef.current;
-      hiddenAtRef.current = null;
-      if (hiddenAt == null) return;
-      if (Date.now() - hiddenAt < VISIBLE_RESYNC_AFTER_MS) return;
-      void runQuietRoundtrip();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = (reason: RoundtripOpts["reason"]) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void runRoundtrip({ reason });
+      }, RESUME_PULL_DEBOUNCE_MS);
     };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [ready, prefs.enabled, prefs.code, runQuietRoundtrip]);
 
-  /** Connect flow: quiet pull with explicit code (no toast). */
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") schedule("resume");
+    };
+    const onFocus = () => schedule("resume");
+    const onOnline = () => schedule("online");
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onOnline);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [ready, prefs.enabled, prefs.code, runRoundtrip]);
+
+  /** Connect flow: full roundtrip with explicit code. */
   const runPull = useCallback(
     async (opts?: { code?: string }) => {
-      await runQuietRoundtrip({
+      await runRoundtrip({
         code: opts?.code,
-        pullOnly: Boolean(opts?.code),
+        reason: "connect",
       });
     },
-    [runQuietRoundtrip],
+    [runRoundtrip],
   );
 
   return {

@@ -115,7 +115,7 @@ await browser.close();
 
 const ok =
   listItems.includes("언젠가") &&
-  String(info.help || info.noteText || "").includes("언젠가");
+  String(info.prompt || info.help || "").includes("언젠가");
 
 console.log(
   JSON.stringify(

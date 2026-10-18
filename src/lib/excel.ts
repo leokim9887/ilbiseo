@@ -46,12 +46,18 @@ export function deadlineValidationListFormula(
   return `"${items.join(",")}"`;
 }
 
+/**
+ * Excel-native 마감목표 entry help — list dropdown only.
+ * Do NOT attach cell comments/notes: ExcelJS emits legacyDrawing after
+ * tableParts (invalid OOXML order) → Office「내용에 문제가 있습니다」repair.
+ */
 function applyDeadlineEntryAids(
   sheet: ExcelJS.Worksheet,
   dataRowCount: number,
 ) {
   const today = todayIsoKst();
-  const endRow = Math.max(dataRowCount + 40, 50);
+  // Bound validation to a modest pad past data (not far past table end)
+  const endRow = Math.max(dataRowCount + 20, 2);
   const validation: ExcelJS.DataValidation = {
     type: "list",
     allowBlank: true,
@@ -60,8 +66,9 @@ function applyDeadlineEntryAids(
     showErrorMessage: false,
     showInputMessage: true,
     promptTitle: "마감목표",
+    // ASCII-safe punctuation — Office list prompts are fragile with fancy quotes
     prompt:
-      "「언젠가」· YYYY-MM-DD · YYYY-MM-DD ~ YYYY-MM-DD — 목록에서 고르거나 직접 입력",
+      "언젠가 / YYYY-MM-DD / YYYY-MM-DD ~ YYYY-MM-DD — 목록에서 고르거나 직접 입력",
   };
   // ExcelJS runtime has dataValidations; typings omit it on Worksheet
   (
@@ -69,14 +76,7 @@ function applyDeadlineEntryAids(
       dataValidations: { add: (address: string, v: ExcelJS.DataValidation) => void };
     }
   ).dataValidations.add(`D2:D${endRow}`, validation);
-  sheet.getCell(1, 4).note = {
-    texts: [
-      {
-        font: { size: 11, name: "Malgun Gothic", family: 2 },
-        text: DEADLINE_ENTRY_HELP,
-      },
-    ],
-  };
+  // Intentionally no sheet.getCell(...).note — see comment above.
 }
 
 const HEADER_FILL: ExcelJS.Fill = {

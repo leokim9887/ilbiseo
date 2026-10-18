@@ -1,20 +1,21 @@
 /**
- * Assert exported .xlsx table XML is Office-safe (no repair dialog triggers).
+ * Assert exported .xlsx is Office-safe (no repair-dialog triggers).
  */
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 import { buildWorkbook } from "../src/lib/excel";
 import {
+  findExcelRepairRisks,
   repairExcelJsTableXml,
   sanitizeExcelText,
 } from "../src/lib/excel-xlsx-repair";
 import type { Task } from "../src/lib/types";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 
 const OUT =
-  process.env.OUT_DIR ||
-  "/cursor/stores/bc-c183c9b6-6e26-42be-ac03-4fae1f3882f3/media";
+  process.env.OUT_DIR || "/cursor/stores/self/media";
 fs.mkdirSync(OUT, { recursive: true });
 
 function ok(name: string, cond: boolean, detail?: unknown) {
@@ -45,19 +46,18 @@ function task(p: Partial<Task> & Pick<Task, "id" | "title">): Task {
   };
 }
 
-function unzipTables(label: string, buf: ArrayBuffer): string[] {
-  const dir = `/tmp/xlsx-repair-smoke/${label}`;
-  fs.rmSync(dir, { recursive: true, force: true });
-  fs.mkdirSync(dir, { recursive: true });
-  const x = `${dir}.xlsx`;
-  fs.writeFileSync(x, Buffer.from(buf));
-  execSync(`unzip -q -o ${JSON.stringify(x)} -d ${JSON.stringify(dir)}`);
-  const td = path.join(dir, "xl/tables");
-  if (!fs.existsSync(td)) return [];
-  return fs
-    .readdirSync(td)
-    .filter((n) => n.endsWith(".xml"))
-    .map((n) => fs.readFileSync(path.join(td, n), "utf8"));
+async function unzipPart(
+  buf: ArrayBuffer,
+  pred: (n: string) => boolean,
+): Promise<{ name: string; xml: string }[]> {
+  const zip = await JSZip.loadAsync(buf);
+  const out: { name: string; xml: string }[] = [];
+  for (const name of Object.keys(zip.files)) {
+    if (zip.files[name].dir) continue;
+    if (!pred(name)) continue;
+    out.push({ name, xml: await zip.file(name)!.async("string") });
+  }
+  return out;
 }
 
 async function main() {
@@ -78,28 +78,27 @@ async function main() {
       ],
       rows: [[1, "x"]],
     });
-    const raw = await wb.xlsx.writeBuffer();
-    const rawXml = unzipTables("raw-bug", raw as ArrayBuffer)[0];
+    const raw = (await wb.xlsx.writeBuffer()) as unknown as ArrayBuffer;
+    const rawTables = await unzipPart(raw, (n) => n.startsWith("xl/tables/"));
     ok(
       "exceljs-still-emits-totalsRowShown-1",
-      /totalsRowShown="1"/.test(rawXml) && !/totalsRowCount="1"/.test(rawXml),
-      rawXml.slice(0, 200),
+      /totalsRowShown="1"/.test(rawTables[0].xml) &&
+        !/totalsRowCount="1"/.test(rawTables[0].xml),
     );
     const fixed = await repairExcelJsTableXml(raw);
-    const fixedXml = unzipTables("raw-fixed", fixed)[0];
+    const fixedTables = await unzipPart(fixed, (n) => n.startsWith("xl/tables/"));
     ok(
       "repair-sets-totalsRowShown-0",
-      /totalsRowShown="0"/.test(fixedXml) &&
-        !/totalsRowShown="1"/.test(fixedXml),
-      fixedXml.match(/totalsRowShown="[^"]+"/)?.[0],
+      /totalsRowShown="0"/.test(fixedTables[0].xml) &&
+        !/totalsRowShown="1"/.test(fixedTables[0].xml),
     );
     ok(
       "repair-strips-totalsRowLabel",
-      !/totalsRowLabel="Total"/.test(fixedXml),
+      !/totalsRowLabel=/.test(fixedTables[0].xml),
     );
   }
 
-  // Empty workbook: no tables (header-only sheets)
+  // Empty workbook: no tables
   {
     const buf = await buildWorkbook({
       tasks: [],
@@ -107,17 +106,15 @@ async function main() {
       guidelines: [],
       habits: [],
     });
-    const xmls = unzipTables("empty-app", buf);
-    ok("empty-no-table-xml", xmls.length === 0, xmls.length);
-    // openpyxl loads
-    fs.writeFileSync("/tmp/xlsx-repair-smoke/empty-app.xlsx", Buffer.from(buf));
-    execSync(
-      `python3 -c "import openpyxl; openpyxl.load_workbook('/tmp/xlsx-repair-smoke/empty-app.xlsx'); print('openpyxl-empty-ok')"`,
-      { stdio: "inherit" },
+    const tables = await unzipPart(buf as ArrayBuffer, (n) =>
+      n.startsWith("xl/tables/"),
     );
+    ok("empty-no-table-xml", tables.length === 0, tables.length);
+    const risks = await findExcelRepairRisks(buf as ArrayBuffer);
+    ok("empty-no-repair-risks", risks.length === 0, risks);
   }
 
-  // Mixed: active + done — tables must be repaired
+  // Mixed workbook with deadline validation — must be Office-clean
   {
     const buf = await buildWorkbook({
       tasks: [
@@ -131,6 +128,13 @@ async function main() {
         }),
         task({
           id: "3",
+          title: "언젠가",
+          kind: "someday",
+          startDate: null,
+          targetDate: null,
+        }),
+        task({
+          id: "4",
           title: "완료",
           status: "completed",
           completedAt: now,
@@ -149,27 +153,74 @@ async function main() {
       ],
       habits: [],
     });
-    const xmls = unzipTables("mixed", buf);
-    ok("mixed-has-tables", xmls.length === 2, xmls.length);
-    for (const xml of xmls) {
+
+    const risks = await findExcelRepairRisks(buf as ArrayBuffer);
+    ok("mixed-no-repair-risks", risks.length === 0, risks);
+
+    const tables = await unzipPart(buf as ArrayBuffer, (n) =>
+      n.startsWith("xl/tables/"),
+    );
+    ok("mixed-has-tables", tables.length === 2, tables.length);
+    for (const t of tables) {
       ok(
-        "mixed-no-bad-totalsShown",
-        !/totalsRowShown="1"/.test(xml) || /totalsRowCount="1"/.test(xml),
-        xml.match(/name="[^"]+"/)?.[0],
+        "mixed-totalsShown-0",
+        /totalsRowShown="0"/.test(t.xml),
+        t.name,
       );
-      ok("mixed-totalsShown-0", /totalsRowShown="0"/.test(xml));
+      ok(
+        "mixed-no-totalsRowFunction",
+        !/totalsRowFunction=/.test(t.xml),
+        t.name,
+      );
     }
-    // shared string must not contain control char
-    const dir = "/tmp/xlsx-repair-smoke/mixed";
-    const ss = path.join(dir, "xl/sharedStrings.xml");
-    if (fs.existsSync(ss)) {
-      const s = fs.readFileSync(ss, "utf8");
-      ok("no-illegal-xml-controls", !/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(s));
-      ok("title-sanitized", s.includes("활성할일") || s.includes("활성"));
+
+    const sheets = await unzipPart(buf as ArrayBuffer, (n) =>
+      /^xl\/worksheets\/sheet\d+\.xml$/.test(n),
+    );
+    for (const s of sheets) {
+      ok(
+        "no-bad-dpi-" + s.name,
+        !/4294967295/.test(s.xml),
+        s.name,
+      );
+      const legacyIdx = s.xml.search(/<legacyDrawing\b/);
+      const tableIdx = s.xml.search(/<tableParts\b/);
+      if (legacyIdx >= 0 && tableIdx >= 0) {
+        ok(
+          "legacyDrawing-before-tableParts-" + s.name,
+          legacyIdx < tableIdx,
+        );
+      }
     }
-    fs.writeFileSync(path.join(OUT, "ilbiseo-excel-opens-clean.xlsx"), Buffer.from(buf));
+
+    // No comment / VML parts (notes removed — avoids OOXML order bugs)
+    const zip = await JSZip.loadAsync(buf as ArrayBuffer);
+    const names = Object.keys(zip.files);
+    ok(
+      "no-comments-parts",
+      !names.some((n) => /comments\d*\.xml/.test(n)),
+      names.filter((n) => n.includes("comment")),
+    );
+    ok(
+      "no-vml-drawings",
+      !names.some((n) => n.endsWith(".vml")),
+      names.filter((n) => n.includes("vml")),
+    );
+
+    // dataValidation list still present with 언젠가
+    const todoSheet = sheets.find((s) => s.xml.includes("IlbiseoTodo") || s.xml.includes("dataValidations"));
+    // sheet1 is 할 일
+    const sheet1 = sheets[0];
+    ok(
+      "has-deadline-list-validation",
+      /<dataValidations[\s\S]*언젠가/.test(sheet1.xml),
+      sheet1.xml.match(/<dataValidations[\s\S]*?<\/dataValidations>/)?.[0]?.slice(0, 200),
+    );
+
+    const outXlsx = path.join(OUT, "ilbiseo-excel-opens-clean-v2.xlsx");
+    fs.writeFileSync(outXlsx, Buffer.from(buf as ArrayBuffer));
     execSync(
-      `python3 -c "import openpyxl; wb=openpyxl.load_workbook('${path.join(OUT, "ilbiseo-excel-opens-clean.xlsx")}'); print('sheets', wb.sheetnames); assert '할 일' in wb.sheetnames"`,
+      `python3 -c "import openpyxl; wb=openpyxl.load_workbook('${outXlsx}'); assert '할 일' in wb.sheetnames; ws=wb['할 일']; assert ws.data_validations.dataValidation; print('openpyxl-ok', wb.sheetnames, 'dv', len(ws.data_validations.dataValidation))"`,
       { stdio: "inherit" },
     );
   }
@@ -182,15 +233,24 @@ async function main() {
       guidelines: [],
       habits: [],
     });
-    const xmls = unzipTables("active-only", buf);
-    ok("active-only-one-table", xmls.length === 1, xmls.length);
-    ok("active-only-repaired", /totalsRowShown="0"/.test(xmls[0]));
+    const risks = await findExcelRepairRisks(buf as ArrayBuffer);
+    ok("active-only-no-risks", risks.length === 0, risks);
+    const tables = await unzipPart(buf as ArrayBuffer, (n) =>
+      n.startsWith("xl/tables/"),
+    );
+    ok("active-only-one-table", tables.length === 1, tables.length);
   }
 
+  const result = {
+    ok: true,
+    at: new Date().toISOString(),
+    sample: path.join(OUT, "ilbiseo-excel-opens-clean-v2.xlsx"),
+  };
   fs.writeFileSync(
     path.join(OUT, "smoke-excel-file-repair.json"),
-    JSON.stringify({ ok: true, at: new Date().toISOString() }, null, 2),
+    JSON.stringify(result, null, 2),
   );
+  console.log(JSON.stringify(result, null, 2));
   console.log("all passed");
 }
 

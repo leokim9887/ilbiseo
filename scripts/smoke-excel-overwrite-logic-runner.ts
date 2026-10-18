@@ -3,8 +3,11 @@ import path from "node:path";
 import {
   classifyExcelWriteError,
   excelSaveToastMessage,
+  needsDatedExcelRename,
   resolveSaveStrategy,
 } from "../src/lib/excel-save-policy";
+import { datedExcelFilename } from "../src/lib/excel-filename";
+import { todayIsoKst } from "../src/lib/date-range";
 
 const results: { name: string; pass: boolean; detail: unknown }[] = [];
 
@@ -73,8 +76,26 @@ ok("classify-permission", denied.kind === "permission", denied);
 
 ok(
   "toast-overwrite",
-  excelSaveToastMessage({ mode: "overwrite", fileName: "일비서.xlsx" }) ===
-    "기존 파일에 저장했습니다",
+  excelSaveToastMessage({
+    mode: "overwrite",
+    fileName: "일비서_2026-10-18.xlsx",
+  }) === "저장했습니다 · 일비서_2026-10-18.xlsx",
+);
+
+const stamped = datedExcelFilename(new Date("2026-10-18T12:00:00+09:00"));
+ok(
+  "dated-filename-pattern",
+  stamped === `일비서_${todayIsoKst(new Date("2026-10-18T12:00:00+09:00"))}.xlsx` &&
+    /^일비서_\d{4}-\d{2}-\d{2}\.xlsx$/.test(stamped),
+  stamped,
+);
+ok(
+  "rename-needed-legacy",
+  needsDatedExcelRename("일비서.xlsx", stamped) === true,
+);
+ok(
+  "rename-not-needed-same-day",
+  needsDatedExcelRename(stamped, stamped) === false,
 );
 ok(
   "toast-error-locked",

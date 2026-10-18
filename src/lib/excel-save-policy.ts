@@ -114,16 +114,27 @@ export function resolveSaveStrategy(input: {
 export function excelSaveToastMessage(result: ExcelSaveResult): string | null {
   switch (result.mode) {
     case "overwrite":
-      return "기존 파일에 저장했습니다";
+      return result.fileName
+        ? `저장했습니다 · ${result.fileName}`
+        : "기존 파일에 저장했습니다";
     case "created":
       return `저장했습니다 · ${result.fileName}`;
     case "download":
       return result.reason === "unsupported"
-        ? "다운로드로 저장했습니다. 같은 파일에 덮어쓰려면 PC Chrome·Edge를 써 주세요"
-        : "다운로드로 저장했습니다";
+        ? `다운로드로 저장했습니다 · ${result.fileName}`
+        : `다운로드로 저장했습니다 · ${result.fileName}`;
     case "error":
       return result.message;
     case "cancelled":
       return null;
   }
+}
+
+/** True when stored handle name must change to today’s dated stamp. */
+export function needsDatedExcelRename(
+  currentName: string | null | undefined,
+  desiredName: string,
+): boolean {
+  if (!currentName) return true;
+  return currentName !== desiredName;
 }

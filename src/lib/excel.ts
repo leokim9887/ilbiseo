@@ -392,8 +392,12 @@ export async function buildBriefingWorkbook(
   return buildWorkbook({ tasks, calendarEvents, briefing });
 }
 
+import { datedExcelFilename } from "./excel-filename";
+export { datedExcelFilename };
+
+/** Email / briefing attachment name — same KST dated pattern. */
 export function briefingFilename(date: string): string {
-  return `일비서-${date}.xlsx`;
+  return datedExcelFilename(date);
 }
 
 export function downloadXlsx(

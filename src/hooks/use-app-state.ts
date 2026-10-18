@@ -20,7 +20,10 @@ import { buildDailyBriefing } from "@/lib/briefing";
 import { buildWorkbook } from "@/lib/excel";
 import {
   classifyExcelWriteError,
+  datedExcelFilename,
   loadExcelHandle,
+  needsDatedExcelRename,
+  renameExcelHandle,
   supportsFileSystemAccess,
   writeBufferToHandle,
 } from "@/lib/excel-link";
@@ -86,9 +89,20 @@ export function useAppState() {
         guidelines: next.guidelines,
         habits: next.habits,
       });
-      await writeBufferToHandle(handle, buf);
+      // Keep Explorer filename on today’s KST stamp when auto-syncing
+      // (silent — never open a picker from auto path).
+      let writeHandle = handle;
+      try {
+        const desired = datedExcelFilename();
+        if (needsDatedExcelRename(handle.name, desired)) {
+          writeHandle = await renameExcelHandle(handle, desired);
+        }
+      } catch {
+        writeHandle = handle;
+      }
+      await writeBufferToHandle(writeHandle, buf);
       setExcelStatus(
-        `엑셀 갱신됨 · ${new Date().toLocaleTimeString("ko-KR")}`,
+        `엑셀 갱신됨 · ${writeHandle.name || "일비서"} · ${new Date().toLocaleTimeString("ko-KR")}`,
       );
     } catch (e) {
       const { kind, message } = classifyExcelWriteError(e);

@@ -4,12 +4,12 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   clearExcelHandle,
-  DEFAULT_EXCEL_NAME,
+  datedExcelFilename,
   excelSaveToastMessage,
   saveExcelBuffer,
   supportsFileSystemAccess,
 } from "@/lib/excel-link";
-import { buildWorkbook, briefingFilename } from "@/lib/excel";
+import { buildWorkbook } from "@/lib/excel";
 import { buildDailyBriefing } from "@/lib/briefing";
 import type { AppState } from "@/lib/types";
 import { FileSpreadsheet, Save, Unlink } from "lucide-react";
@@ -63,12 +63,11 @@ export function ExcelLinker({
   const save = async (forceNewFile: boolean) => {
     setBusy(true);
     try {
-      const { buf, briefing } = await buildBuf();
+      const { buf } = await buildBuf();
       const result = await saveExcelBuffer(buf, {
         forceNewFile,
-        suggestedName: fsOk
-          ? DEFAULT_EXCEL_NAME
-          : briefingFilename(briefing.date),
+        // Always stamp today’s KST date (picker + overwrite rename).
+        suggestedName: datedExcelFilename(),
       });
       const msg = excelSaveToastMessage(result);
       if (msg) showToast(msg);
@@ -114,9 +113,9 @@ export function ExcelLinker({
           <p className="mt-0.5 text-sm text-[var(--ink-muted)]">
             {fsOk
               ? linked
-                ? "같은 파일에 바로 저장합니다. 엑셀을 닫고 저장하세요."
-                : "처음만 저장 위치를 고릅니다. 다음부터는 같은 파일에 저장합니다."
-              : "이 브라우저에서는 파일로 내려받습니다."}
+                ? "저장할 때마다 오늘 날짜 이름으로 맞춥니다. 엑셀을 닫고 저장하세요."
+                : "처음만 위치를 고릅니다. 파일 이름에 오늘 날짜가 들어갑니다."
+              : "이 브라우저에서는 오늘 날짜 이름으로 내려받습니다."}
           </p>
         </div>
       </div>

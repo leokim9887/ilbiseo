@@ -7,9 +7,11 @@
  */
 
 import { downloadXlsx } from "./excel";
+import { datedExcelFilename } from "./excel-filename";
 import {
   classifyExcelWriteError,
   excelSaveToastMessage,
+  needsDatedExcelRename,
   resolveSaveStrategy,
   type ExcelSaveResult,
   type ExcelWriteErrorKind,
@@ -19,15 +21,21 @@ export type { ExcelSaveResult, ExcelWriteErrorKind };
 export {
   classifyExcelWriteError,
   excelSaveToastMessage,
+  needsDatedExcelRename,
   resolveSaveStrategy,
 };
+export { datedExcelFilename };
 
 const DB_NAME = "ilbiseo-fs";
 const STORE = "handles";
 const KEY = "excel";
 const META_KEY = "ilbiseo-excel-link-meta-v1";
 
-export const DEFAULT_EXCEL_NAME = "일비서.xlsx";
+/** Legacy undated name (pre–dated-filename). Prefer datedExcelFilename(). */
+export const LEGACY_EXCEL_NAME = "일비서.xlsx";
+
+/** @deprecated use datedExcelFilename() at call time (KST midnight must roll). */
+export const DEFAULT_EXCEL_NAME = LEGACY_EXCEL_NAME;
 
 type ExcelLinkMeta = {
   fileName: string;
@@ -92,7 +100,7 @@ export async function saveExcelHandle(
   handle: FileSystemFileHandle,
 ): Promise<void> {
   memoryHandle = handle;
-  writeMeta(handle.name || DEFAULT_EXCEL_NAME);
+  writeMeta(handle.name || datedExcelFilename());
   const db = await openDb();
   try {
     await new Promise<void>((resolve, reject) => {
@@ -131,7 +139,7 @@ export async function loadExcelHandle(): Promise<FileSystemFileHandle | null> {
       if (handle) {
         memoryHandle = handle;
         if (!readMeta()?.fileName) {
-          writeMeta(handle.name || DEFAULT_EXCEL_NAME);
+          writeMeta(handle.name || datedExcelFilename());
         }
       }
       return handle;
@@ -204,8 +212,34 @@ export async function ensureWritePermission(
   }
 }
 
+/**
+ * Rename the linked file in place (Chrome/Edge File System Access `move`).
+ * Updates memory + IndexedDB meta so Explorer shows the new dated name.
+ */
+export async function renameExcelHandle(
+  handle: FileSystemFileHandle,
+  newName: string,
+): Promise<FileSystemFileHandle> {
+  if (!newName || handle.name === newName) return handle;
+  const ok = await ensureWritePermission(handle);
+  if (!ok) {
+    throw Object.assign(
+      new Error("파일 이름 바꾸기 권한이 없습니다."),
+      { name: "NotAllowedError" },
+    );
+  }
+  if (typeof handle.move !== "function") {
+    throw Object.assign(new Error("이 브라우저는 파일 이름 바꾸기를 지원하지 않습니다."), {
+      name: "NotSupportedError",
+    });
+  }
+  await handle.move(newName);
+  await saveExcelHandle(handle);
+  return handle;
+}
+
 export async function pickExcelFile(
-  suggestedName: string = DEFAULT_EXCEL_NAME,
+  suggestedName: string = datedExcelFilename(),
 ): Promise<FileSystemFileHandle | null> {
   const picker = window.showSaveFilePicker;
   if (!picker) return null;
@@ -267,14 +301,16 @@ export async function writeBufferToHandle(
     await saveExcelHandle(handle);
   } catch {
     memoryHandle = handle;
-    writeMeta(handle.name || DEFAULT_EXCEL_NAME);
+    writeMeta(handle.name || datedExcelFilename());
   }
 }
 
 /**
- * 첫 저장: 위치·이름 선택 → 핸들 IndexedDB(+메모리·localStorage 메타) 보관.
- * 이후 저장: 같은 파일 createWritable 덮어쓰기. 실패해도 피커로 떨어지지 않음.
- * FS Access 없음: 다운로드 폴백.
+ * 첫 저장: 위치·이름 선택(오늘 KST 날짜 포함) → 핸들 보관.
+ * 이후 저장: 같은 핸들 덮어쓰기. 날짜가 바뀌면 move()로 이름 갱신 후 쓰기.
+ * move 불가 시(구형 브라우저)만 새 날짜 이름으로 피커 → 핸들 교체.
+ * 쓰기 실패 시에는 피커로 떨어지지 않음(덮어쓰기 신뢰성 유지).
+ * FS Access 없음: 다운로드 폴백(날짜 이름).
  */
 export async function saveExcelBuffer(
   buffer: ArrayBuffer | ArrayBufferView,
@@ -286,7 +322,7 @@ export async function saveExcelBuffer(
     downloadFallback?: boolean;
   },
 ): Promise<ExcelSaveResult> {
-  const suggestedName = options?.suggestedName ?? DEFAULT_EXCEL_NAME;
+  const suggestedName = options?.suggestedName ?? datedExcelFilename();
   const downloadFallback = options?.downloadFallback !== false;
   const data = toArrayBuffer(buffer);
   const forceNewFile = Boolean(options?.forceNewFile);
@@ -313,10 +349,48 @@ export async function saveExcelBuffer(
 
   if (strategy === "overwrite" && existing) {
     try {
-      await writeBufferToHandle(existing, data);
+      let handle = existing;
+      if (needsDatedExcelRename(existing.name, suggestedName)) {
+        try {
+          handle = await renameExcelHandle(existing, suggestedName);
+        } catch {
+          // Cannot rename in place — open dated save-as once so Explorer
+          // shows today’s name (not stuck on 일비서.xlsx / yesterday).
+          try {
+            const picked = await pickExcelFile(suggestedName);
+            if (!picked) {
+              // Father cancelled rename picker — still overwrite old name
+              // so data is not lost.
+              await writeBufferToHandle(existing, data);
+              return {
+                mode: "overwrite",
+                fileName:
+                  existing.name || readMeta()?.fileName || suggestedName,
+              };
+            }
+            handle = picked;
+            await writeBufferToHandle(handle, data);
+            return {
+              mode: "created",
+              fileName: handle.name || suggestedName,
+            };
+          } catch (pickErr) {
+            if (isAbortError(pickErr)) {
+              await writeBufferToHandle(existing, data);
+              return {
+                mode: "overwrite",
+                fileName:
+                  existing.name || readMeta()?.fileName || suggestedName,
+              };
+            }
+            throw pickErr;
+          }
+        }
+      }
+      await writeBufferToHandle(handle, data);
       return {
         mode: "overwrite",
-        fileName: existing.name || readMeta()?.fileName || suggestedName,
+        fileName: handle.name || readMeta()?.fileName || suggestedName,
       };
     } catch (e) {
       const { kind, message } = classifyExcelWriteError(e);

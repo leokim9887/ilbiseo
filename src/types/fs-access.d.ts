@@ -32,6 +32,11 @@ interface FileSystemFileHandle {
   requestPermission(descriptor: {
     mode?: "read" | "readwrite";
   }): Promise<PermissionState>;
+  /** Chromium: rename in the same folder (updates Explorer name). */
+  move?(
+    nameOrParent: string | FileSystemDirectoryHandle,
+    optionalName?: string,
+  ): Promise<void>;
 }
 
 interface Window {

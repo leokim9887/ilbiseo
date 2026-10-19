@@ -93,6 +93,27 @@ async function main() {
     );
   }
 
+  // Father until-only `~M/D` (corrected: start=today KST, end=tilde date)
+  {
+    const today = "2026-10-19";
+    const a = parseDeadline("~10/19", { today });
+    ok(
+      "until:~10/19→today..today",
+      a.startDate === today &&
+        a.targetDate === "2026-10-19" &&
+        a.kind === "spot",
+      a,
+    );
+    const b = parseDeadline("~10/30", { today });
+    ok(
+      "until:~10/30→today..10/30",
+      b.startDate === today &&
+        b.targetDate === "2026-10-30" &&
+        b.label === "2026-10-19 ~ 2026-10-30",
+      b,
+    );
+  }
+
   // ——— Round-trip via buildWorkbook + parseExcelFile ———
   const exportTasks: Task[] = [
     baseTask({

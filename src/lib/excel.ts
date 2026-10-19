@@ -27,6 +27,7 @@ export const DEADLINE_ENTRY_HELP =
   "· 언젠가 — 기한 없음 (앱「언젠가」와 동일)\n" +
   "· 2026-10-17 — 하루\n" +
   "· 2026-10-17 ~ 2026-10-24 — 구간\n" +
+  "· ~10/30 — 「오늘까지」가 아니라 「그날까지」: 시작=불러온 날(오늘), 종료=10/30\n" +
   "목록에서 고르거나 위 형식으로 직접 입력하세요. 불러오면 앱과 똑같이 맞춰집니다.";
 
 /** Dropdown list formula for Excel data validation (comma-separated). */

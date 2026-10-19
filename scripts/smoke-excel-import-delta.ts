@@ -100,6 +100,48 @@ async function main() {
     parseDeadline("").kind === "someday",
   );
 
+  // Father until-only `~M/D`: start = today (KST), end = tilde date — NOT tilde as start
+  {
+    const today = "2026-10-19";
+    const untilSame = parseDeadline("~10/19", { today });
+    ok(
+      "until-tilde-same-day",
+      untilSame.startDate === today &&
+        untilSame.targetDate === "2026-10-19" &&
+        untilSame.kind === "spot" &&
+        untilSame.label === "2026-10-19",
+      untilSame,
+    );
+    const untilLater = parseDeadline("~10/30", { today });
+    ok(
+      "until-tilde-start-today-end-md",
+      untilLater.startDate === today &&
+        untilLater.targetDate === "2026-10-30" &&
+        untilLater.kind === "ongoing" &&
+        untilLater.label === "2026-10-19 ~ 2026-10-30",
+      untilLater,
+    );
+    const untilFw = parseDeadline("～10/18", { today });
+    ok(
+      "until-fullwidth-tilde",
+      untilFw.startDate === today && untilFw.targetDate === "2026-10-18",
+      untilFw,
+    );
+    // Do NOT treat tilde date as start
+    ok(
+      "until-not-tilde-as-start",
+      untilLater.startDate !== "2026-10-30" &&
+        untilSame.startDate === today,
+    );
+    // Full range with both sides still uses explicit start (not today)
+    const both = parseDeadline("2026-10-01 ~ 2026-10-30", { today });
+    ok(
+      "full-range-keeps-explicit-start",
+      both.startDate === "2026-10-01" && both.targetDate === "2026-10-30",
+      both,
+    );
+  }
+
   // Off-by-one regression: KST local midnight must NOT become previous UTC day
   {
     const kstMid = new Date("2026-10-16T15:00:00.000Z"); // KST 10-17 00:00

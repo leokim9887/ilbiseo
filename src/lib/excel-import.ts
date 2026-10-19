@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { todayIsoKst } from "./date-range";
 import { createId } from "./id";
 import { clampPriority } from "./priority";
 import { inferGroupKey } from "./sort";
@@ -534,8 +535,14 @@ function isoFromYmd(
   return `${year}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
 }
 
-/** Parse one calendar day from common Excel / father text forms. */
-function parseOneDate(raw: string): string | null {
+/**
+ * Parse one calendar day from common Excel / father text forms.
+ * @param defaultYear — year for bare `M/D` (KST “today” year when omitted)
+ */
+function parseOneDate(
+  raw: string,
+  defaultYear?: number,
+): string | null {
   const s = raw.replace(/\u00a0/g, " ").trim();
   if (!s) return null;
 
@@ -568,23 +575,46 @@ function parseOneDate(raw: string): string | null {
     return isoFromYmd(c, a, b);
   }
 
+  // Father bare month/day: `10/19` / `10.19` — year = KST today (or injected)
+  const md = s.match(/^(\d{1,2})\s*[./-]\s*(\d{1,2})$/);
+  if (md) {
+    const year =
+      defaultYear ?? Number.parseInt(todayIsoKst().slice(0, 4), 10);
+    return isoFromYmd(year, md[1], md[2]);
+  }
+
   // Bare Excel serial
   if (/^\d{5}(\.\d+)?$/.test(s)) return excelSerialToIso(Number(s));
 
   return null;
 }
 
+export type ParseDeadlineOptions = {
+  /** Override “today” (YYYY-MM-DD, KST). Defaults to calendar today in Asia/Seoul. */
+  today?: string;
+};
+
 /**
  * Parse 「마감목표」 from Excel export / father-edited cells.
  * Handles: Date serials, YYYY-MM-DD, ranges `A ~ B`, locale m/d/yy,
- * Korean 년월일, ISO datetime. Empty / 「언젠가」 → someday (no fake dates).
+ * Korean 년월일, ISO datetime, father until-only `~M/D`.
+ * Empty / 「언젠가」 → someday (no fake dates).
+ *
+ * Father until-only (`~10/19`, no start in the cell):
+ * - **종료일** = the date after `~` (year = KST current year unless present)
+ * - **시작일** = today (KST calendar day of paste/import/edit) — NOT the tilde date
  */
-export function parseDeadline(raw: string): {
+export function parseDeadline(
+  raw: string,
+  options?: ParseDeadlineOptions,
+): {
   startDate: string | null;
   targetDate: string | null;
   kind: TaskKind;
   label: string;
 } {
+  const today = options?.today ?? todayIsoKst();
+  const defaultYear = Number.parseInt(today.slice(0, 4), 10);
   const s = raw.replace(/\u00a0/g, " ").trim();
   if (!s || /^언젠가$/i.test(s) || /^someday$/i.test(s)) {
     return {
@@ -598,8 +628,22 @@ export function parseDeadline(raw: string): {
   // Range: start ~ end (various dashes / tildes; allow spaced dots)
   const rangeParts = s.split(/\s*[~～〜]\s*|\s+[–—]\s+/);
   if (rangeParts.length === 2) {
-    const start = parseOneDate(rangeParts[0]);
-    const end = parseOneDate(rangeParts[1]);
+    const startRaw = rangeParts[0].trim();
+    const endRaw = rangeParts[1].trim();
+    const end = parseOneDate(endRaw, defaultYear);
+    // Until-only: `~10/19` / `～10/30` — empty start → start = today (KST)
+    if (end && !startRaw) {
+      const start = today;
+      const kind: TaskKind = start === end ? "spot" : "ongoing";
+      return {
+        startDate: start,
+        targetDate: end,
+        kind,
+        // App single-day form when start===end; otherwise range text
+        label: start === end ? start : `${start} ~ ${end}`,
+      };
+    }
+    const start = parseOneDate(startRaw, defaultYear);
     if (start && end) {
       const kind: TaskKind = start === end ? "spot" : "ongoing";
       return {
@@ -616,8 +660,8 @@ export function parseDeadline(raw: string): {
     /^(.+?)\s+-\s+(.+)$/,
   );
   if (hyphenRange) {
-    const start = parseOneDate(hyphenRange[1]);
-    const end = parseOneDate(hyphenRange[2]);
+    const start = parseOneDate(hyphenRange[1], defaultYear);
+    const end = parseOneDate(hyphenRange[2], defaultYear);
     if (start && end) {
       const kind: TaskKind = start === end ? "spot" : "ongoing";
       return {
@@ -629,7 +673,7 @@ export function parseDeadline(raw: string): {
     }
   }
 
-  const single = parseOneDate(s);
+  const single = parseOneDate(s, defaultYear);
   if (single) {
     return {
       startDate: single,

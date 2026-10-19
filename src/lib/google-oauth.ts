@@ -121,6 +121,33 @@ export async function exchangeCode(code: string): Promise<GoogleTokenBundle> {
   };
 }
 
+/** Father-facing copy when Google rejects the stored refresh/access token. */
+export const GOOGLE_RECONNECT_MESSAGE =
+  "구글 연결이 만료됐습니다. 다시 연결해 주세요.";
+
+/** True when Google (or our APIs) report expired / revoked / invalid_grant. */
+export function isGoogleTokenRevokedError(text: string | undefined | null): boolean {
+  if (!text) return false;
+  return /token has been expired or revoked|invalid_grant|invalid credentials|expired or revoked|세션이 만료|연결이 만료|다시 연결해/i.test(
+    text,
+  );
+}
+
+export function mapGoogleAuthError(
+  error?: string | null,
+  errorDescription?: string | null,
+): string {
+  const blob = `${error ?? ""} ${errorDescription ?? ""}`.trim();
+  if (isGoogleTokenRevokedError(blob) || /invalid_grant/i.test(blob)) {
+    return GOOGLE_RECONNECT_MESSAGE;
+  }
+  if (/invalid_client|unauthorized_client/i.test(blob)) {
+    return "구글 앱 설정에 문제가 있습니다. 관리자에게 알려 주세요.";
+  }
+  // Never surface raw English Google OAuth strings as the only UI copy.
+  return GOOGLE_RECONNECT_MESSAGE;
+}
+
 export async function refreshAccessToken(
   refreshToken: string,
 ): Promise<GoogleTokenBundle> {
@@ -143,9 +170,7 @@ export async function refreshAccessToken(
     error_description?: string;
   };
   if (!res.ok || !json.access_token) {
-    throw new Error(
-      json.error_description || json.error || "토큰 갱신 실패",
-    );
+    throw new Error(mapGoogleAuthError(json.error, json.error_description));
   }
   return {
     access_token: json.access_token,
@@ -209,11 +234,15 @@ export function formatGoogleApiError(
     };
     const msg = j.error?.message?.trim();
     if (msg) {
-      if (/invalid_grant|invalid credentials|auth/i.test(msg)) {
-        return `${what} 인증이 만료되었거나 잘못되었습니다. 「연결 해제」후 다시 「Google 캘린더 연결」하세요.`;
+      if (isGoogleTokenRevokedError(msg) || /invalid_grant|invalid credentials|unauth/i.test(msg)) {
+        return GOOGLE_RECONNECT_MESSAGE;
       }
       if (/accessNotConfigured|has not been used|disabled/i.test(msg)) {
         return `Google Calendar API가 프로젝트에서 꺼져 있습니다. Cloud Console에서 Calendar API를 사용 설정하세요.`;
+      }
+      // Prefer Korean framing over raw English Google messages.
+      if (/[A-Za-z]{8,}/.test(msg) && !/[가-힣]/.test(msg)) {
+        return `${what}을(를) 불러오지 못했습니다. 잠시 후 다시 시도하거나 다시 연결해 주세요.`;
       }
       return `${what} 오류: ${msg.slice(0, 160)}`;
     }

@@ -27,7 +27,29 @@ type GoogleStatus = {
   email: string | null;
   missing: string[];
   setupHint: string;
+  needsReconnect?: boolean;
+  error?: string | null;
 };
+
+const RECONNECT_MESSAGE = "구글 연결이 만료됐습니다. 다시 연결해 주세요.";
+
+function fatherFriendlyGoogleError(raw: string): string {
+  if (
+    /token has been expired or revoked|invalid_grant|invalid credentials|expired or revoked|세션이 만료|연결이 만료|다시 연결/i.test(
+      raw,
+    )
+  ) {
+    return RECONNECT_MESSAGE;
+  }
+  if (/<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(raw)) {
+    return "Google 일정을 불러오지 못했습니다. 「새로고침」하거나 다시 연결해 보세요.";
+  }
+  // Hide leftover raw English API strings.
+  if (/[A-Za-z]{8,}/.test(raw) && !/[가-힣]/.test(raw)) {
+    return "구글 일정을 불러오지 못했습니다. 다시 연결해 주세요.";
+  }
+  return raw;
+}
 
 function parseYearMonth(isoDay: string): { year: number; monthIndex: number } {
   const [y, m] = isoDay.split("-").map(Number);
@@ -40,6 +62,7 @@ export function CalendarPanel({
   banner,
 }: CalendarPanelProps) {
   const [googleError, setGoogleError] = useState<string | null>(null);
+  const [needsReconnect, setNeedsReconnect] = useState(false);
   const [status, setStatus] = useState<GoogleStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [busy, setBusy] = useState<"refresh" | "disconnect" | null>(null);
@@ -48,12 +71,37 @@ export function CalendarPanel({
   const [year, setYear] = useState(initial.year);
   const [monthIndex, setMonthIndex] = useState(initial.monthIndex);
 
+  const markDisconnected = useCallback((message?: string | null) => {
+    setNeedsReconnect(true);
+    setGoogleError(fatherFriendlyGoogleError(message || RECONNECT_MESSAGE));
+    setStatus((s) =>
+      s
+        ? {
+            ...s,
+            connected: false,
+            needsReconnect: true,
+            error: message || RECONNECT_MESSAGE,
+          }
+        : s,
+    );
+    autoFetched.current = false;
+  }, []);
+
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
     try {
       const res = await fetch("/api/google/status");
       const json = (await res.json()) as GoogleStatus;
       setStatus(json);
+      if (json.needsReconnect || (json.configured && !json.connected && json.error)) {
+        setNeedsReconnect(Boolean(json.needsReconnect));
+        if (json.error) {
+          setGoogleError(fatherFriendlyGoogleError(json.error));
+        }
+      } else if (json.connected) {
+        setNeedsReconnect(false);
+        setGoogleError(null);
+      }
     } catch {
       setStatus({
         configured: false,
@@ -84,37 +132,49 @@ export function CalendarPanel({
       const res = await fetch("/api/google/events?full=1");
       const json = (await res.json()) as {
         error?: string;
+        needsReconnect?: boolean;
         events?: CalendarEvent[];
         email?: string | null;
         count?: number;
         mode?: string;
       };
       if (!res.ok) {
+        if (json.needsReconnect || res.status === 401) {
+          markDisconnected(json.error);
+          return;
+        }
         throw new Error(json.error || "일정을 가져오지 못했습니다.");
       }
       const list = json.events ?? [];
       onReplace(list);
       setLastFetchCount(json.count ?? list.length);
+      setNeedsReconnect(false);
       setStatus((s) =>
         s
           ? {
               ...s,
               connected: true,
+              needsReconnect: false,
+              error: null,
               email: json.email ?? s.email,
             }
           : s,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "가져오기 실패";
-      setGoogleError(
-        /<\s*!doctype|<\s*html|Error 404 \(Not Found\)/i.test(msg)
-          ? "Google 일정을 불러오지 못했습니다. 「새로고침」하거나 연결을 다시 해보세요."
-          : msg,
-      );
+      const friendly = fatherFriendlyGoogleError(msg);
+      if (
+        /만료|다시 연결|expired|revoked|invalid_grant|401/i.test(msg) ||
+        friendly === RECONNECT_MESSAGE
+      ) {
+        markDisconnected(friendly);
+      } else {
+        setGoogleError(friendly);
+      }
     } finally {
       setBusy(null);
     }
-  }, [onReplace]);
+  }, [markDisconnected, onReplace]);
 
   useEffect(() => {
     if (!status?.connected || autoFetched.current) return;
@@ -125,6 +185,7 @@ export function CalendarPanel({
   const disconnect = async () => {
     setBusy("disconnect");
     setGoogleError(null);
+    setNeedsReconnect(false);
     try {
       await fetch("/api/google/disconnect", { method: "POST" });
       autoFetched.current = false;
@@ -176,7 +237,7 @@ export function CalendarPanel({
     () =>
       events.filter((ev) => {
         const start = ev.start.slice(0, 10);
-        const end = (ev.end?.slice(0, 10) || start);
+        const end = ev.end?.slice(0, 10) || start;
         const monthStart = `${monthPrefix}-01`;
         const last = new Date(year, monthIndex + 1, 0).getDate();
         const monthEnd = `${monthPrefix}-${String(last).padStart(2, "0")}`;
@@ -186,7 +247,8 @@ export function CalendarPanel({
   );
 
   const configured = status?.configured ?? false;
-  const connected = status?.connected ?? false;
+  const connected = (status?.connected ?? false) && !needsReconnect;
+  const showReconnect = configured && (!connected || needsReconnect);
 
   return (
     <PanelShell
@@ -228,7 +290,7 @@ export function CalendarPanel({
               className="inline-flex h-12 min-h-12 w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg bg-[#217346] px-3 text-sm font-medium text-white hover:bg-[#1a5c38] sm:h-11 sm:min-h-11 sm:w-auto"
             >
               <Link2 className="size-4" />
-              Google 캘린더 연결
+              {needsReconnect ? "다시 연결" : "Google 캘린더 연결"}
             </a>
           ) : null}
         </>
@@ -261,6 +323,23 @@ export function CalendarPanel({
               {lastFetchCount != null ? ` · ${lastFetchCount}건` : null}
               {` · 이 달 ${monthEventCount}건`}
             </p>
+          ) : configured && needsReconnect ? (
+            <div className="space-y-3">
+              <p className="text-[var(--ink)]">
+                <span className="font-semibold text-destructive">연결 만료</span>
+                {status?.email ? ` · ${status.email}` : ""}
+              </p>
+              <p className="text-sm text-destructive" role="alert">
+                {googleError || RECONNECT_MESSAGE}
+              </p>
+              <a
+                href="/api/google/auth"
+                className="inline-flex h-12 min-h-12 w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg bg-[#217346] px-4 text-base font-semibold text-white hover:bg-[#1a5c38] sm:h-11 sm:w-auto sm:text-sm"
+              >
+                <Link2 className="size-4" />
+                다시 연결
+              </a>
+            </div>
           ) : configured ? (
             <p className="text-[var(--ink)]">연결을 누르면 로그인합니다.</p>
           ) : (
@@ -274,7 +353,7 @@ export function CalendarPanel({
               일정을 가져오는 중…
             </p>
           ) : null}
-          {googleError ? (
+          {googleError && !needsReconnect ? (
             <p className="mt-2 text-sm text-destructive" role="alert">
               {googleError}
             </p>
@@ -285,18 +364,22 @@ export function CalendarPanel({
           <EmptyState
             title="캘린더 일정이 없습니다"
             description={
-              configured
-                ? "연결하면 일정이 여기에 보입니다."
-                : "잠시 후 다시 확인해 주세요."
+              showReconnect
+                ? needsReconnect
+                  ? "다시 연결하면 일정이 여기에 보입니다."
+                  : "연결하면 일정이 여기에 보입니다."
+                : configured
+                  ? "연결하면 일정이 여기에 보입니다."
+                  : "잠시 후 다시 확인해 주세요."
             }
             action={
-              configured && !connected ? (
+              showReconnect ? (
                 <a
                   href="/api/google/auth"
                   className="inline-flex h-11 min-h-11 touch-manipulation items-center justify-center gap-1.5 rounded-lg bg-[#217346] px-4 text-sm font-medium text-white hover:bg-[#1a5c38]"
                 >
                   <Link2 className="size-4" />
-                  Google 캘린더 연결
+                  {needsReconnect ? "다시 연결" : "Google 캘린더 연결"}
                 </a>
               ) : undefined
             }

@@ -59,10 +59,31 @@ async function main() {
   {
     const d = parseDeadline("~10/18", { today });
     ok(
-      "~10/18 → start=today (not 10/18)",
-      d.startDate === today &&
+      "~10/18 past → single day 10/18 (not range with today)",
+      d.startDate === "2026-10-18" &&
         d.targetDate === "2026-10-18" &&
-        d.startDate !== "2026-10-18",
+        d.kind === "spot" &&
+        d.label === "2026-10-18",
+      d,
+    );
+  }
+  {
+    const d = parseDeadline("2026-10-18 ~ 2026-10-19", { today });
+    ok(
+      "past~today range collapses to past single",
+      d.startDate === "2026-10-18" &&
+        d.targetDate === "2026-10-18" &&
+        d.label === "2026-10-18",
+      d,
+    );
+  }
+  {
+    const d = parseDeadline("2026-10-19 ~ 2026-10-18", { today });
+    ok(
+      "today~past inverted collapses to past single",
+      d.startDate === "2026-10-18" &&
+        d.targetDate === "2026-10-18" &&
+        d.label === "2026-10-18",
       d,
     );
   }

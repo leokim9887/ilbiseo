@@ -106,8 +106,8 @@ export function isSomedayDeadline(
 /**
  * Active task whose 마감목표 **시작일** is before today (KST) → 「지난 일정」.
  * - Compare stored **startDate** (range A~B → A; single day → that day).
- * - Do **not** use taskDateRange’s swapped window — father tilde `~10/18`
- *   with today 10/19 stores start=today, end=10/18; that must stay **not** past.
+ * - Use stored startDate (not taskDateRange swap). Past tilde `~10/18` now
+ *   stores as single day 10/18 → past; open tilde `~10/30` stores start=today.
  * - Start &lt; today → past (even if end is still in the future).
  * - Start === today or future → not past.
  * - 「언젠가」/ undated → never past.

@@ -600,9 +600,10 @@ export type ParseDeadlineOptions = {
  * Korean 년월일, ISO datetime, father until-only `~M/D`.
  * Empty / 「언젠가」 → someday (no fake dates).
  *
- * Father until-only (`~10/19`, no start in the cell):
- * - **종료일** = the date after `~` (year = KST current year unless present)
- * - **시작일** = today (KST calendar day of paste/import/edit) — NOT the tilde date
+ * Father until-only (`~M/D`, no start in the cell):
+ * - end = date after `~` (year = KST current year unless present)
+ * - if end ≥ today → start=today, end=tilde (open until that day)
+ * - if end &lt; today → **single day = tilde date only** (never `과거 ~ 오늘` / `오늘 ~ 과거`)
  */
 export function parseDeadline(
   raw: string,
@@ -631,20 +632,44 @@ export function parseDeadline(
     const startRaw = rangeParts[0].trim();
     const endRaw = rangeParts[1].trim();
     const end = parseOneDate(endRaw, defaultYear);
-    // Until-only: `~10/19` / `～10/30` — empty start → start = today (KST)
+    // Until-only: `~10/19` / `～10/30` — empty start
     if (end && !startRaw) {
+      // Past tilde date → single calendar day (not expand to include today)
+      if (end < today) {
+        return {
+          startDate: end,
+          targetDate: end,
+          kind: "spot",
+          label: end,
+        };
+      }
+      // end ≥ today → start = today (KST), end = tilde date
       const start = today;
       const kind: TaskKind = start === end ? "spot" : "ongoing";
       return {
         startDate: start,
         targetDate: end,
         kind,
-        // App single-day form when start===end; otherwise range text
         label: start === end ? start : `${start} ~ ${end}`,
       };
     }
     const start = parseOneDate(startRaw, defaultYear);
     if (start && end) {
+      // Never keep inverted / today-padded past ranges from bad prior imports:
+      // e.g. `2026-10-18 ~ 2026-10-19` or `2026-10-19 ~ 2026-10-18` when one side
+      // is today and the other is past → collapse to the past single day.
+      if (start !== end) {
+        const a = start <= end ? start : end;
+        const b = start <= end ? end : start;
+        if (a < today && b === today) {
+          return {
+            startDate: a,
+            targetDate: a,
+            kind: "spot",
+            label: a,
+          };
+        }
+      }
       const kind: TaskKind = start === end ? "spot" : "ongoing";
       return {
         startDate: start,
@@ -663,6 +688,18 @@ export function parseDeadline(
     const start = parseOneDate(hyphenRange[1], defaultYear);
     const end = parseOneDate(hyphenRange[2], defaultYear);
     if (start && end) {
+      if (start !== end) {
+        const a = start <= end ? start : end;
+        const b = start <= end ? end : start;
+        if (a < today && b === today) {
+          return {
+            startDate: a,
+            targetDate: a,
+            kind: "spot",
+            label: a,
+          };
+        }
+      }
       const kind: TaskKind = start === end ? "spot" : "ongoing";
       return {
         startDate: start,

@@ -123,15 +123,23 @@ async function main() {
     );
     const untilFw = parseDeadline("～10/18", { today });
     ok(
-      "until-fullwidth-tilde",
-      untilFw.startDate === today && untilFw.targetDate === "2026-10-18",
+      "until-fullwidth-tilde-past-single",
+      untilFw.startDate === "2026-10-18" &&
+        untilFw.targetDate === "2026-10-18" &&
+        untilFw.kind === "spot",
       untilFw,
     );
-    // Do NOT treat tilde date as start
+    // Future tilde: start=today, not the tilde date as sole start
     ok(
-      "until-not-tilde-as-start",
-      untilLater.startDate !== "2026-10-30" &&
-        untilSame.startDate === today,
+      "until-future-start-today-not-end-only",
+      untilLater.startDate === today &&
+        untilLater.targetDate === "2026-10-30" &&
+        untilLater.startDate !== "2026-10-30",
+    );
+    ok(
+      "until-past-no-range-with-today",
+      untilFw.label === "2026-10-18" &&
+        !untilFw.label.includes("~"),
     );
     // Full range with both sides still uses explicit start (not today)
     const both = parseDeadline("2026-10-01 ~ 2026-10-30", { today });

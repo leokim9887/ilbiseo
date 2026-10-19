@@ -112,6 +112,15 @@ async function main() {
         b.label === "2026-10-19 ~ 2026-10-30",
       b,
     );
+    const c = parseDeadline("~10/18", { today });
+    ok(
+      "until:~10/18 past→single 10/18",
+      c.startDate === "2026-10-18" &&
+        c.targetDate === "2026-10-18" &&
+        c.label === "2026-10-18" &&
+        c.kind === "spot",
+      c,
+    );
   }
 
   // ——— Round-trip via buildWorkbook + parseExcelFile ———

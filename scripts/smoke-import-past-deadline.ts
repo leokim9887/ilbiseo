@@ -93,13 +93,15 @@ async function main() {
     ),
   );
 
-  // Tilde ~10/18 with today 10/19 → start=today → NOT past
+  // Tilde ~10/18 with today 10/19 → single day 10/18 → past (지난 일정)
   {
     const d = parseDeadline("~10/18", { today });
     ok(
-      "tilde ~10/18 start=today → not past",
-      d.startDate === today &&
-        !isPastUnfinishedTask(
+      "tilde ~10/18 past → single day → past section",
+      d.startDate === "2026-10-18" &&
+        d.targetDate === "2026-10-18" &&
+        d.label === "2026-10-18" &&
+        isPastUnfinishedTask(
           {
             status: "active",
             kind: d.kind,

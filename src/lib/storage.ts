@@ -14,6 +14,10 @@ import {
 import { createId } from "./id";
 import { inferGroupKey } from "./sort";
 import { clampPriority } from "./priority";
+import {
+  normalizeTaskDeadlineDates,
+  todayIsoKst,
+} from "./date-range";
 
 export function createEmptyState(): AppState {
   return {
@@ -101,7 +105,10 @@ function taskToSideItem(raw: Record<string, unknown>): SideListItem {
   };
 }
 
-function migrateTask(raw: Record<string, unknown>): Task {
+function migrateTask(
+  raw: Record<string, unknown>,
+  today: string = todayIsoKst(),
+): Task {
   const title = String(raw.title ?? "할 일");
   const notes = String(raw.notes ?? raw.memo ?? "");
   const end =
@@ -109,7 +116,7 @@ function migrateTask(raw: Record<string, unknown>): Task {
     (raw.endDate as string | null) ??
     null;
   const start = (raw.startDate as string | null) ?? null;
-  return {
+  const base: Task = {
     id: String(raw.id ?? createId()),
     title,
     category: parseTaskCategory(raw.category),
@@ -128,6 +135,8 @@ function migrateTask(raw: Record<string, unknown>): Task {
     createdAt: String(raw.createdAt ?? new Date().toISOString()),
     completedAt: (raw.completedAt as string | null) ?? null,
   };
+  // Fix stored 「과거 ~ 오늘」 from older tilde/import bugs without re-import
+  return normalizeTaskDeadlineDates(base, today);
 }
 
 /** Fold leftover checklist items into someday tasks; always persist empty checklists. */
@@ -187,10 +196,12 @@ export function normalizeState(raw: unknown): AppState | null {
   const obj = raw as Record<string, unknown>;
   if (!Array.isArray(obj.tasks)) return null;
 
+  const today = todayIsoKst();
   const rawTasks = obj.tasks as Record<string, unknown>[];
   const migratedGuidelines: SideListItem[] = [];
   const migratedHabits: SideListItem[] = [];
   const keptTasks: Task[] = [];
+  let deadlineCollapsed = false;
 
   for (const t of rawTasks) {
     if (!t || typeof t !== "object") continue;
@@ -200,7 +211,19 @@ export function normalizeState(raw: unknown): AppState | null {
       else migratedHabits.push(item);
       continue;
     }
-    keptTasks.push(migrateTask(t));
+    const beforeStart = (t.startDate as string | null) ?? null;
+    const beforeEnd =
+      (t.targetDate as string | null) ??
+      (t.endDate as string | null) ??
+      null;
+    const migrated = migrateTask(t, today);
+    if (
+      migrated.startDate !== beforeStart ||
+      migrated.targetDate !== beforeEnd
+    ) {
+      deadlineCollapsed = true;
+    }
+    keptTasks.push(migrated);
   }
 
   const legacyChecks = Array.isArray(obj.checklists)
@@ -239,7 +262,25 @@ export function normalizeState(raw: unknown): AppState | null {
     guidelines,
     habits,
     deletions,
+    // Internal: loadState persists when true (stripped before return to callers
+    // via normalizeStateResult — see below). Stored only ephemerally.
+    ...(deadlineCollapsed ? { __deadlineCollapsed: true } : {}),
+  } as AppState;
+}
+
+/** True when normalizeState collapsed any past~today deadline. */
+export function stateHadDeadlineCollapse(state: AppState): boolean {
+  return Boolean(
+    (state as AppState & { __deadlineCollapsed?: boolean }).__deadlineCollapsed,
+  );
+}
+
+function stripDeadlineCollapseFlag(state: AppState): AppState {
+  if (!("__deadlineCollapsed" in state)) return state;
+  const { __deadlineCollapsed: _, ...rest } = state as AppState & {
+    __deadlineCollapsed?: boolean;
   };
+  return rest;
 }
 
 export function loadState(): AppState | null {
@@ -271,8 +312,17 @@ export function loadState(): AppState | null {
         Number(parsed.version ?? 0) < APP_VERSION;
       const n = normalizeState(parsed);
       if (n) {
-        if (hadChecks || needsStartMigrate || needsSideMigrate) saveState(n);
-        return n;
+        const collapsed = stateHadDeadlineCollapse(n);
+        const clean = stripDeadlineCollapseFlag(n);
+        if (
+          hadChecks ||
+          needsStartMigrate ||
+          needsSideMigrate ||
+          collapsed
+        ) {
+          saveState(clean);
+        }
+        return clean;
       }
     }
     const v1 = localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -287,8 +337,8 @@ export function loadState(): AppState | null {
         habits: [],
       });
       if (n) {
-        saveState(n);
-        return n;
+        saveState(stripDeadlineCollapseFlag(n));
+        return stripDeadlineCollapseFlag(n);
       }
     }
     return null;

@@ -5,6 +5,7 @@ import type {
   Task,
 } from "./types";
 import { APP_VERSION } from "./types";
+import { normalizeTaskDeadlineDates } from "./date-range";
 
 function normalizeDeletions(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -90,14 +91,14 @@ function pickTask(a: Task, b: Task, prefer: MergePrefer): Task {
     const bC = parseTime(b.completedAt);
     if (aC !== bC) return aC >= bC ? a : b;
   }
-  return {
+  return normalizeTaskDeadlineDates({
     ...preferred,
     title: preferred.title.trim() || other.title,
     memo: preferred.memo || other.memo,
     groupKey: preferred.groupKey || other.groupKey,
     startDate: preferred.startDate ?? other.startDate,
     targetDate: preferred.targetDate ?? other.targetDate,
-  };
+  });
 }
 
 function pickSideItem(

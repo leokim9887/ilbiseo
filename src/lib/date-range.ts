@@ -74,14 +74,65 @@ export function monthRangeContaining(iso: string): { start: string; end: string 
   return { start, end };
 }
 
+/**
+ * Collapse bad 「과거 ~ 오늘」 / 「오늘 ~ 과거」 windows to a single past day.
+ * Legitimate ranges that extend past today (e.g. 10/01 ~ 11/30) are kept.
+ */
+export function collapsePastCappedToToday(
+  startDate: string | null | undefined,
+  targetDate: string | null | undefined,
+  today: string = todayIsoKst(),
+): {
+  startDate: string | null;
+  targetDate: string | null;
+  collapsed: boolean;
+} {
+  const a = startDate?.trim() || null;
+  const b = targetDate?.trim() || null;
+  if (!a && !b) {
+    return { startDate: null, targetDate: null, collapsed: false };
+  }
+  if (!a || !b || a === b) {
+    const only = a || b;
+    return { startDate: only, targetDate: only, collapsed: false };
+  }
+  const lo = a <= b ? a : b;
+  const hi = a <= b ? b : a;
+  if (lo < today && hi === today) {
+    return { startDate: lo, targetDate: lo, collapsed: true };
+  }
+  return { startDate: a, targetDate: b, collapsed: false };
+}
+
+/** Persist/display-safe deadline fields (spot when collapsed to one day). */
+export function normalizeTaskDeadlineDates<
+  T extends Pick<Task, "startDate" | "targetDate" | "kind">,
+>(task: T, today: string = todayIsoKst()): T {
+  if (task.kind === "someday") return task;
+  const { startDate, targetDate, collapsed } = collapsePastCappedToToday(
+    task.startDate,
+    task.targetDate,
+    today,
+  );
+  if (!collapsed) return task;
+  return {
+    ...task,
+    startDate,
+    targetDate,
+    kind: "spot" as T["kind"],
+  };
+}
+
 /** Effective [start, end] for a task. Single-date → both ends that day. */
 export function taskDateRange(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
+  today: string = todayIsoKst(),
 ): { start: string; end: string } | null {
   // 「언젠가」= no specific deadline (null dates + kind someday)
   if (task.kind === "someday") return null;
-  const start = task.startDate?.trim() || null;
-  const end = task.targetDate?.trim() || null;
+  const n = normalizeTaskDeadlineDates(task, today);
+  const start = n.startDate?.trim() || null;
+  const end = n.targetDate?.trim() || null;
   if (!start && !end) return null;
   if (start && end) {
     return start <= end ? { start, end } : { start: end, end: start };
@@ -119,8 +170,10 @@ export function isPastUnfinishedTask(
 ): boolean {
   if (task.status !== "active") return false;
   if (isSomedayDeadline(task)) return false;
+  // After collapse, past~today → single past day; use normalized start
+  const n = normalizeTaskDeadlineDates(task, today);
   const start =
-    task.startDate?.trim() || task.targetDate?.trim() || null;
+    n.startDate?.trim() || n.targetDate?.trim() || null;
   if (!start) return false;
   return start < today;
 }
@@ -145,9 +198,10 @@ export function overlapsPeriod(
 /** Display in 마감목표 cell / xlsx — e.g. `2026-09-01 ~ 2026-09-30` or `언젠가` */
 export function formatDeadlineRange(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
+  today: string = todayIsoKst(),
 ): string {
   if (isSomedayDeadline(task)) return "언젠가";
-  const r = taskDateRange(task);
+  const r = taskDateRange(task, today);
   if (!r) return "";
   if (r.start === r.end) return r.start;
   return `${r.start} ~ ${r.end}`;
@@ -170,6 +224,7 @@ export function excelDateFromIso(iso: string): Date {
  */
 export function deadlineExcelParts(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
+  today: string = todayIsoKst(),
 ):
   | { kind: "someday"; value: string }
   | { kind: "empty"; value: "" }
@@ -178,7 +233,7 @@ export function deadlineExcelParts(
   if (isSomedayDeadline(task)) {
     return { kind: "someday", value: "언젠가" };
   }
-  const r = taskDateRange(task);
+  const r = taskDateRange(task, today);
   if (!r) return { kind: "empty", value: "" };
   if (r.start === r.end) {
     return {
@@ -204,9 +259,10 @@ export function deadlineExcelParts(
  */
 export function formatDeadlineRangeCompact(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
+  today: string = todayIsoKst(),
 ): string {
   if (isSomedayDeadline(task)) return "언젠가";
-  const r = taskDateRange(task);
+  const r = taskDateRange(task, today);
   if (!r) return "";
   const short = (iso: string) => {
     const [y, m, d] = iso.split("-");

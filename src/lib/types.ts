@@ -77,11 +77,18 @@ export interface AppState {
   calendarEvents: CalendarEvent[];
   guidelines: SideListItem[];
   habits: SideListItem[];
+  /**
+   * Soft-delete tombstones: entity id → deletedAt ISO.
+   * Sync merge drops matching entities so deletes are not resurrected
+   * from a peer that still has the old row.
+   */
+  deletions: Record<string, string>;
 }
 
 export const STORAGE_KEY = "ilbiseo-state-v2";
 export const LEGACY_STORAGE_KEY = "ilbiseo-tasks-v1";
-export const APP_VERSION = 3;
+/** v4: deletions tombstones for sync-safe delete */
+export const APP_VERSION = 4;
 
 export const CATEGORY_ORDER: TaskCategory[] = [...TASK_CATEGORIES];
 

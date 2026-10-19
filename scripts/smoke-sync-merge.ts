@@ -149,4 +149,78 @@ ok(
     fingerprintState(onlyRemote.merged) === fingerprintState(remote),
 );
 
+// --- delete tombstone: local deleted, remote still has row → stays gone ---
+const deletedAt = "2026-10-18T12:00:00.000Z";
+const localAfterDelete: AppState = {
+  ...createEmptyState(),
+  tasks: [task({ id: "keep", title: "남김" })],
+  deletions: { gone: deletedAt },
+};
+const remoteStillHas: AppState = {
+  ...createEmptyState(),
+  tasks: [
+    task({ id: "keep", title: "남김" }),
+    task({ id: "gone", title: "삭제된줄" }),
+  ],
+};
+const afterDeleteMerge = mergeAppStates(localAfterDelete, remoteStillHas, "remote");
+ok(
+  "tombstone blocks resurrection from remote",
+  afterDeleteMerge.tasks.length === 1 &&
+    afterDeleteMerge.tasks[0]?.id === "keep" &&
+    afterDeleteMerge.deletions.gone === deletedAt,
+);
+
+const deleteSync = mergeForSync({
+  local: localAfterDelete,
+  remote: remoteStillHas,
+  localUpdatedAt: "2026-10-18T12:00:01.000Z",
+  remoteUpdatedAt: "2026-10-18T11:00:00.000Z",
+});
+ok(
+  "delete merge should push (remote still has deleted id)",
+  deleteSync.shouldPush === true &&
+    !deleteSync.merged.tasks.some((t) => t.id === "gone"),
+);
+
+// peer tombstone drops local copy
+const peerDeleted: AppState = {
+  ...createEmptyState(),
+  deletions: { x: "2026-10-18T15:00:00.000Z" },
+};
+const localHasX: AppState = {
+  ...createEmptyState(),
+  tasks: [task({ id: "x", title: "아직있음" })],
+};
+const peerWinsDelete = mergeAppStates(localHasX, peerDeleted, "local");
+ok(
+  "peer tombstone drops local item",
+  peerWinsDelete.tasks.length === 0 &&
+    Boolean(peerWinsDelete.deletions.x),
+);
+
+// unique sibling still unioned alongside tombstone
+const mixed = mergeAppStates(
+  {
+    ...createEmptyState(),
+    tasks: [task({ id: "a", title: "PC" })],
+    deletions: { z: deletedAt },
+  },
+  {
+    ...createEmptyState(),
+    tasks: [
+      task({ id: "b", title: "폰" }),
+      task({ id: "z", title: "옛줄" }),
+    ],
+  },
+  "remote",
+);
+ok(
+  "union + tombstone together",
+  mixed.tasks.length === 2 &&
+    mixed.tasks.some((t) => t.id === "a") &&
+    mixed.tasks.some((t) => t.id === "b") &&
+    !mixed.tasks.some((t) => t.id === "z"),
+);
+
 console.log("smoke-sync-merge: all passed");

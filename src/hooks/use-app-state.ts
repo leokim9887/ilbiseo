@@ -10,6 +10,8 @@ import type {
   TaskCategory,
 } from "@/lib/types";
 import {
+  applyLocalDeletions,
+  clearDeletions,
   createEmptyState,
   loadState,
   saveState,
@@ -198,7 +200,9 @@ export function useAppState() {
         createdAt: new Date().toISOString(),
         completedAt: null,
       };
-      persist({ ...state, tasks: [...state.tasks, task] });
+      persist(
+        clearDeletions({ ...state, tasks: [...state.tasks, task] }, [task.id]),
+      );
       return task;
     },
     [persist, state],
@@ -212,7 +216,12 @@ export function useAppState() {
         urgency: clampPriority(t.urgency),
         importance: clampPriority(t.importance),
       }));
-      persist({ ...state, tasks: [...state.tasks, ...normalized] });
+      persist(
+        clearDeletions(
+          { ...state, tasks: [...state.tasks, ...normalized] },
+          normalized.map((t) => t.id),
+        ),
+      );
     },
     [persist, state],
   );
@@ -389,10 +398,7 @@ export function useAppState() {
 
   const deleteTask = useCallback(
     (id: string) => {
-      persist({
-        ...state,
-        tasks: state.tasks.filter((t) => t.id !== id),
-      });
+      persist(applyLocalDeletions(state, [id]));
     },
     [persist, state],
   );
@@ -400,11 +406,7 @@ export function useAppState() {
   const deleteTasks = useCallback(
     (ids: string[]) => {
       if (ids.length === 0) return;
-      const remove = new Set(ids);
-      persist({
-        ...state,
-        tasks: state.tasks.filter((t) => !remove.has(t.id)),
-      });
+      persist(applyLocalDeletions(state, ids));
     },
     [persist, state],
   );
@@ -463,7 +465,9 @@ export function useAppState() {
         createdAt: new Date().toISOString(),
         completedAt: null,
       };
-      persist({ ...state, [key]: [...state[key], item] });
+      persist(
+        clearDeletions({ ...state, [key]: [...state[key], item] }, [item.id]),
+      );
       return item;
     },
     [persist, state],
@@ -474,7 +478,12 @@ export function useAppState() {
     (kind: SideListKind, items: SideListItem[]) => {
       if (items.length === 0) return;
       const key = sideKey(kind);
-      persist({ ...state, [key]: [...state[key], ...items] });
+      persist(
+        clearDeletions(
+          { ...state, [key]: [...state[key], ...items] },
+          items.map((i) => i.id),
+        ),
+      );
     },
     [persist, state],
   );
@@ -522,11 +531,7 @@ export function useAppState() {
 
   const deleteSideItem = useCallback(
     (kind: SideListKind, id: string) => {
-      const key = sideKey(kind);
-      persist({
-        ...state,
-        [key]: state[key].filter((item) => item.id !== id),
-      });
+      persist(applyLocalDeletions(state, [id]));
     },
     [persist, state],
   );
@@ -534,12 +539,7 @@ export function useAppState() {
   const deleteSideItems = useCallback(
     (kind: SideListKind, ids: string[]) => {
       if (ids.length === 0) return;
-      const key = sideKey(kind);
-      const remove = new Set(ids);
-      persist({
-        ...state,
-        [key]: state[key].filter((item) => !remove.has(item.id)),
-      });
+      persist(applyLocalDeletions(state, ids));
     },
     [persist, state],
   );

@@ -6,18 +6,29 @@ import type {
 } from "./types";
 import { APP_VERSION } from "./types";
 
+function normalizeDeletions(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [id, at] of Object.entries(raw as Record<string, unknown>)) {
+    if (!id || typeof at !== "string") continue;
+    const t = Date.parse(at);
+    if (Number.isNaN(t)) continue;
+    out[id] = new Date(t).toISOString();
+  }
+  return out;
+}
+
 /**
  * Safe multi-device merge for PC ↔ phone (and 3+ devices).
  *
- * Whole-blob LWW alone can wipe sibling edits (A adds a task, B edits another,
- * then B's push replaces A's addition). This merge:
  * - Unions collections by `id` (items only on one device are kept)
  * - On same-id conflicts, prefers the side with the newer blob `updatedAt`
- * - Sticky completion: if either side is done/completed, keep the completed form
- *   (completion is father-critical and must not flip back silently)
+ * - Sticky completion: if either side is done/completed, keep completed
+ * - **Deletions / tombstones:** `deletions[id] = deletedAt` — after union,
+ *   drop any entity whose id is tombstoned. Deletion wins over a peer that
+ *   still carries the old row (prevents add→delete→refresh resurrection).
  *
- * Google Calendar OAuth stays per-device (cookies/tokens are not in AppState).
- * Cached calendarEvents still merge by id like other lists.
+ * Google Calendar OAuth stays per-device (not in AppState).
  */
 
 export type MergePrefer = "local" | "remote";
@@ -50,6 +61,21 @@ export function maxIsoTimestamp(
   return new Date().toISOString();
 }
 
+/** Merge tombstone maps — later deletedAt wins per id. */
+export function mergeDeletions(
+  local: Record<string, string> | undefined,
+  remote: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {
+    ...normalizeDeletions(local),
+  };
+  for (const [id, at] of Object.entries(normalizeDeletions(remote))) {
+    const prev = out[id];
+    if (!prev || parseTime(at) >= parseTime(prev)) out[id] = at;
+  }
+  return out;
+}
+
 function pickTask(a: Task, b: Task, prefer: MergePrefer): Task {
   const preferred = prefer === "local" ? a : b;
   const other = prefer === "local" ? b : a;
@@ -57,7 +83,6 @@ function pickTask(a: Task, b: Task, prefer: MergePrefer): Task {
   const aDone = a.status === "completed";
   const bDone = b.status === "completed";
   if (aDone !== bDone) {
-    // Sticky completion: keep the completed record.
     return aDone ? a : b;
   }
   if (aDone && bDone) {
@@ -65,8 +90,6 @@ function pickTask(a: Task, b: Task, prefer: MergePrefer): Task {
     const bC = parseTime(b.completedAt);
     if (aC !== bC) return aC >= bC ? a : b;
   }
-  // Same status — prefer newer blob's full item, but keep richer non-empty fields
-  // from the other side when preferred left them blank.
   return {
     ...preferred,
     title: preferred.title.trim() || other.title,
@@ -133,8 +156,17 @@ function mergeById<T extends { id: string }>(
   return [...map.values()];
 }
 
+function dropTombstoned<T extends { id: string }>(
+  items: T[],
+  deletions: Record<string, string>,
+): T[] {
+  if (!deletions || Object.keys(deletions).length === 0) return items;
+  return items.filter((item) => !(item.id in deletions));
+}
+
 /** Stable fingerprint for “did merge change anything?” checks. */
 export function fingerprintState(state: AppState): string {
+  const deletions = normalizeDeletions(state.deletions);
   const norm = {
     version: state.version,
     tasks: [...state.tasks].sort((a, b) => a.id.localeCompare(b.id)),
@@ -143,6 +175,9 @@ export function fingerprintState(state: AppState): string {
     calendarEvents: [...state.calendarEvents].sort((a, b) =>
       a.id.localeCompare(b.id),
     ),
+    deletions: Object.keys(deletions)
+      .sort()
+      .map((id) => [id, deletions[id]]),
   };
   return JSON.stringify(norm);
 }
@@ -152,23 +187,31 @@ export function mergeAppStates(
   remote: AppState,
   prefer: MergePrefer,
 ): AppState {
+  const deletions = mergeDeletions(local.deletions, remote.deletions);
   return {
-    version: Math.max(local.version || APP_VERSION, remote.version || APP_VERSION, APP_VERSION),
-    tasks: mergeById(local.tasks, remote.tasks, prefer, pickTask),
+    version: Math.max(
+      local.version || APP_VERSION,
+      remote.version || APP_VERSION,
+      APP_VERSION,
+    ),
+    tasks: dropTombstoned(
+      mergeById(local.tasks, remote.tasks, prefer, pickTask),
+      deletions,
+    ),
     checklists: [],
-    calendarEvents: mergeById(
-      local.calendarEvents,
-      remote.calendarEvents,
-      prefer,
-      pickCalendar,
+    calendarEvents: dropTombstoned(
+      mergeById(local.calendarEvents, remote.calendarEvents, prefer, pickCalendar),
+      deletions,
     ),
-    guidelines: mergeById(
-      local.guidelines,
-      remote.guidelines,
-      prefer,
-      pickSideItem,
+    guidelines: dropTombstoned(
+      mergeById(local.guidelines, remote.guidelines, prefer, pickSideItem),
+      deletions,
     ),
-    habits: mergeById(local.habits, remote.habits, prefer, pickSideItem),
+    habits: dropTombstoned(
+      mergeById(local.habits, remote.habits, prefer, pickSideItem),
+      deletions,
+    ),
+    deletions,
   };
 }
 

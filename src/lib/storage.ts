@@ -23,7 +23,55 @@ export function createEmptyState(): AppState {
     calendarEvents: [],
     guidelines: [],
     habits: [],
+    deletions: {},
   };
+}
+
+/** Normalize raw deletions map (id → ISO deletedAt). */
+export function normalizeDeletions(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [id, at] of Object.entries(raw as Record<string, unknown>)) {
+    if (!id || typeof at !== "string") continue;
+    const t = Date.parse(at);
+    if (Number.isNaN(t)) continue;
+    out[id] = new Date(t).toISOString();
+  }
+  return out;
+}
+
+/** Record tombstones and strip matching entities from collections. */
+export function applyLocalDeletions(
+  state: AppState,
+  ids: string[],
+  deletedAt: string = new Date().toISOString(),
+): AppState {
+  if (ids.length === 0) return state;
+  const remove = new Set(ids);
+  const deletions = { ...state.deletions };
+  for (const id of ids) deletions[id] = deletedAt;
+  return {
+    ...state,
+    deletions,
+    tasks: state.tasks.filter((t) => !remove.has(t.id)),
+    guidelines: state.guidelines.filter((i) => !remove.has(i.id)),
+    habits: state.habits.filter((i) => !remove.has(i.id)),
+    calendarEvents: state.calendarEvents.filter((e) => !remove.has(e.id)),
+  };
+}
+
+/** Drop tombstones when an id is intentionally re-added (rare). */
+export function clearDeletions(state: AppState, ids: string[]): AppState {
+  if (ids.length === 0 || !state.deletions) return state;
+  let changed = false;
+  const deletions = { ...state.deletions };
+  for (const id of ids) {
+    if (id in deletions) {
+      delete deletions[id];
+      changed = true;
+    }
+  }
+  return changed ? { ...state, deletions } : state;
 }
 
 function migrateSideItem(raw: Record<string, unknown>): SideListItem {
@@ -166,15 +214,31 @@ export function normalizeState(raw: unknown): AppState | null {
     ? (obj.habits as Record<string, unknown>[]).map(migrateSideItem)
     : [];
 
+  const deletions = normalizeDeletions(obj.deletions);
+  const tasks = foldChecklistsIntoTasks(keptTasks, legacyChecks).filter(
+    (t) => !(t.id in deletions),
+  );
+  const guidelines = mergeSideLists(
+    fromFieldGuidelines,
+    migratedGuidelines,
+  ).filter((i) => !(i.id in deletions));
+  const habits = mergeSideLists(fromFieldHabits, migratedHabits).filter(
+    (i) => !(i.id in deletions),
+  );
+  const calendarEvents = (
+    Array.isArray(obj.calendarEvents)
+      ? (obj.calendarEvents as CalendarEvent[])
+      : []
+  ).filter((e) => !(e.id in deletions));
+
   return {
     version: APP_VERSION,
-    tasks: foldChecklistsIntoTasks(keptTasks, legacyChecks),
+    tasks,
     checklists: [],
-    calendarEvents: Array.isArray(obj.calendarEvents)
-      ? (obj.calendarEvents as CalendarEvent[])
-      : [],
-    guidelines: mergeSideLists(fromFieldGuidelines, migratedGuidelines),
-    habits: mergeSideLists(fromFieldHabits, migratedHabits),
+    calendarEvents,
+    guidelines,
+    habits,
+    deletions,
   };
 }
 
@@ -240,6 +304,7 @@ export function saveState(state: AppState): void {
     checklists: [],
     guidelines: state.guidelines ?? [],
     habits: state.habits ?? [],
+    deletions: normalizeDeletions(state.deletions),
     version: APP_VERSION,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));

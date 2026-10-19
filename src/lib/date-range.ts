@@ -104,9 +104,14 @@ export function isSomedayDeadline(
 }
 
 /**
- * Active task whose deadline window is already past.
- * Uses taskDateRange: end day (or sole date) before today → overdue.
- * 「언젠가」/ undated tasks are never overdue.
+ * Active task whose 마감목표 **시작일** is before today (KST) → 「지난 일정」.
+ * - Compare stored **startDate** (range A~B → A; single day → that day).
+ * - Do **not** use taskDateRange’s swapped window — father tilde `~10/18`
+ *   with today 10/19 stores start=today, end=10/18; that must stay **not** past.
+ * - Start &lt; today → past (even if end is still in the future).
+ * - Start === today or future → not past.
+ * - 「언젠가」/ undated → never past.
+ * Used after Excel 불러오기 and in normal 할 일 views (same 틀, bottom + separator).
  */
 export function isPastUnfinishedTask(
   task: Pick<Task, "status" | "startDate" | "targetDate" | "kind">,
@@ -114,9 +119,10 @@ export function isPastUnfinishedTask(
 ): boolean {
   if (task.status !== "active") return false;
   if (isSomedayDeadline(task)) return false;
-  const r = taskDateRange(task);
-  if (!r) return false;
-  return r.end < today;
+  const start =
+    task.startDate?.trim() || task.targetDate?.trim() || null;
+  if (!start) return false;
+  return start < today;
 }
 
 /**

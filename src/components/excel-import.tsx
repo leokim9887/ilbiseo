@@ -641,7 +641,10 @@ function SheetPreviewBlock({
   showFrame: boolean;
   showDeadline: boolean;
 }) {
-  const rows = slice.preview.filter((r) => r.delta !== "empty").slice(0, 20);
+  // Father UX: list only 새 / 바뀜 — never 「그대로」or empty rows
+  const rows = slice.preview
+    .filter((r) => r.delta === "new" || r.delta === "changed")
+    .slice(0, 20);
   return (
     <div
       className="space-y-1.5"
@@ -654,7 +657,14 @@ function SheetPreviewBlock({
         <FrameLine preview={slice.preview} />
       ) : null}
       {rows.length === 0 ? (
-        <p className="text-[12px] text-[var(--ink-muted)]">행 없음</p>
+        <p
+          className="text-[12px] text-[var(--ink-muted)]"
+          data-excel-import-preview-empty
+        >
+          {slice.summary.unchanged > 0
+            ? "새·바뀐 행 없음 (그대로는 생략)"
+            : "행 없음"}
+        </p>
       ) : (
         <div className="max-h-36 overflow-auto rounded-sm border border-[#9aa5ad] dark:border-[#4a5c52]">
           <table className="w-full min-w-[280px] text-left text-[13px]">

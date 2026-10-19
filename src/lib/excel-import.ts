@@ -233,7 +233,8 @@ export function summarizeDeltaCounts(preview: MappedPreviewRow[]): {
   const parts: string[] = [];
   if (neu) parts.push(`새 ${neu}건`);
   if (changed) parts.push(`바뀐 ${changed}건`);
-  if (unchanged) parts.push(`그대로 ${unchanged}건`);
+  // Preview table omits unchanged rows — keep a short skip note only
+  if (unchanged) parts.push(`그대로 ${unchanged}건은 생략`);
   if (blocked) parts.push(`같은 내용 ${blocked}건 제외`);
   return {
     neu,
@@ -1341,7 +1342,7 @@ export function buildWorkbookImportPlan(
   const parts: string[] = [];
   if (neu) parts.push(`새 ${neu}건`);
   if (changed) parts.push(`바뀐 ${changed}건`);
-  if (unchanged) parts.push(`그대로 ${unchanged}건`);
+  if (unchanged) parts.push(`그대로 ${unchanged}건은 생략`);
   if (blocked) parts.push(`같은 내용 ${blocked}건 제외`);
 
   return {

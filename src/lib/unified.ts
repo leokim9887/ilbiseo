@@ -6,7 +6,7 @@ import {
   taskDateRange,
   todayIso,
 } from "./date-range";
-import { formatCalendarWhen } from "./calendar-data";
+import { displayCalendarLabel, formatCalendarWhen } from "./calendar-data";
 import { eventInclusiveDayRange } from "./calendar-span";
 
 export type UnifiedSource = "task" | "calendar";
@@ -95,7 +95,7 @@ function eventToItem(ev: CalendarEvent): UnifiedItem {
     badge: "캘린더",
     accent: "calendar",
     meta: [
-      ev.calendarName || null,
+      displayCalendarLabel(ev.calendarName),
       ev.notes && ev.notes !== "ICS import" ? ev.notes.slice(0, 60) : null,
       ev.source === "google" ? "Google" : ev.source === "ics" ? "ICS" : "mock",
       "읽기 전용",
@@ -103,7 +103,7 @@ function eventToItem(ev: CalendarEvent): UnifiedItem {
       .filter(Boolean)
       .join(" · "),
     readOnly: true,
-    calendarName: ev.calendarName,
+    calendarName: displayCalendarLabel(ev.calendarName) ?? undefined,
     eventId: ev.id,
   };
 }

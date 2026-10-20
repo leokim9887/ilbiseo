@@ -1229,11 +1229,6 @@ export function ExcelWorkbook({
                         <p className="break-words text-[13.5px] font-semibold leading-snug text-[#1a2420] sm:text-[15px]">
                           {calendarListUpTitle(ev)}
                         </p>
-                        {ev.calendarName ? (
-                          <p className="mt-0.5 text-[11px] text-[#3b6ea5] sm:text-[13px]">
-                            {ev.calendarName}
-                          </p>
-                        ) : null}
                       </td>
                       <td className="border border-black px-0.5 py-1.5 text-center align-middle text-[12px] leading-snug break-words text-[#1a2420] sm:px-1 sm:py-2 sm:text-[14.5px]">
                         {formatEventDeadline(ev)}

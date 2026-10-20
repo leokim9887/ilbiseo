@@ -73,6 +73,18 @@ export function createMockCalendarEvents(): CalendarEvent[] {
 export { parseIcsToEvents, importIcsFromInput, looksLikeCalendarUrl } from "./ics";
 
 /**
+ * Calendar summary for todo/gcal list rows.
+ * Hides Google account emails (e.g. goldage64@gmail.com) that often appear as
+ * primary-calendar `summary`. Connection UI still shows status.email separately.
+ */
+export function displayCalendarLabel(name?: string | null): string | null {
+  const n = name?.trim();
+  if (!n) return null;
+  if (n.includes("@")) return null;
+  return n;
+}
+
+/**
  * When label for lists / Excel / briefing.
  * Multi-day → one string with full inclusive range, e.g. `2026-10-14 ~ 2026-10-21`.
  * Never expands to one row per day.

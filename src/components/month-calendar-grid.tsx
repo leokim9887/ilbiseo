@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CalendarEvent } from "@/lib/types";
 import {
+  displayCalendarLabel,
   formatCalendarDayDetailWhen,
   formatCalendarWhen,
 } from "@/lib/calendar-data";
@@ -521,6 +522,7 @@ export function MonthCalendarGrid({
           >
             {detailEvents.map((ev) => {
               const multi = eventInclusiveDayRange(ev).multiDay;
+              const calLabel = displayCalendarLabel(ev.calendarName);
               return (
                 <li
                   key={ev.id}
@@ -534,9 +536,9 @@ export function MonthCalendarGrid({
                   <p className="mt-1 text-[13px] tabular-nums text-[var(--ink-muted)]">
                     {formatCalendarDayDetailWhen(ev)}
                   </p>
-                  {ev.calendarName ? (
+                  {calLabel ? (
                     <p className="mt-0.5 text-[13px] text-[var(--ink-muted)]">
-                      {ev.calendarName}
+                      {calLabel}
                     </p>
                   ) : null}
                 </li>

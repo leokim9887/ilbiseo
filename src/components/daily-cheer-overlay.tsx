@@ -9,12 +9,11 @@ const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
 const IDX_KEY = "ilbiseo-daily-cheer-idx";
 
 /**
- * TEMP / TODO — QA toggle for Ace daily cheer.
+ * QA / TEMP toggle for Ace daily cheer (keep `false` in production).
  * `true`  → show overlay on every page refresh/load (ignore 07:00 KST day gate).
- * `false` → restore once-per-cheer-day via `cheerDayIsoKst()` + localStorage.
- * Revert to `false` after visual QA is done.
+ * `false` → once per cheer day via `cheerDayIsoKst()` + localStorage (07:00 Asia/Seoul).
  */
-const FORCE_CHEER_EVERY_LOAD = true;
+const FORCE_CHEER_EVERY_LOAD = false;
 
 /** Father-friendly rotating pool — Ace cheering grandpa. */
 export const CHEER_MESSAGES = [
@@ -90,8 +89,8 @@ function writeShownDay(day: string) {
 
 /**
  * Ace cheer overlay — Ace face dominates; cheer copy floats over the real photo.
- * Default: once per cheer day (Asia/Seoul 07:00 boundary).
- * TEMP: FORCE_CHEER_EVERY_LOAD shows on every refresh for QA.
+ * Once per cheer day: Asia/Seoul day boundary at 07:00 (not midnight).
+ * Optional QA: set FORCE_CHEER_EVERY_LOAD = true to show on every refresh.
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);
@@ -101,7 +100,7 @@ export function DailyCheerOverlay() {
 
   useEffect(() => {
     if (openedRef.current) return;
-    // TEMP: skip day-boundary gate while FORCE_CHEER_EVERY_LOAD is true
+    // Production: skip if already shown for this cheer day (07:00 KST boundary)
     if (!FORCE_CHEER_EVERY_LOAD) {
       const dayKey = cheerDayIsoKst();
       if (readShownDay() === dayKey) return;
@@ -118,7 +117,6 @@ export function DailyCheerOverlay() {
       commitCheerIndex(nextIdxRef.current);
       nextIdxRef.current = null;
     }
-    // TEMP: do not lock the cheer day while force-every-load QA is on
     if (!FORCE_CHEER_EVERY_LOAD) {
       writeShownDay(cheerDayIsoKst());
     }

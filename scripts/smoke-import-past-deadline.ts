@@ -1,7 +1,7 @@
 /**
- * After Excel import: 마감목표 start < today(KST) → 「지난 일정」 (isPastUnfinishedTask).
- * start === today / future / 언젠가 → not past.
- * Range A~B with A past + B future → still past (start rule).
+ * After Excel import: 마감목표 end ≤ yesterday(KST) → 「지난 일정」 (isPastUnfinishedTask).
+ * end === today / future / 언젠가 → not past.
+ * Range A~B overlapping today (start past, end today+) → NOT past (end rule).
  */
 import fs from "fs";
 import path from "path";
@@ -12,7 +12,7 @@ import {
   autoMapHeaders,
   sheetToTasks,
 } from "../src/lib/excel-import";
-import { isPastUnfinishedTask, todayIsoKst } from "../src/lib/date-range";
+import { addDaysIso, isPastUnfinishedTask, todayIsoKst } from "../src/lib/date-range";
 import { sinkPastSheetRowsLast } from "../src/lib/sheet-rows";
 import { sinkPastUnfinishedTasksLast as sinkSort } from "../src/lib/sort";
 import type { Task } from "../src/lib/types";
@@ -29,17 +29,18 @@ function ok(name: string, cond: boolean, detail?: unknown) {
 }
 
 async function main() {
-  const today = "2026-10-19";
+  const today = "2026-10-20";
+  const yesterday = addDaysIso(today, -1);
 
-  // ——— Unit: start-based past ———
+  // ——— Unit: end-based past ———
   ok(
     "single past day → past",
     isPastUnfinishedTask(
       {
         status: "active",
         kind: "spot",
-        startDate: "2026-10-18",
-        targetDate: "2026-10-18",
+        startDate: yesterday,
+        targetDate: yesterday,
       },
       today,
     ),
@@ -57,13 +58,25 @@ async function main() {
     ),
   );
   ok(
-    "range start past end future → past (start rule)",
-    isPastUnfinishedTask(
+    "range start past end future → not past (end rule)",
+    !isPastUnfinishedTask(
       {
         status: "active",
         kind: "ongoing",
-        startDate: "2026-10-01",
-        targetDate: "2026-11-30",
+        startDate: "2026-10-19",
+        targetDate: "2026-10-21",
+      },
+      today,
+    ),
+  );
+  ok(
+    "range start past end today → not past",
+    !isPastUnfinishedTask(
+      {
+        status: "active",
+        kind: "ongoing",
+        startDate: "2026-10-19",
+        targetDate: today,
       },
       today,
     ),
@@ -81,6 +94,18 @@ async function main() {
     ),
   );
   ok(
+    "range end yesterday → past",
+    isPastUnfinishedTask(
+      {
+        status: "active",
+        kind: "ongoing",
+        startDate: "2026-10-01",
+        targetDate: yesterday,
+      },
+      today,
+    ),
+  );
+  ok(
     "언젠가 → not past",
     !isPastUnfinishedTask(
       {
@@ -93,7 +118,7 @@ async function main() {
     ),
   );
 
-  // Tilde ~10/18 with today 10/19 → single day 10/18 → past (지난 일정)
+  // Tilde ~10/18 with today 10/20 → single day 10/18 → past
   {
     const d = parseDeadline("~10/18", { today });
     ok(
@@ -114,12 +139,32 @@ async function main() {
     );
   }
 
-  // Explicit old start from father Excel paste
+  // Explicit ongoing range overlapping today — stay active
   {
-    const d = parseDeadline("2026-10-01 ~ 2026-10-30", { today });
+    const d = parseDeadline("2026-10-19 ~ 2026-10-21", { today });
     ok(
-      "explicit old start → past after import shape",
-      d.startDate === "2026-10-01" &&
+      "explicit range overlapping today → not past after import shape",
+      d.startDate === "2026-10-19" &&
+        d.targetDate === "2026-10-21" &&
+        !isPastUnfinishedTask(
+          {
+            status: "active",
+            kind: d.kind,
+            startDate: d.startDate,
+            targetDate: d.targetDate,
+          },
+          today,
+        ),
+      d,
+    );
+  }
+
+  // Fully past range
+  {
+    const d = parseDeadline("2026-09-01 ~ 2026-09-30", { today });
+    ok(
+      "explicit range end before yesterday → past",
+      d.targetDate === "2026-09-30" &&
         isPastUnfinishedTask(
           {
             status: "active",
@@ -138,10 +183,11 @@ async function main() {
   const ws = wb.addWorksheet("할 일");
   ws.addRow(["순서", "틀", "할일 LIST UP", "마감목표", "중요도"]);
   ws.addRow([1, "업무용", "오늘일", today, 2]);
-  ws.addRow([2, "업무용", "예전시작구간", "2026-10-01 ~ 2026-11-30", 3]);
-  ws.addRow([3, "업무용", "어제하루", "2026-10-18", 2]);
-  ws.addRow([4, "업무용", "틸드오늘시작", "~10/30", 2]);
-  ws.addRow([5, "업무용", "언젠가일", "언젠가", 1]);
+  ws.addRow([2, "업무용", "진행중구간", "2026-10-19 ~ 2026-10-21", 3]);
+  ws.addRow([3, "업무용", "어제하루", yesterday, 2]);
+  ws.addRow([4, "업무용", "완전지난구간", "2026-09-01 ~ 2026-09-30", 2]);
+  ws.addRow([5, "업무용", "틸드오늘시작", "~10/30", 2]);
+  ws.addRow([6, "업무용", "언젠가일", "언젠가", 1]);
   const buf = Buffer.from(await wb.xlsx.writeBuffer());
   const fixture = path.join(OUT, "ilbiseo-import-past-deadline-fixture.xlsx");
   fs.writeFileSync(fixture, buf);
@@ -154,22 +200,26 @@ async function main() {
   const mapping = autoMapHeaders(todo.headers);
   const tasks = sheetToTasks(todo, mapping, "work") as Task[];
 
-  // sheetToTasks uses live today for tilde — for past checks use live today on live tasks,
-  // and re-parse explicit cells with fixed today for deterministic asserts.
   const live = todayIsoKst();
   const byTitle = Object.fromEntries(tasks.map((t) => [t.title, t]));
 
   ok(
-    "imported 어제하루 start < live today → past",
+    "imported 어제하루 end < live today → past",
     byTitle["어제하루"] &&
       isPastUnfinishedTask(byTitle["어제하루"], live),
     byTitle["어제하루"],
   );
   ok(
-    "imported 예전시작구간 start past → past",
-    byTitle["예전시작구간"] &&
-      isPastUnfinishedTask(byTitle["예전시작구간"], live),
-    byTitle["예전시작구간"],
+    "imported 완전지난구간 end past → past",
+    byTitle["완전지난구간"] &&
+      isPastUnfinishedTask(byTitle["완전지난구간"], live),
+    byTitle["완전지난구간"],
+  );
+  ok(
+    "imported 진행중구간 overlapping today → not past",
+    byTitle["진행중구간"] &&
+      !isPastUnfinishedTask(byTitle["진행중구간"], live),
+    byTitle["진행중구간"],
   );
   ok(
     "imported 오늘일 → not past",
@@ -215,7 +265,7 @@ async function main() {
     kinds,
   );
   ok(
-    "오늘/언젠가/틸드는 separator 위",
+    "진행중/오늘/언젠가/틸드는 separator 위",
     kinds.slice(0, sepAt).every((k) => k.startsWith("cur:")),
     kinds,
   );

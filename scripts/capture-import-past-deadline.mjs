@@ -1,5 +1,6 @@
 /**
- * Capture: Excel 불러오기 후 start < today → 「지난 일정」구분선 아래.
+ * Capture: Excel 불러오기 후 end ≤ yesterday → 「지난 일정」구분선 아래.
+ * Ongoing ranges overlapping today stay above the separator.
  */
 import fs from "fs";
 import path from "path";
@@ -66,13 +67,20 @@ async function buildFixture(today) {
   ws.addRow([
     2,
     "업무용",
-    "예전 시작 구간 (시작 지남)",
-    "2026-10-01 ~ 2026-11-30",
+    "진행 중 구간 (오늘 포함)",
+    `${past} ~ ${today}`,
     3,
   ]);
-  ws.addRow([3, "업무용", "어제 하루", past, 2]);
-  ws.addRow([4, "업무용", "틸드 오늘시작 (~10/30)", "~10/30", 2]);
-  ws.addRow([5, "업무용", "언젠가 정리", "언젠가", 1]);
+  ws.addRow([
+    3,
+    "업무용",
+    "완전 지난 구간",
+    "2026-09-01 ~ 2026-09-30",
+    2,
+  ]);
+  ws.addRow([4, "업무용", "어제 하루", past, 2]);
+  ws.addRow([5, "업무용", "틸드 오늘시작 (~10/30)", "~10/30", 2]);
+  ws.addRow([6, "업무용", "언젠가 정리", "언젠가", 1]);
   const buf = Buffer.from(await wb.xlsx.writeBuffer());
   const p = path.join(OUT, "ilbiseo-import-past-deadline-fixture.xlsx");
   fs.writeFileSync(p, buf);
@@ -165,9 +173,22 @@ async function main() {
   }
   // Past titles should be last among todo titles
   const last = titles[titles.length - 1];
-  const pastTitles = ["어제 하루", "예전 시작 구간 (시작 지남)"];
+  const pastTitles = ["어제 하루", "완전 지난 구간"];
+  const activeOngoing = "진행 중 구간 (오늘 포함)";
   if (!pastTitles.includes(last) && !titles.some((t) => pastTitles.includes(t))) {
     throw new Error(`Past titles missing in list: ${JSON.stringify(titles)}`);
+  }
+  if (!titles.includes(activeOngoing)) {
+    throw new Error(`Ongoing range missing from list: ${JSON.stringify(titles)}`);
+  }
+  // Ongoing overlapping today must NOT be marked overdue
+  const overdueTitles = await page
+    .locator('[data-excel-overdue="1"] textarea[aria-label="할 일"]')
+    .evaluateAll((els) => els.map((e) => e.value));
+  if (overdueTitles.includes(activeOngoing)) {
+    throw new Error(
+      `Ongoing range wrongly marked past: ${JSON.stringify(overdueTitles)}`,
+    );
   }
 
   const out = path.join(OUT, "ilbiseo-import-past-deadline.png");

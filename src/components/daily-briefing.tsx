@@ -71,10 +71,12 @@ export function DailyBriefingPanel({
     attachXlsx: true,
   });
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
-  const [busy, setBusy] = useState<"none" | "api" | "sync">("none");
+  const [busy, setBusy] = useState<"none" | "api">("none");
   const [apiNote, setApiNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
+  /** Father-friendly: briefing body hidden until 「미리보기」; click again to hide. */
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   useEffect(() => {
     const loaded = loadSettings();
@@ -184,25 +186,11 @@ export function DailyBriefingPanel({
     }
   };
 
-  const forceSync = async () => {
-    setBusy("sync");
-    setError(null);
-    try {
-      const r = await syncSnapshot(settings, {
-        tasks,
-        calendarEvents,
-        guidelines,
-        habits,
-      });
-      setSyncNote(
-        r.ok
-          ? `${r.message ? `메일용 저장됨 · ${r.message}` : "메일용 저장됨"}`
-          : `동기화 실패 · ${r.error || r.message || ""}`,
-      );
-      if (!r.ok) setError(r.error || r.message || "동기화 실패");
-    } finally {
-      setBusy("none");
-    }
+  const togglePreview = () => {
+    setPreviewVisible((open) => {
+      if (!open) void callApi(false);
+      return !open;
+    });
   };
 
   return (
@@ -290,23 +278,11 @@ export function DailyBriefingPanel({
               size="lg"
               className="min-h-11"
               variant="outline"
-              onClick={() => callApi(false)}
+              onClick={togglePreview}
               disabled={busy !== "none"}
+              aria-pressed={previewVisible}
             >
               미리보기
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              className="min-h-11"
-              variant="outline"
-              onClick={forceSync}
-              disabled={busy !== "none"}
-            >
-              {busy === "sync" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : null}
-              지금 맞춰 두기
             </Button>
           </div>
 
@@ -333,117 +309,124 @@ export function DailyBriefingPanel({
           </p>
         ) : null}
 
-        <article className="overflow-hidden rounded-xl border border-[var(--grid-line)]">
-          <header className="border-b border-[var(--grid-line)] bg-[var(--sheet-header)] px-4 py-3">
-            <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-[var(--brand)]">
-              {preview.headline}
-            </h3>
-            <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              {preview.summaryLine}
-            </p>
-          </header>
+        {previewVisible ? (
+          <article
+            className="overflow-hidden rounded-xl border border-[var(--grid-line)]"
+            data-briefing-preview="shown"
+          >
+            <header className="border-b border-[var(--grid-line)] bg-[var(--sheet-header)] px-4 py-3">
+              <h3 className="font-[family-name:var(--font-display)] text-lg font-bold text-[var(--brand)]">
+                {preview.headline}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                {preview.summaryLine}
+              </p>
+            </header>
 
-          <div className="divide-y divide-[var(--grid-line)]">
-            <section className="px-4 py-3">
-              <h4 className="mb-2 text-sm font-semibold text-[#217346]">
-                【할 일】
-              </h4>
-              {preview.sections.length === 0 ? (
-                <p className="text-sm text-[var(--ink-muted)]">할 일 없음</p>
-              ) : (
-                preview.sections.map((section) => (
-                  <div key={section.kind} className="mb-3">
-                    <p className="mb-1 text-sm font-medium">
-                      {section.title}{" "}
-                      <span className="text-[13px] text-[var(--ink-muted)]">
-                        {section.summary}
-                      </span>
-                    </p>
-                    <ul className="space-y-1.5">
-                      {section.lines.map((line, i) => (
-                        <li
-                          key={`${line.title}-${i}`}
-                          className="rounded-lg bg-[var(--row-hover)] px-3 py-2.5 text-sm"
-                        >
-                          <p className="font-medium">
-                            ☐{" "}
-                            {line.priorityTag ? (
-                              <span className="text-[var(--accent-spot)]">
-                                {line.priorityTag}{" "}
-                              </span>
-                            ) : null}
-                            {line.title}
-                          </p>
-                          <p className="text-[13px] text-[var(--ink-muted)]">
-                            {line.categoryLabel} · {line.importanceLabel}
-                            {line.targetDate ? ` · 기한 ${line.targetDate}` : ""}
-                          </p>
-                          {line.memo ? (
-                            <p className="text-[13px] text-[var(--ink-muted)]">
-                              메모: {line.memo}
-                            </p>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))
-              )}
-            </section>
-
-            {preview.guidelineLines.length > 0 ? (
+            <div className="divide-y divide-[var(--grid-line)]">
               <section className="px-4 py-3">
-                <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
-                  【지침】
+                <h4 className="mb-2 text-sm font-semibold text-[#217346]">
+                  【할 일】
                 </h4>
-                <ul className="space-y-1 text-sm">
-                  {preview.guidelineLines.map((g, i) => (
-                    <li key={`g-${i}`}>
-                      {g.done ? "☑" : "☐"} {g.title}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            {preview.habitLines.length > 0 ? (
-              <section className="px-4 py-3">
-                <h4 className="mb-2 text-sm font-semibold text-[#2d7a4f]">
-                  【습관】
-                </h4>
-                <ul className="space-y-1 text-sm">
-                  {preview.habitLines.map((h, i) => (
-                    <li key={`h-${i}`}>
-                      {h.done ? "☑" : "☐"} {h.title}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            {preview.calendarLines.length > 0 ? (
-              <section className="px-4 py-3">
-                <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
-                  【구글 캘린더】
-                </h4>
-                <ul className="space-y-1.5">
-                  {preview.calendarLines.map((c, i) => (
-                    <li key={`${c.title}-${i}`} className="text-sm">
-                      <span className="text-[var(--ink-muted)]">{c.when}</span>{" "}
-                      {c.title}
-                      {c.calendarName ? (
-                        <span className="text-[var(--ink-muted)]">
-                          {" "}
-                          · {c.calendarName}
+                {preview.sections.length === 0 ? (
+                  <p className="text-sm text-[var(--ink-muted)]">할 일 없음</p>
+                ) : (
+                  preview.sections.map((section) => (
+                    <div key={section.kind} className="mb-3">
+                      <p className="mb-1 text-sm font-medium">
+                        {section.title}{" "}
+                        <span className="text-[13px] text-[var(--ink-muted)]">
+                          {section.summary}
                         </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                      </p>
+                      <ul className="space-y-1.5">
+                        {section.lines.map((line, i) => (
+                          <li
+                            key={`${line.title}-${i}`}
+                            className="rounded-lg bg-[var(--row-hover)] px-3 py-2.5 text-sm"
+                          >
+                            <p className="font-medium">
+                              ☐{" "}
+                              {line.priorityTag ? (
+                                <span className="text-[var(--accent-spot)]">
+                                  {line.priorityTag}{" "}
+                                </span>
+                              ) : null}
+                              {line.title}
+                            </p>
+                            <p className="text-[13px] text-[var(--ink-muted)]">
+                              {line.categoryLabel} · {line.importanceLabel}
+                              {line.targetDate
+                                ? ` · 기한 ${line.targetDate}`
+                                : ""}
+                            </p>
+                            {line.memo ? (
+                              <p className="text-[13px] text-[var(--ink-muted)]">
+                                메모: {line.memo}
+                              </p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                )}
               </section>
-            ) : null}
-          </div>
-        </article>
+
+              {preview.guidelineLines.length > 0 ? (
+                <section className="px-4 py-3">
+                  <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
+                    【지침】
+                  </h4>
+                  <ul className="space-y-1 text-sm">
+                    {preview.guidelineLines.map((g, i) => (
+                      <li key={`g-${i}`}>
+                        {g.done ? "☑" : "☐"} {g.title}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {preview.habitLines.length > 0 ? (
+                <section className="px-4 py-3">
+                  <h4 className="mb-2 text-sm font-semibold text-[#2d7a4f]">
+                    【습관】
+                  </h4>
+                  <ul className="space-y-1 text-sm">
+                    {preview.habitLines.map((h, i) => (
+                      <li key={`h-${i}`}>
+                        {h.done ? "☑" : "☐"} {h.title}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {preview.calendarLines.length > 0 ? (
+                <section className="px-4 py-3">
+                  <h4 className="mb-2 text-sm font-semibold text-[#3b6ea5]">
+                    【구글 캘린더】
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {preview.calendarLines.map((c, i) => (
+                      <li key={`${c.title}-${i}`} className="text-sm">
+                        <span className="text-[var(--ink-muted)]">{c.when}</span>{" "}
+                        {c.title}
+                        {c.calendarName ? (
+                          <span className="text-[var(--ink-muted)]">
+                            {" "}
+                            · {c.calendarName}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
+          </article>
+        ) : null}
       </div>
     </PanelShell>
   );

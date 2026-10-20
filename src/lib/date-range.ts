@@ -155,12 +155,12 @@ export function isSomedayDeadline(
 }
 
 /**
- * Active task whose 마감목표 **시작일** is before today (KST) → 「지난 일정」.
- * - Compare stored **startDate** (range A~B → A; single day → that day).
- * - Use stored startDate (not taskDateRange swap). Past tilde `~10/18` now
- *   stores as single day 10/18 → past; open tilde `~10/30` stores start=today.
- * - Start &lt; today → past (even if end is still in the future).
- * - Start === today or future → not past.
+ * Active task whose 마감목표 window is **fully past** (KST) → 「지난 일정」.
+ * - Fully past = **종료일 ≤ 어제** (max through yesterday).
+ * - Use stored dates (not collapsePastCappedToToday): range ending today
+ *   stays active even if start was yesterday.
+ * - Single day === today → not past; single day ≤ yesterday → past.
+ * - Range ending today or later → not past; ending yesterday or earlier → past.
  * - 「언젠가」/ undated → never past.
  * Used after Excel 불러오기 and in normal 할 일 views (same 틀, bottom + separator).
  */
@@ -170,12 +170,13 @@ export function isPastUnfinishedTask(
 ): boolean {
   if (task.status !== "active") return false;
   if (isSomedayDeadline(task)) return false;
-  // After collapse, past~today → single past day; use normalized start
-  const n = normalizeTaskDeadlineDates(task, today);
-  const start =
-    n.startDate?.trim() || n.targetDate?.trim() || null;
-  if (!start) return false;
-  return start < today;
+  const start = task.startDate?.trim() || null;
+  const end = task.targetDate?.trim() || null;
+  if (!start && !end) return false;
+  const hi =
+    start && end ? (start <= end ? end : start) : (end || start)!;
+  const yesterday = addDaysIso(today, -1);
+  return hi <= yesterday;
 }
 
 /**

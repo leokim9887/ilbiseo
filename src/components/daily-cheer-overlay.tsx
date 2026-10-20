@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button";
 const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
 const IDX_KEY = "ilbiseo-daily-cheer-idx";
 
+/**
+ * TEMP / TODO — QA toggle for Ace daily cheer.
+ * `true`  → show overlay on every page refresh/load (ignore 07:00 KST day gate).
+ * `false` → restore once-per-cheer-day via `cheerDayIsoKst()` + localStorage.
+ * Revert to `false` after visual QA is done.
+ */
+const FORCE_CHEER_EVERY_LOAD = true;
+
 /** Father-friendly rotating pool — Ace cheering grandpa. */
 export const CHEER_MESSAGES = [
   "할아버지, 오늘도 화이팅이에요!",
@@ -20,7 +28,7 @@ export const CHEER_MESSAGES = [
   "할 일 하나하나, 에이스가 응원합니다!",
   "할아버지, 잠시 쉬어도 괜찮아요. 그래도 화이팅!",
   "오늘 하루도 든든한 할아버지! 화이팅입니다!",
-  "에이스 응원 도착! 할아버지, 파이팅!",
+  "에이스 응원 도착! 할아버지, 화이팅!",
   "할아버지가 하면 다 잘돼요. 오늘도 화이팅!",
 ] as const;
 
@@ -82,7 +90,8 @@ function writeShownDay(day: string) {
 
 /**
  * Ace cheer overlay — rotating message + 시작.
- * Once per cheer day: Asia/Seoul day boundary at 07:00 (not midnight).
+ * Default: once per cheer day (Asia/Seoul 07:00 boundary).
+ * TEMP: FORCE_CHEER_EVERY_LOAD shows on every refresh for QA.
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);
@@ -92,8 +101,11 @@ export function DailyCheerOverlay() {
 
   useEffect(() => {
     if (openedRef.current) return;
-    const dayKey = cheerDayIsoKst();
-    if (readShownDay() === dayKey) return;
+    // TEMP: skip day-boundary gate while FORCE_CHEER_EVERY_LOAD is true
+    if (!FORCE_CHEER_EVERY_LOAD) {
+      const dayKey = cheerDayIsoKst();
+      if (readShownDay() === dayKey) return;
+    }
     openedRef.current = true;
     const { message: msg, nextIdx } = peekCheerMessage();
     nextIdxRef.current = nextIdx;
@@ -106,7 +118,10 @@ export function DailyCheerOverlay() {
       commitCheerIndex(nextIdxRef.current);
       nextIdxRef.current = null;
     }
-    writeShownDay(cheerDayIsoKst());
+    // TEMP: do not lock the cheer day while force-every-load QA is on
+    if (!FORCE_CHEER_EVERY_LOAD) {
+      writeShownDay(cheerDayIsoKst());
+    }
     setOpen(false);
   }, []);
 
@@ -126,7 +141,7 @@ export function DailyCheerOverlay() {
 
   return (
     <div
-      className="animate-fade-up fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(12,28,26,0.55)] px-4 backdrop-blur-[2px]"
+      className="cheer-backdrop fixed inset-0 z-[80] flex items-center justify-center px-4"
       role="dialog"
       aria-modal="true"
       aria-label="에이스 응원"
@@ -134,30 +149,42 @@ export function DailyCheerOverlay() {
       onClick={dismiss}
     >
       <div
-        className="relative w-full max-w-[22rem] sm:max-w-[24rem]"
+        className="cheer-card relative w-full max-w-[22.5rem] sm:max-w-[25rem]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative overflow-hidden rounded-3xl border border-[#c9b27c]/45 bg-[linear-gradient(165deg,#f7f3ea_0%,#efe8d8_48%,#e7dfd0_100%)] px-5 pb-5 pt-6 shadow-[0_18px_48px_rgba(8,24,22,0.35)] sm:px-6 sm:pb-6 sm:pt-7">
+        <div className="relative overflow-hidden rounded-[1.65rem] border border-[#c9b27c]/55 bg-[linear-gradient(168deg,#faf6ee_0%,#f0e8d6_42%,#e6dcc8_100%)] px-5 pb-5 pt-6 shadow-[0_22px_56px_rgba(8,24,22,0.42),0_0_0_1px_rgba(201,178,124,0.18)] sm:px-7 sm:pb-6 sm:pt-7">
+          {/* Warm top wash — depth without clutter */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(ellipse_at_50%_0%,rgba(201,178,124,0.28)_0%,transparent_70%)]"
+            aria-hidden
+          />
+
           <div className="relative mx-auto flex w-fit flex-col items-center">
+            <p className="cheer-label mb-2.5 font-sans text-[0.72rem] font-semibold tracking-[0.14em] text-[#8a7340] sm:text-[0.75rem]">
+              에이스의 응원
+            </p>
+
             <div
-              className="relative mb-3 max-w-[18rem] rounded-2xl bg-white px-4 py-3 text-center shadow-sm ring-1 ring-[#163f39]/10"
+              className="cheer-bubble relative mb-4 max-w-[19rem] rounded-2xl bg-white/95 px-4 py-3.5 text-center shadow-[0_6px_20px_rgba(22,63,57,0.08)] ring-1 ring-[#163f39]/12 sm:max-w-[20rem]"
               data-daily-cheer-bubble
             >
-              <p className="font-sans text-[1.05rem] font-semibold leading-snug text-[#163f39] sm:text-[1.12rem]">
+              <p className="font-sans text-[1.12rem] font-semibold leading-snug text-[#143832] sm:text-[1.2rem]">
                 {message}
               </p>
               <span
-                className="absolute left-1/2 top-full -mt-px -translate-x-1/2 border-x-[10px] border-t-[12px] border-x-transparent border-t-white"
+                className="absolute left-1/2 top-full -mt-px -translate-x-1/2 border-x-[11px] border-t-[13px] border-x-transparent border-t-white/95"
                 aria-hidden
               />
             </div>
 
-            <div className="relative size-[11.25rem] sm:size-[12.5rem]">
+            <div className="cheer-face relative size-[12rem] sm:size-[13.5rem]">
+              {/* Soft warm glow — intentional presence, not purple */}
+              <div className="cheer-glow absolute -inset-3 rounded-full" aria-hidden />
               <div
-                className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_40%_35%,#f0e6c8_0%,#c9b27c_55%,#8a7340_100%)] opacity-90"
+                className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_38%_32%,#f3e7c4_0%,#c9b27c_52%,#7a6540_100%)] opacity-95 shadow-[0_10px_28px_rgba(22,63,57,0.22)]"
                 aria-hidden
               />
-              <div className="absolute inset-[7px] overflow-hidden rounded-full bg-[#163f39]/10 ring-2 ring-white/80">
+              <div className="absolute inset-[8px] overflow-hidden rounded-full bg-[#163f39]/10 ring-[3px] ring-white/90">
                 <Image
                   src="/ilbiseo-grandson-cheer.png?v=26"
                   alt="에이스"
@@ -175,7 +202,7 @@ export function DailyCheerOverlay() {
           <Button
             type="button"
             size="lg"
-            className="mt-5 min-h-12 w-full touch-manipulation text-[1.05rem] font-semibold sm:min-h-11"
+            className="cheer-cta mt-6 min-h-12 w-full touch-manipulation text-[1.08rem] font-semibold shadow-[0_4px_14px_rgba(26,77,69,0.28)] sm:min-h-11"
             onClick={dismiss}
             data-daily-cheer-confirm
           >

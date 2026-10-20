@@ -298,6 +298,105 @@
   animation: sheet-in 0.28s ease-out both;
 }
 
+/* —— Ace daily cheer overlay (dramatic entrance) —— */
+@keyframes cheer-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cheer-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cheer-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes cheer-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cheer-backdrop {
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 50% 42%,
+      rgba(42, 72, 58, 0.22) 0%,
+      transparent 62%
+    ),
+    rgba(10, 24, 22, 0.62);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: cheer-backdrop-in 0.38s ease-out both;
+}
+
+.cheer-card {
+  animation: cheer-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.cheer-glow {
+  background: radial-gradient(
+    circle,
+    rgba(232, 196, 110, 0.55) 0%,
+    rgba(201, 178, 124, 0.28) 42%,
+    transparent 68%
+  );
+  animation: cheer-glow-breathe 2.8s ease-in-out 0.45s infinite;
+}
+
+.cheer-label {
+  animation: cheer-stagger-in 0.45s ease-out 0.22s both;
+}
+
+.cheer-bubble {
+  animation: cheer-stagger-in 0.48s ease-out 0.28s both;
+}
+
+.cheer-face {
+  animation: cheer-stagger-in 0.5s ease-out 0.18s both;
+}
+
+.cheer-cta {
+  animation: cheer-stagger-in 0.45s ease-out 0.42s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cheer-backdrop,
+  .cheer-card,
+  .cheer-glow,
+  .cheer-label,
+  .cheer-bubble,
+  .cheer-face,
+  .cheer-cta {
+    animation: none !important;
+  }
+}
+
 /* Excel workbook cell controls — readable + father-friendly density */
 .excel-input {
   width: 100%;

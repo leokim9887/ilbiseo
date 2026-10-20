@@ -628,6 +628,24 @@
   border-color: #3a4a42 !important;
 }
 
+/* Portaled dialogs (outside .excel-wb) — title/body stay readable in dark */
+.dark [data-slot="dialog-content"],
+.dark [data-similarity-alert] {
+  color: #e8ece9;
+  border-color: #3a4a42;
+}
+.dark [data-slot="dialog-title"],
+.dark [data-similarity-alert] [data-slot="dialog-title"] {
+  color: var(--ink) !important;
+}
+.dark [data-slot="dialog-description"],
+.dark [data-similarity-alert] [data-slot="dialog-description"] {
+  color: var(--ink-muted) !important;
+}
+.dark [data-slot="dialog-footer"] {
+  border-color: #3a4a42;
+}
+
 /* Install hint / misc light bars */
 .dark .pwa-browser-only,
 .dark [data-install-hint] {

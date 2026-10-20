@@ -1717,10 +1717,10 @@ export function ExcelWorkbook({
           showCloseButton={false}
         >
           <DialogHeader>
-            <DialogTitle className="text-[16px] text-[#1a2420]">
+            <DialogTitle className="text-[16px] text-[var(--ink)]">
               비슷한 할 일
             </DialogTitle>
-            <DialogDescription className="text-[14px] leading-relaxed text-[#3d4a44]">
+            <DialogDescription className="text-[14px] leading-relaxed text-[var(--ink-muted)]">
               {similarityAlert}
             </DialogDescription>
           </DialogHeader>

@@ -236,14 +236,39 @@ async function main() {
   const hiddenPath = path.join(OUT, "ilbiseo-briefing-preview-hidden.png");
   await page.screenshot({ path: hiddenPath, fullPage: false });
 
-  // Show preview (API may fail without mail creds — body still shows via local build)
+  // Show preview — local toggle only (no API / SMTP toast)
   await page.getByRole("button", { name: "미리보기" }).click();
   await page
     .locator('[data-briefing-preview="shown"]')
-    .waitFor({ timeout: 15000 });
-  await page.waitForTimeout(600);
+    .waitFor({ timeout: 5000 });
+  await page.waitForTimeout(300);
+  const bodyText = await page.locator("body").innerText();
+  if (
+    bodyText.includes("미리보기만 했습니다") ||
+    bodyText.includes("네이버 SMTP") ||
+    bodyText.includes("미리보기 ·")
+  ) {
+    throw new Error(`Preview must not show SMTP/test-mail toast: ${bodyText.slice(0, 400)}`);
+  }
+  // Test-mail button stays available independently (not gated by preview)
+  const testMail = page.getByRole("button", { name: "테스트 메일 보내기" });
+  if (!(await testMail.isEnabled())) {
+    throw new Error("테스트 메일 보내기 should stay enabled after preview");
+  }
   const shownPath = path.join(OUT, "ilbiseo-briefing-preview-shown.png");
   await page.screenshot({ path: shownPath, fullPage: true });
+  const toggleOnlyPath = path.join(
+    OUT,
+    "ilbiseo-briefing-preview-toggle-only.png",
+  );
+  await page.screenshot({ path: toggleOnlyPath, fullPage: false });
+  // Optional: show settings + preview with test-mail still independent
+  const independentPath = path.join(
+    OUT,
+    "ilbiseo-briefing-test-mail-independent.png",
+  );
+  await page.getByRole("button", { name: "테스트 메일 보내기" }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: independentPath, fullPage: false });
 
   // ——— Past by end date ———
   await page.goto(`${BASE}?view=todo`, { waitUntil: "domcontentloaded" });
@@ -303,6 +328,11 @@ async function main() {
     today,
     hiddenPath,
     shownPath,
+    toggleOnlyPath: path.join(OUT, "ilbiseo-briefing-preview-toggle-only.png"),
+    independentPath: path.join(
+      OUT,
+      "ilbiseo-briefing-test-mail-independent.png",
+    ),
     pastPath,
     overdueTitles,
     activeTitles,

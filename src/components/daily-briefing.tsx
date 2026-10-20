@@ -129,7 +129,8 @@ export function DailyBriefingPanel({
     habits,
   ]);
 
-  const callApi = async (send: boolean) => {
+  /** Real Naver SMTP test send only — never called from 「미리보기」. */
+  const sendTestMail = async () => {
     setBusy("api");
     setError(null);
     setApiNote(null);
@@ -149,7 +150,7 @@ export function DailyBriefingPanel({
           calendarEvents,
           guidelines,
           habits,
-          send,
+          send: true,
           preferredHour: "08:00",
           workEmail: settings.workEmail,
           attachXlsx: settings.attachXlsx,
@@ -175,9 +176,7 @@ export function DailyBriefingPanel({
         ),
       );
       setApiNote(
-        send
-          ? `테스트 메일 · ${data.delivery?.message ?? data.delivery?.status ?? "완료"}`
-          : `미리보기 · ${data.delivery?.message ?? "발송하지 않음"}`,
+        `테스트 메일 · ${data.delivery?.message ?? data.delivery?.status ?? "완료"}`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "메일 요청에 실패했습니다");
@@ -186,11 +185,9 @@ export function DailyBriefingPanel({
     }
   };
 
+  /** Local body toggle only — no API, no SMTP toast, no test-mail priming. */
   const togglePreview = () => {
-    setPreviewVisible((open) => {
-      if (!open) void callApi(false);
-      return !open;
-    });
+    setPreviewVisible((open) => !open);
   };
 
   return (
@@ -263,7 +260,7 @@ export function DailyBriefingPanel({
               type="button"
               size="lg"
               className="min-h-11"
-              onClick={() => callApi(true)}
+              onClick={() => void sendTestMail()}
               disabled={busy !== "none"}
             >
               {busy === "api" ? (
@@ -279,7 +276,6 @@ export function DailyBriefingPanel({
               className="min-h-11"
               variant="outline"
               onClick={togglePreview}
-              disabled={busy !== "none"}
               aria-pressed={previewVisible}
             >
               미리보기

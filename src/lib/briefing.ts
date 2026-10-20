@@ -57,7 +57,6 @@ export type DailyBriefing = {
     when: string;
     title: string;
     notes: string;
-    calendarName?: string;
   }[];
   guidelineLines: { title: string; memo: string; done: boolean }[];
   habitLines: { title: string; memo: string; done: boolean }[];
@@ -66,6 +65,22 @@ export type DailyBriefing = {
   activeCount: number;
   completedCount: number;
 };
+
+/**
+ * Briefing schedule line: date/time + title only.
+ * Never append Google account / calendarName (connection UI keeps that).
+ * Shared by in-app preview, SMTP mail, Excel「브리핑요약」.
+ */
+export function formatBriefingCalendarLine(line: {
+  when: string;
+  title: string;
+}): string {
+  const when = line.when.trim();
+  const title = line.title.trim();
+  if (!when) return title;
+  if (!title) return when;
+  return `${when} ${title}`;
+}
 
 const SECTION_TITLE: Record<TaskKind, string> = {
   spot: "① 스팟 — 오늘 마무리",
@@ -136,7 +151,6 @@ function buildBriefingHtml(opts: {
     when: string;
     title: string;
     notes: string;
-    calendarName?: string;
   }[];
 }): string {
   const blocks: string[] = [];
@@ -220,7 +234,7 @@ function buildBriefingHtml(opts: {
     blocks.push(`<ul style="margin:0;padding-left:18px;">`);
     for (const c of opts.calendarLines) {
       blocks.push(
-        `<li style="margin:0 0 8px;"><span style="color:#5a635e;">${escapeHtml(c.when)}</span> · <strong>${escapeHtml(c.title)}</strong>${c.notes ? `<div style="font-size:13px;color:#6a7670;">${escapeHtml(c.notes)}</div>` : ""}</li>`,
+        `<li style="margin:0 0 8px;">${escapeHtml(formatBriefingCalendarLine(c))}${c.notes ? `<div style="font-size:13px;color:#6a7670;">${escapeHtml(c.notes)}</div>` : ""}</li>`,
       );
     }
     blocks.push(`</ul>`);
@@ -287,7 +301,6 @@ export function buildDailyBriefing(
       when: formatCalendarWhen(e),
       title: e.title,
       notes: e.notes,
-      calendarName: e.calendarName,
     }));
 
   const guidelineLines = sideLines(guidelines);
@@ -345,7 +358,7 @@ export function buildDailyBriefing(
   if (calendarLines.length > 0) {
     parts.push("【구글 캘린더】");
     for (const c of calendarLines) {
-      parts.push(`• ${c.when}  ${c.title}`);
+      parts.push(`• ${formatBriefingCalendarLine(c)}`);
       if (c.notes) parts.push(`  ${c.notes}`);
     }
   }

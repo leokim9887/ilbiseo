@@ -5,7 +5,10 @@ import fs from "fs";
 import path from "path";
 import ExcelJS from "exceljs";
 import { findSimilarActiveTasks } from "../src/lib/text-similarity";
-import { buildDailyBriefing } from "../src/lib/briefing";
+import {
+  buildDailyBriefing,
+  formatBriefingCalendarLine,
+} from "../src/lib/briefing";
 import { buildWorkbook } from "../src/lib/excel";
 import { formatCalendarWhen } from "../src/lib/calendar-data";
 import {
@@ -365,6 +368,17 @@ async function main() {
       "briefing-plaintext-gcal-week",
       b.plaintext.includes("월요일회의") && b.plaintext.includes("토요일일정"),
       b.plaintext,
+    );
+    ok(
+      "briefing-gcal-line-no-calendar-email",
+      !b.plaintext.includes("@") &&
+        !b.html.includes("@") &&
+        b.calendarLines.every(
+          (c) =>
+            !("calendarName" in c) &&
+            formatBriefingCalendarLine(c) === `${c.when} ${c.title}`,
+        ),
+      { plaintext: b.plaintext, html: b.html, lines: b.calendarLines },
     );
   }
 

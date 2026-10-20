@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CalendarEvent, SideListItem, Task } from "@/lib/types";
 import {
   buildDailyBriefing,
+  formatBriefingCalendarLine,
   loadSettings,
   saveSettings,
   type AppSettings,
@@ -407,14 +408,7 @@ export function DailyBriefingPanel({
                   <ul className="space-y-1.5">
                     {preview.calendarLines.map((c, i) => (
                       <li key={`${c.title}-${i}`} className="text-sm">
-                        <span className="text-[var(--ink-muted)]">{c.when}</span>{" "}
-                        {c.title}
-                        {c.calendarName ? (
-                          <span className="text-[var(--ink-muted)]">
-                            {" "}
-                            · {c.calendarName}
-                          </span>
-                        ) : null}
+                        {formatBriefingCalendarLine(c)}
                       </li>
                     ))}
                   </ul>

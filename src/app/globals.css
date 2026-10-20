@@ -298,7 +298,7 @@
   animation: sheet-in 0.28s ease-out both;
 }
 
-/* —— Ace daily cheer overlay (dramatic entrance) —— */
+/* —— Ace daily cheer — face-dominant, alive (real photo) —— */
 @keyframes cheer-backdrop-in {
   from {
     opacity: 0;
@@ -308,10 +308,10 @@
   }
 }
 
-@keyframes cheer-card-in {
+@keyframes cheer-stage-in {
   from {
     opacity: 0;
-    transform: translateY(18px) scale(0.92);
+    transform: translateY(22px) scale(0.94);
   }
   to {
     opacity: 1;
@@ -319,19 +319,44 @@
   }
 }
 
-@keyframes cheer-glow-breathe {
+/* Real Ace photo: subtle breath + soft lean (eye contact) */
+@keyframes cheer-face-alive {
   0%,
   100% {
-    opacity: 0.55;
-    transform: scale(1);
+    transform: scale(1) translate3d(0, 0, 0);
   }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.06);
+  40% {
+    transform: scale(1.035) translate3d(0, -1.5%, 0);
+  }
+  70% {
+    transform: scale(1.02) translate3d(0.4%, -0.6%, 0);
   }
 }
 
-@keyframes cheer-stagger-in {
+@keyframes cheer-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes cheer-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cheer-cta-in {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -345,53 +370,50 @@
 .cheer-backdrop {
   background:
     radial-gradient(
-      ellipse 80% 60% at 50% 42%,
-      rgba(42, 72, 58, 0.22) 0%,
-      transparent 62%
+      ellipse 70% 55% at 50% 40%,
+      rgba(56, 78, 52, 0.28) 0%,
+      transparent 58%
     ),
-    rgba(10, 24, 22, 0.62);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  animation: cheer-backdrop-in 0.38s ease-out both;
+    rgba(6, 14, 12, 0.78);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  animation: cheer-backdrop-in 0.4s ease-out both;
 }
 
-.cheer-card {
-  animation: cheer-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+.cheer-stage {
+  animation: cheer-stage-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
 }
 
 .cheer-glow {
   background: radial-gradient(
     circle,
-    rgba(232, 196, 110, 0.55) 0%,
-    rgba(201, 178, 124, 0.28) 42%,
+    rgba(240, 200, 110, 0.55) 0%,
+    rgba(201, 178, 124, 0.28) 38%,
     transparent 68%
   );
-  animation: cheer-glow-breathe 2.8s ease-in-out 0.45s infinite;
+  animation: cheer-glow-pulse 3.2s ease-in-out 0.35s infinite;
 }
 
-.cheer-label {
-  animation: cheer-stagger-in 0.45s ease-out 0.22s both;
+.cheer-face-alive {
+  transform-origin: 50% 42%;
+  animation: cheer-face-alive 4.2s ease-in-out 0.5s infinite;
+  will-change: transform;
 }
 
 .cheer-bubble {
-  animation: cheer-stagger-in 0.48s ease-out 0.28s both;
-}
-
-.cheer-face {
-  animation: cheer-stagger-in 0.5s ease-out 0.18s both;
+  animation: cheer-bubble-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
 }
 
 .cheer-cta {
-  animation: cheer-stagger-in 0.45s ease-out 0.42s both;
+  animation: cheer-cta-in 0.45s ease-out 0.55s both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .cheer-backdrop,
-  .cheer-card,
+  .cheer-stage,
   .cheer-glow,
-  .cheer-label,
+  .cheer-face-alive,
   .cheer-bubble,
-  .cheer-face,
   .cheer-cta {
     animation: none !important;
   }

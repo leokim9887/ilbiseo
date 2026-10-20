@@ -89,7 +89,7 @@ function writeShownDay(day: string) {
 }
 
 /**
- * Ace cheer overlay — rotating message + 시작.
+ * Ace cheer overlay — Ace face dominates; cheer copy floats over the real photo.
  * Default: once per cheer day (Asia/Seoul 07:00 boundary).
  * TEMP: FORCE_CHEER_EVERY_LOAD shows on every refresh for QA.
  */
@@ -141,74 +141,67 @@ export function DailyCheerOverlay() {
 
   return (
     <div
-      className="cheer-backdrop fixed inset-0 z-[80] flex items-center justify-center px-4"
+      className="cheer-backdrop fixed inset-0 z-[80] flex items-center justify-center px-3 sm:px-6"
       role="dialog"
       aria-modal="true"
       aria-label="에이스 응원"
       data-daily-cheer
       onClick={dismiss}
     >
+      {/* Portrait stage — Ace fills most of the surface; no dialog chrome */}
       <div
-        className="cheer-card relative w-full max-w-[22.5rem] sm:max-w-[25rem]"
+        className="cheer-stage relative flex w-[min(94vw,24rem)] flex-col items-center sm:w-[min(86vmin,36rem)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative overflow-hidden rounded-[1.65rem] border border-[#c9b27c]/55 bg-[linear-gradient(168deg,#faf6ee_0%,#f0e8d6_42%,#e6dcc8_100%)] px-5 pb-5 pt-6 shadow-[0_22px_56px_rgba(8,24,22,0.42),0_0_0_1px_rgba(201,178,124,0.18)] sm:px-7 sm:pb-6 sm:pt-7">
-          {/* Warm top wash — depth without clutter */}
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(ellipse_at_50%_0%,rgba(201,178,124,0.28)_0%,transparent_70%)]"
-            aria-hidden
-          />
+        <div className="cheer-portrait relative aspect-square w-full">
+          {/* Warm ambient light behind Ace */}
+          <div className="cheer-glow pointer-events-none absolute inset-[-10%] rounded-full" aria-hidden />
 
-          <div className="relative mx-auto flex w-fit flex-col items-center">
-            <p className="cheer-label mb-2.5 font-sans text-[0.72rem] font-semibold tracking-[0.14em] text-[#8a7340] sm:text-[0.75rem]">
-              에이스의 응원
-            </p>
-
+          {/* Soft circular frame — real Ace pixels, soft vignette edge */}
+          <div className="cheer-face-frame absolute inset-0 overflow-hidden rounded-full shadow-[0_28px_72px_rgba(0,0,0,0.5)]">
+            <div className="cheer-face-alive absolute inset-0">
+              <Image
+                src="/ilbiseo-grandson-cheer.png?v=26"
+                alt="에이스"
+                width={640}
+                height={640}
+                priority
+                unoptimized
+                className="size-full object-cover object-center"
+                data-daily-cheer-face
+              />
+            </div>
+            {/* Soft edge fade into dark — not a white modal ring */}
             <div
-              className="cheer-bubble relative mb-4 max-w-[19rem] rounded-2xl bg-white/95 px-4 py-3.5 text-center shadow-[0_6px_20px_rgba(22,63,57,0.08)] ring-1 ring-[#163f39]/12 sm:max-w-[20rem]"
-              data-daily-cheer-bubble
-            >
-              <p className="font-sans text-[1.12rem] font-semibold leading-snug text-[#143832] sm:text-[1.2rem]">
-                {message}
-              </p>
-              <span
-                className="absolute left-1/2 top-full -mt-px -translate-x-1/2 border-x-[11px] border-t-[13px] border-x-transparent border-t-white/95"
-                aria-hidden
-              />
-            </div>
-
-            <div className="cheer-face relative size-[12rem] sm:size-[13.5rem]">
-              {/* Soft warm glow — intentional presence, not purple */}
-              <div className="cheer-glow absolute -inset-3 rounded-full" aria-hidden />
-              <div
-                className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_38%_32%,#f3e7c4_0%,#c9b27c_52%,#7a6540_100%)] opacity-95 shadow-[0_10px_28px_rgba(22,63,57,0.22)]"
-                aria-hidden
-              />
-              <div className="absolute inset-[8px] overflow-hidden rounded-full bg-[#163f39]/10 ring-[3px] ring-white/90">
-                <Image
-                  src="/ilbiseo-grandson-cheer.png?v=26"
-                  alt="에이스"
-                  width={640}
-                  height={640}
-                  priority
-                  unoptimized
-                  className="size-full object-cover object-center"
-                  data-daily-cheer-face
-                />
-              </div>
-            </div>
+              className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-white/10"
+              style={{
+                background:
+                  "radial-gradient(circle at 50% 40%, transparent 48%, rgba(8,18,16,0.28) 68%, rgba(6,14,12,0.82) 100%)",
+              }}
+              aria-hidden
+            />
           </div>
 
-          <Button
-            type="button"
-            size="lg"
-            className="cheer-cta mt-6 min-h-12 w-full touch-manipulation text-[1.08rem] font-semibold shadow-[0_4px_14px_rgba(26,77,69,0.28)] sm:min-h-11"
-            onClick={dismiss}
-            data-daily-cheer-confirm
+          {/* Cheer copy floats over Ace chest / lower face */}
+          <div
+            className="cheer-bubble absolute inset-x-[7%] bottom-[15%] z-10 sm:inset-x-[10%] sm:bottom-[16%]"
+            data-daily-cheer-bubble
           >
-            시작
-          </Button>
+            <p className="rounded-[1.25rem] bg-[rgba(10,22,20,0.74)] px-4 py-3 text-center font-sans text-[1.08rem] font-semibold leading-snug text-[#f7f3ea] shadow-[0_10px_28px_rgba(0,0,0,0.38)] backdrop-blur-[6px] ring-1 ring-[#c9b27c]/40 sm:px-5 sm:py-3.5 sm:text-[1.22rem]">
+              {message}
+            </p>
+          </div>
         </div>
+
+        <Button
+          type="button"
+          size="lg"
+          className="cheer-cta mt-4 min-h-12 w-[min(100%,15rem)] touch-manipulation rounded-full text-[1.08rem] font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] sm:mt-5 sm:min-h-11"
+          onClick={dismiss}
+          data-daily-cheer-confirm
+        >
+          시작
+        </Button>
       </div>
     </div>
   );

@@ -124,21 +124,35 @@ function styleBodyCells(
   sheet: ExcelJS.Worksheet,
   dataRowCount: number,
   columnCount: number,
-  opts?: { titleCol?: number; memoLines?: boolean[] },
+  opts?: {
+    titleCol?: number;
+    titleColWidth?: number;
+    memoLines?: boolean[];
+  },
 ) {
   const titleCol = opts?.titleCol ?? 0;
+  const titleWidth = opts?.titleColWidth ?? 42;
   for (let r = 2; r <= dataRowCount + 1; r++) {
     const row = sheet.getRow(r);
     const idx = r - 2;
+    const titleText =
+      titleCol > 0 ? cellPlainText(row.getCell(titleCol).value) : "";
     const multi =
-      opts?.memoLines?.[idx] === true ||
-      (titleCol > 0 &&
-        String(row.getCell(titleCol).value ?? "").includes("\n"));
-    row.height = multi ? 34 : 20;
+      opts?.memoLines?.[idx] === true || titleText.includes("\n");
+    if (titleCol > 0 && titleText) {
+      row.height = wrappedRowHeight(titleText, titleWidth);
+    } else {
+      row.height = multi ? 34 : 20;
+    }
     for (let c = 1; c <= columnCount; c++) {
       const cell = row.getCell(c);
       cell.border = GRID_BORDER;
-      cell.font = BODY_FONT;
+      // Do not flatten rich-text memo styling on 「할 일」cells
+      const isRich =
+        cell.value != null &&
+        typeof cell.value === "object" &&
+        "richText" in cell.value;
+      if (!isRich) cell.font = BODY_FONT;
     }
   }
 }
@@ -155,10 +169,49 @@ const TODO_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
   { name: "중요도", filterButton: true },
 ];
 
-function listUpCell(task: Pick<Task, "title" | "memo">): string {
+const MEMO_FONT: Partial<ExcelJS.Font> = {
+  name: "Malgun Gothic",
+  color: { argb: "FF5A635E" },
+  size: 10,
+  italic: true,
+};
+
+/**
+ * 「할 일」셀: title + memo on next line (import splitListUp: first line / rest).
+ * Memo is muted italic so it stays visually distinct — not merged into title styling.
+ */
+function listUpCell(
+  task: Pick<Task, "title" | "memo">,
+): string | ExcelJS.CellRichTextValue {
   const title = sanitizeExcelText(String(task.title ?? ""));
   const memo = sanitizeExcelText(String(task.memo ?? ""));
-  return memo ? `${title}\n${memo}` : title;
+  if (!memo) return title;
+  return {
+    richText: [
+      { text: title, font: { ...BODY_FONT } },
+      { text: `\n${memo}`, font: { ...MEMO_FONT } },
+    ],
+  };
+}
+
+function cellPlainText(value: ExcelJS.CellValue | undefined): string {
+  if (value == null) return "";
+  if (typeof value === "object" && "richText" in value) {
+    return (value.richText ?? []).map((r) => r.text).join("");
+  }
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value);
+}
+
+/** Rough row height for wrapped Korean text at a given Excel column width. */
+function wrappedRowHeight(text: string, colWidth: number): number {
+  const charsPerLine = Math.max(6, Math.floor(colWidth * 0.9));
+  let lines = 0;
+  for (const part of text.split("\n")) {
+    const len = [...part].length;
+    lines += Math.max(1, Math.ceil(len / charsPerLine));
+  }
+  return Math.min(140, Math.max(20, 4 + lines * 15));
 }
 
 /** 마감목표: single day = Date; range/언젠가 = text (exact round-trip). */
@@ -201,16 +254,24 @@ function colLetter(n: number): string {
   return s;
 }
 
+/** Exact Excel width units (father layout). */
+const TODO_COL_WIDTHS = {
+  order: 6,
+  frame: 10,
+  title: 95,
+  deadline: 28,
+  importance: 8,
+} as const;
+
 function applyTodoColumnLayout(
   sheet: ExcelJS.Worksheet,
   columnCount: number,
 ) {
-  // Fit Korean headers without large empty gutters
-  sheet.getColumn(1).width = 6;
-  sheet.getColumn(2).width = 9;
-  sheet.getColumn(3).width = 42;
-  sheet.getColumn(4).width = 24;
-  sheet.getColumn(5).width = 8;
+  sheet.getColumn(1).width = TODO_COL_WIDTHS.order;
+  sheet.getColumn(2).width = TODO_COL_WIDTHS.frame;
+  sheet.getColumn(3).width = TODO_COL_WIDTHS.title;
+  sheet.getColumn(4).width = TODO_COL_WIDTHS.deadline;
+  sheet.getColumn(5).width = TODO_COL_WIDTHS.importance;
   if (columnCount >= 6) sheet.getColumn(6).width = 8;
   sheet.getColumn(1).alignment = {
     vertical: "middle",
@@ -278,11 +339,17 @@ function enableSortableTodoTable(
   tasksForDeadlineFmt.forEach((t, i) => {
     writeDeadlineCell(sheet.getRow(i + 2).getCell(4), t);
   });
+  // Re-apply rich-text 「할 일」cells (table write may flatten) then style borders
+  dataRows.forEach((rowVals, i) => {
+    const v = rowVals[2];
+    if (v != null && typeof v === "object" && "richText" in (v as object)) {
+      sheet.getRow(i + 2).getCell(3).value = v as ExcelJS.CellRichTextValue;
+    }
+  });
   styleBodyCells(sheet, dataRows.length, columns.length, {
     titleCol: 3,
-    memoLines: dataRows.map((row) =>
-      String(row[2] ?? "").includes("\n"),
-    ),
+    titleColWidth: TODO_COL_WIDTHS.title,
+    memoLines: dataRows.map((row) => cellPlainText(row[2]).includes("\n")),
   });
   applyDeadlineEntryAids(sheet, dataRows.length);
   // Ensure dimension covers table (defensive)
@@ -309,10 +376,11 @@ function addSideSheet(
     views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
   // Unified model — no 완료 column (same on 할 일 / 한 일 views)
+  // Exact widths: 내용 70 · 메모 30
   sheet.columns = [
     { header: "순서", key: "order", width: 6 },
-    { header: "내용", key: "title", width: 36 },
-    { header: "메모", key: "memo", width: 32 },
+    { header: "내용", key: "title", width: 70 },
+    { header: "메모", key: "memo", width: 30 },
   ];
   styleHeader(sheet.getRow(1));
   items.forEach((item, i) => {
@@ -337,6 +405,8 @@ function addSideSheet(
     horizontal: "left",
   };
   styleBodyCells(sheet, items.length, 3, {
+    titleCol: 2,
+    titleColWidth: 70,
     memoLines: items.map((item) =>
       Boolean(sanitizeExcelText(item.memo ?? "")),
     ),
@@ -398,15 +468,14 @@ export async function buildWorkbook(
     TODO_TABLE_COLUMNS,
   );
 
-  // 「구글캘린더」: only events within 2 weeks from save (KST), one row per event
-  // (multi-day → full range in 「언제」). No 「캘린더」/「출처」 columns.
+  // 「구글캘린더」: display-only (not in IMPORT_SHEET_ALLOWLIST).
+  // No 「메모」column — import never reads this sheet; notes were display-only.
   const cal = wb.addWorksheet("구글캘린더", {
     views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
   cal.columns = [
-    { header: "언제", key: "when", width: 26 },
-    { header: "일정", key: "title", width: 36 },
-    { header: "메모", key: "notes", width: 30 },
+    { header: "언제", key: "when", width: 20 },
+    { header: "일정", key: "title", width: 70 },
   ];
   styleHeader(cal.getRow(1));
   const saveDay = todayIsoKst();
@@ -423,7 +492,6 @@ export async function buildWorkbook(
     cal.addRow({
       when: sanitizeExcelText(formatCalendarWhen(e)),
       title: sanitizeExcelText(e.title ?? ""),
-      notes: sanitizeExcelText(e.notes ?? ""),
     });
   }
   cal.getColumn(1).alignment = {
@@ -436,15 +504,9 @@ export async function buildWorkbook(
     vertical: "top",
     horizontal: "left",
   };
-  cal.getColumn(3).alignment = {
-    wrapText: true,
-    vertical: "top",
-    horizontal: "left",
-  };
-  styleBodyCells(cal, calSorted.length, 3, {
-    memoLines: calSorted.map((e) =>
-      Boolean(sanitizeExcelText(e.notes ?? "")),
-    ),
+  styleBodyCells(cal, calSorted.length, 2, {
+    titleCol: 2,
+    titleColWidth: 70,
   });
 
   addSideSheet(wb, "지침", guidelines);
@@ -454,7 +516,8 @@ export async function buildWorkbook(
     const summary = wb.addWorksheet("브리핑요약", {
       views: [{ state: "frozen", ySplit: 1, showGridLines: false }],
     });
-    summary.getColumn(1).width = 72;
+    // Exact Excel width unit
+    summary.getColumn(1).width = 85;
     summary.addRow([sanitizeExcelText(briefing.headline)]);
     const head = summary.getRow(1);
     head.font = {
@@ -464,7 +527,10 @@ export async function buildWorkbook(
       color: { argb: "FF163F39" },
     };
     head.alignment = { wrapText: true, vertical: "middle" };
-    head.height = 28;
+    head.height = wrappedRowHeight(
+      sanitizeExcelText(briefing.headline),
+      85,
+    );
     head.getCell(1).fill = HEADER_FILL;
     head.getCell(1).border = GRID_BORDER;
 
@@ -472,16 +538,19 @@ export async function buildWorkbook(
     const sub = summary.getRow(2);
     sub.font = BODY_FONT;
     sub.alignment = { wrapText: true, vertical: "top" };
-    sub.height = 22;
+    sub.height = wrappedRowHeight(
+      sanitizeExcelText(briefing.summaryLine),
+      85,
+    );
     sub.getCell(1).border = GRID_BORDER;
 
     summary.addRow([]);
     for (const line of briefing.plaintext.split("\n")) {
-      const row = summary.addRow([sanitizeExcelText(line)]);
+      const text = sanitizeExcelText(line);
+      const row = summary.addRow([text]);
       row.font = BODY_FONT;
       row.alignment = { wrapText: true, vertical: "top" };
-      const text = String(line ?? "");
-      row.height = text.length > 60 ? 32 : text.trim() ? 18 : 10;
+      row.height = text.trim() ? wrappedRowHeight(text, 85) : 10;
     }
   }
 

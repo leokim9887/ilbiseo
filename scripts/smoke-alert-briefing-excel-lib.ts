@@ -475,10 +475,11 @@ async function main() {
     ok("excel-no-calendar-col", !headers.includes("캘린더"), headers.join(","));
     ok("excel-no-source-col", !headers.includes("출처"), headers.join(","));
     ok(
-      "excel-has-when-title-memo",
+      "excel-has-when-title-no-memo",
       headers.includes("언제") &&
         headers.includes("일정") &&
-        headers.includes("메모"),
+        !headers.includes("메모") &&
+        headers.length === 2,
       headers.join(","),
     );
     const rows: { when: string; title: string }[] = [];

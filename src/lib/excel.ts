@@ -21,7 +21,7 @@ import {
   sanitizeExcelText,
 } from "./excel-xlsx-repair";
 
-/** Father-facing 마감목표 entry formats (Excel dropdown + comment). */
+/** Father-facing 마감목표 entry formats (Excel dropdown + input prompt). */
 export const DEADLINE_ENTRY_HELP =
   "마감목표 입력 안내\n" +
   "· 언젠가 — 기한 없음 (앱「언젠가」와 동일)\n" +
@@ -80,31 +80,67 @@ function applyDeadlineEntryAids(
   // Intentionally no sheet.getCell(...).note — see comment above.
 }
 
+/** Soft sage header — readable on Excel desktop & Online; brand-adjacent ink. */
 const HEADER_FILL: ExcelJS.Fill = {
   type: "pattern",
   pattern: "solid",
-  fgColor: { argb: "FFF3F3F3" },
+  fgColor: { argb: "FFE2EDE8" },
 };
 const HEADER_FONT: Partial<ExcelJS.Font> = {
-  color: { argb: "FF000000" },
+  name: "Malgun Gothic",
+  color: { argb: "FF163F39" },
   bold: true,
-  size: 12,
+  size: 11,
 };
-const THIN_BLACK: Partial<ExcelJS.Borders> = {
-  top: { style: "thin", color: { argb: "FF000000" } },
-  left: { style: "thin", color: { argb: "FF000000" } },
-  bottom: { style: "thin", color: { argb: "FF000000" } },
-  right: { style: "thin", color: { argb: "FF000000" } },
+const BODY_FONT: Partial<ExcelJS.Font> = {
+  name: "Malgun Gothic",
+  color: { argb: "FF1A2420" },
+  size: 11,
+};
+/** Light grid — cleaner than harsh black; still visible in Excel Online. */
+const GRID_BORDER: Partial<ExcelJS.Borders> = {
+  top: { style: "thin", color: { argb: "FFB8C4BE" } },
+  left: { style: "thin", color: { argb: "FFB8C4BE" } },
+  bottom: { style: "thin", color: { argb: "FFB8C4BE" } },
+  right: { style: "thin", color: { argb: "FFB8C4BE" } },
 };
 
 function styleHeader(row: ExcelJS.Row) {
   row.eachCell((cell) => {
     cell.fill = HEADER_FILL;
     cell.font = HEADER_FONT;
-    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    cell.border = THIN_BLACK;
+    cell.alignment = {
+      vertical: "middle",
+      horizontal: "center",
+      wrapText: true,
+    };
+    cell.border = GRID_BORDER;
   });
-  row.height = 24;
+  row.height = 26;
+}
+
+/** Body cells: light border + Korean-friendly font; keep existing numFmt/value. */
+function styleBodyCells(
+  sheet: ExcelJS.Worksheet,
+  dataRowCount: number,
+  columnCount: number,
+  opts?: { titleCol?: number; memoLines?: boolean[] },
+) {
+  const titleCol = opts?.titleCol ?? 0;
+  for (let r = 2; r <= dataRowCount + 1; r++) {
+    const row = sheet.getRow(r);
+    const idx = r - 2;
+    const multi =
+      opts?.memoLines?.[idx] === true ||
+      (titleCol > 0 &&
+        String(row.getCell(titleCol).value ?? "").includes("\n"));
+    row.height = multi ? 34 : 20;
+    for (let c = 1; c <= columnCount; c++) {
+      const cell = row.getCell(c);
+      cell.border = GRID_BORDER;
+      cell.font = BODY_FONT;
+    }
+  }
 }
 
 /**
@@ -169,19 +205,28 @@ function applyTodoColumnLayout(
   sheet: ExcelJS.Worksheet,
   columnCount: number,
 ) {
-  sheet.getColumn(1).width = 8;
-  sheet.getColumn(2).width = 10;
-  sheet.getColumn(3).width = 48;
-  sheet.getColumn(4).width = 22;
-  sheet.getColumn(5).width = 10;
-  if (columnCount >= 6) sheet.getColumn(6).width = 10;
-  sheet.getColumn(3).alignment = { wrapText: true, vertical: "top" };
-  sheet.getColumn(4).alignment = {
-    wrapText: true,
+  // Fit Korean headers without large empty gutters
+  sheet.getColumn(1).width = 6;
+  sheet.getColumn(2).width = 9;
+  sheet.getColumn(3).width = 42;
+  sheet.getColumn(4).width = 24;
+  sheet.getColumn(5).width = 8;
+  if (columnCount >= 6) sheet.getColumn(6).width = 8;
+  sheet.getColumn(1).alignment = {
     vertical: "middle",
     horizontal: "center",
   };
   sheet.getColumn(2).alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  sheet.getColumn(3).alignment = {
+    wrapText: true,
+    vertical: "top",
+    horizontal: "left",
+  };
+  sheet.getColumn(4).alignment = {
+    wrapText: true,
     vertical: "middle",
     horizontal: "center",
   };
@@ -233,6 +278,12 @@ function enableSortableTodoTable(
   tasksForDeadlineFmt.forEach((t, i) => {
     writeDeadlineCell(sheet.getRow(i + 2).getCell(4), t);
   });
+  styleBodyCells(sheet, dataRows.length, columns.length, {
+    titleCol: 3,
+    memoLines: dataRows.map((row) =>
+      String(row[2] ?? "").includes("\n"),
+    ),
+  });
   applyDeadlineEntryAids(sheet, dataRows.length);
   // Ensure dimension covers table (defensive)
   const lastCol = colLetter(columns.length);
@@ -255,13 +306,13 @@ function addSideSheet(
   items: SideListItem[],
 ) {
   const sheet = wb.addWorksheet(name, {
-    views: [{ state: "frozen", ySplit: 1 }],
+    views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
   // Unified model — no 완료 column (same on 할 일 / 한 일 views)
   sheet.columns = [
-    { header: "순서", key: "order", width: 8 },
-    { header: "내용", key: "title", width: 40 },
-    { header: "메모", key: "memo", width: 28 },
+    { header: "순서", key: "order", width: 6 },
+    { header: "내용", key: "title", width: 36 },
+    { header: "메모", key: "memo", width: 32 },
   ];
   styleHeader(sheet.getRow(1));
   items.forEach((item, i) => {
@@ -270,6 +321,25 @@ function addSideSheet(
       title: sanitizeExcelText(item.title ?? ""),
       memo: sanitizeExcelText(item.memo ?? ""),
     });
+  });
+  sheet.getColumn(1).alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+  sheet.getColumn(2).alignment = {
+    wrapText: true,
+    vertical: "top",
+    horizontal: "left",
+  };
+  sheet.getColumn(3).alignment = {
+    wrapText: true,
+    vertical: "top",
+    horizontal: "left",
+  };
+  styleBodyCells(sheet, items.length, 3, {
+    memoLines: items.map((item) =>
+      Boolean(sanitizeExcelText(item.memo ?? "")),
+    ),
   });
 }
 
@@ -290,7 +360,7 @@ export async function buildWorkbook(
   // Father TO DO LIST: Excel Table — ▾ only on 틀 · 마감목표 · 중요도
   // (시급성 열은 제거 — 기존 파일 불러오기는 excel-import에서 선택 매핑)
   const todo = wb.addWorksheet("할 일", {
-    views: [{ state: "frozen", ySplit: 1 }],
+    views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
   const activeTasks = sortTasks(tasks);
   const todoRows: ExcelJS.CellValue[][] = activeTasks.map((t, i) => [
@@ -309,7 +379,7 @@ export async function buildWorkbook(
   );
 
   const done = wb.addWorksheet("한 일", {
-    views: [{ state: "frozen", ySplit: 1 }],
+    views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
   const completedTasks = sortCompleted(tasks);
   // Same columns as 「할 일」— no 완료여부 (sheet membership already means done)
@@ -331,12 +401,12 @@ export async function buildWorkbook(
   // 「구글캘린더」: only events within 2 weeks from save (KST), one row per event
   // (multi-day → full range in 「언제」). No 「캘린더」/「출처」 columns.
   const cal = wb.addWorksheet("구글캘린더", {
-    views: [{ state: "frozen", ySplit: 1 }],
+    views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
   cal.columns = [
-    { header: "언제", key: "when", width: 28 },
-    { header: "일정", key: "title", width: 34 },
-    { header: "메모", key: "notes", width: 28 },
+    { header: "언제", key: "when", width: 26 },
+    { header: "일정", key: "title", width: 36 },
+    { header: "메모", key: "notes", width: 30 },
   ];
   styleHeader(cal.getRow(1));
   const saveDay = todayIsoKst();
@@ -346,36 +416,72 @@ export async function buildWorkbook(
     saveDay,
     windowEnd,
   );
-  for (const e of [...calInWindow].sort((a, b) =>
+  const calSorted = [...calInWindow].sort((a, b) =>
     a.start.localeCompare(b.start),
-  )) {
+  );
+  for (const e of calSorted) {
     cal.addRow({
       when: sanitizeExcelText(formatCalendarWhen(e)),
       title: sanitizeExcelText(e.title ?? ""),
       notes: sanitizeExcelText(e.notes ?? ""),
     });
   }
-  cal.getColumn("when").alignment = {
+  cal.getColumn(1).alignment = {
     wrapText: true,
     vertical: "middle",
+    horizontal: "left",
   };
+  cal.getColumn(2).alignment = {
+    wrapText: true,
+    vertical: "top",
+    horizontal: "left",
+  };
+  cal.getColumn(3).alignment = {
+    wrapText: true,
+    vertical: "top",
+    horizontal: "left",
+  };
+  styleBodyCells(cal, calSorted.length, 3, {
+    memoLines: calSorted.map((e) =>
+      Boolean(sanitizeExcelText(e.notes ?? "")),
+    ),
+  });
 
   addSideSheet(wb, "지침", guidelines);
   addSideSheet(wb, "습관", habits);
 
   if (briefing) {
-    const summary = wb.addWorksheet("브리핑요약");
-    summary.getColumn(1).width = 88;
+    const summary = wb.addWorksheet("브리핑요약", {
+      views: [{ state: "frozen", ySplit: 1, showGridLines: false }],
+    });
+    summary.getColumn(1).width = 72;
     summary.addRow([sanitizeExcelText(briefing.headline)]);
-    summary.getRow(1).font = {
+    const head = summary.getRow(1);
+    head.font = {
+      name: "Malgun Gothic",
       bold: true,
       size: 14,
       color: { argb: "FF163F39" },
     };
+    head.alignment = { wrapText: true, vertical: "middle" };
+    head.height = 28;
+    head.getCell(1).fill = HEADER_FILL;
+    head.getCell(1).border = GRID_BORDER;
+
     summary.addRow([sanitizeExcelText(briefing.summaryLine)]);
+    const sub = summary.getRow(2);
+    sub.font = BODY_FONT;
+    sub.alignment = { wrapText: true, vertical: "top" };
+    sub.height = 22;
+    sub.getCell(1).border = GRID_BORDER;
+
     summary.addRow([]);
     for (const line of briefing.plaintext.split("\n")) {
-      summary.addRow([sanitizeExcelText(line)]);
+      const row = summary.addRow([sanitizeExcelText(line)]);
+      row.font = BODY_FONT;
+      row.alignment = { wrapText: true, vertical: "top" };
+      const text = String(line ?? "");
+      row.height = text.length > 60 ? 32 : text.trim() ? 18 : 10;
     }
   }
 

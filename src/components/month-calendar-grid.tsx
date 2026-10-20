@@ -11,7 +11,7 @@ import {
   eventInclusiveDayRange,
   eventOccursOnDay,
 } from "@/lib/calendar-span";
-import { todayIsoKst } from "@/lib/date-range";
+import { formatDisplayDateRange, todayIsoKst } from "@/lib/date-range";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -468,7 +468,7 @@ export function MonthCalendarGrid({
                     data-cal-span={seg.event.id}
                     data-cal-span-start={range.startDay}
                     data-cal-span-end={range.endDay}
-                    title={`${seg.event.title} · ${range.startDay} ~ ${range.endDay}`}
+                    title={`${seg.event.title} · ${formatDisplayDateRange(range.startDay, range.endDay)}`}
                     className={`pointer-events-none absolute z-[1] truncate px-1.5 py-1 text-[12px] font-medium leading-snug text-white sm:text-[13px] ${
                       seg.continuesLeft ? "rounded-l-none" : "rounded-l-md"
                     } ${

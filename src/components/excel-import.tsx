@@ -38,6 +38,7 @@ import {
   type TodoDeltaCommit,
   type WorkbookImportPlan,
 } from "@/lib/excel-import";
+import { formatDeadlineRange } from "@/lib/date-range";
 import {
   CATEGORY_LABEL,
   type SideListItem,
@@ -729,7 +730,11 @@ function SheetPreviewBlock({
                       className="whitespace-nowrap px-2 py-1"
                       data-excel-import-deadline
                     >
-                      {r.deadlineLabel}
+                      {formatDeadlineRange({
+                        startDate: r.startDate,
+                        targetDate: r.targetDate,
+                        kind: r.kind,
+                      }) || r.deadlineLabel}
                     </td>
                   ) : null}
                 </tr>

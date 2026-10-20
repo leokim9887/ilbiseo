@@ -303,7 +303,7 @@ async function main() {
       source: "mock",
     };
     const when = formatCalendarWhen(ev);
-    ok("calendar-when-range", when === "2026-10-14 ~ 2026-10-21", when);
+    ok("calendar-when-range", when === "26-10-14 ~ 26-10-21", when);
   }
 
   // 6b) Google Calendar in briefing = this week Mon–Sun KST (tasks stay today-only)

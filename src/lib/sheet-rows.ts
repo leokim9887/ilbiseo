@@ -1,6 +1,8 @@
 import type { CalendarEvent, Task } from "./types";
 import {
   filterByPeriod,
+  formatDisplayDate,
+  formatDisplayDateRange,
   isPastUnfinishedTask,
   sortByPeriod,
   taskDateRange,
@@ -29,17 +31,16 @@ function eventSortKey(ev: CalendarEvent): string {
 export function formatEventDeadline(ev: CalendarEvent): string {
   const { startDay, endDay, multiDay } = eventInclusiveDayRange(ev);
   if (ev.allDay || ev.start.length === 10) {
-    if (!multiDay) return startDay;
-    return `${startDay} ~ ${endDay}`;
+    return formatDisplayDateRange(startDay, multiDay ? endDay : startDay);
   }
   const startTime = ev.start.includes("T") ? ev.start.slice(11, 16) : "";
   const endTime =
     ev.end && ev.end.includes("T") ? ev.end.slice(11, 16) : "";
   if (!multiDay && startTime) {
-    return `${startDay} ${startTime}${endTime ? `~${endTime}` : ""}`;
+    return `${formatDisplayDate(startDay)} ${startTime}${endTime ? `~${endTime}` : ""}`;
   }
-  if (!multiDay) return startDay;
-  return `${startDay} ~ ${endDay}`;
+  if (!multiDay) return formatDisplayDate(startDay);
+  return formatDisplayDateRange(startDay, endDay);
 }
 
 export function calendarListUpTitle(ev: CalendarEvent): string {

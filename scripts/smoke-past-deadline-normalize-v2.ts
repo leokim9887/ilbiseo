@@ -99,13 +99,13 @@ function main() {
     });
     const label = formatDeadlineRange(task, today);
     ok(
-      "formatDeadlineRange past~today → single 2026-10-18",
-      label === "2026-10-18",
+      "formatDeadlineRange past~today → single 26-10-18",
+      label === "26-10-18",
       label,
     );
     ok(
-      "compact also single",
-      formatDeadlineRangeCompact(task, today) === "26.10.18",
+      "compact also single YY-MM-DD",
+      formatDeadlineRangeCompact(task, today) === "26-10-18",
       formatDeadlineRangeCompact(task, today),
     );
     const r = taskDateRange(task, today);
@@ -122,11 +122,11 @@ function main() {
     );
   }
 
-  // Screenshot rows 30–35 patterns
+  // Screenshot rows 30–35 patterns (display = YY-MM-DD)
   for (const [start, end, want] of [
-    ["2026-10-18", "2026-10-19", "2026-10-18"],
-    ["2026-10-16", "2026-10-19", "2026-10-16"],
-    ["2026-10-15", "2026-10-19", "2026-10-15"],
+    ["2026-10-18", "2026-10-19", "26-10-18"],
+    ["2026-10-16", "2026-10-19", "26-10-16"],
+    ["2026-10-15", "2026-10-19", "26-10-15"],
   ] as const) {
     const label = formatDeadlineRange(
       baseTask({ startDate: start, targetDate: end }),

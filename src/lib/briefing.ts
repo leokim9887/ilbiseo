@@ -31,7 +31,7 @@ export type BriefingLine = {
   category: TaskCategory;
   categoryLabel: string;
   targetDate: string | null;
-  /** Display 마감목표 — single day or `YYYY-MM-DD ~ YYYY-MM-DD` */
+  /** Display 마감목표 — single day or `YY-MM-DD ~ YY-MM-DD` */
   deadlineLabel: string;
   importance: number;
   importanceLabel: string;

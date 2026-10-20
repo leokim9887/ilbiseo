@@ -196,7 +196,32 @@ export function overlapsPeriod(
   return r.start <= fe && r.end >= fs;
 }
 
-/** Display in 마감목표 cell / xlsx — e.g. `2026-09-01 ~ 2026-09-30` or `언젠가` */
+/**
+ * Father-facing date display: `YYYY-MM-DD` → `YY-MM-DD`.
+ * Storage, Excel export (`deadlineExcelParts`), sync, and filenames stay full ISO.
+ * Non-ISO strings (e.g. 「언젠가」) pass through unchanged.
+ */
+export function formatDisplayDate(iso: string): string {
+  const s = iso.trim().slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return iso;
+  return `${m[1].slice(2)}-${m[2]}-${m[3]}`;
+}
+
+/** Father-facing range: `26-09-01 ~ 26-09-30` (or single day / passthrough). */
+export function formatDisplayDateRange(
+  start: string,
+  end?: string | null,
+): string {
+  const a = formatDisplayDate(start);
+  if (!end || end === start) return a;
+  return `${a} ~ ${formatDisplayDate(end)}`;
+}
+
+/**
+ * Display in 마감목표 cell / briefing — e.g. `26-09-01 ~ 26-09-30` or `언젠가`.
+ * Excel cells use {@link deadlineExcelParts} (full ISO) separately.
+ */
 export function formatDeadlineRange(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
   today: string = todayIsoKst(),
@@ -204,8 +229,7 @@ export function formatDeadlineRange(
   if (isSomedayDeadline(task)) return "언젠가";
   const r = taskDateRange(task, today);
   if (!r) return "";
-  if (r.start === r.end) return r.start;
-  return `${r.start} ~ ${r.end}`;
+  return formatDisplayDateRange(r.start, r.end);
 }
 
 /**
@@ -255,23 +279,14 @@ export function deadlineExcelParts(
 }
 
 /**
- * Compact phone 마감 — keep year visible (YY.M.D), not MM/DD alone.
- * e.g. `26.10.16` or `26.10.1~26.10.30`
+ * Compact phone 마감 — same `YY-MM-DD` hyphen form as desktop
+ * (e.g. `26-10-16` or `26-10-01 ~ 26-10-30`).
  */
 export function formatDeadlineRangeCompact(
   task: Pick<Task, "startDate" | "targetDate" | "kind">,
   today: string = todayIsoKst(),
 ): string {
-  if (isSomedayDeadline(task)) return "언젠가";
-  const r = taskDateRange(task, today);
-  if (!r) return "";
-  const short = (iso: string) => {
-    const [y, m, d] = iso.split("-");
-    const yy = y.length === 4 ? y.slice(2) : y;
-    return `${yy}.${Number(m)}.${Number(d)}`;
-  };
-  if (r.start === r.end) return short(r.start);
-  return `${short(r.start)}~${short(r.end)}`;
+  return formatDeadlineRange(task, today);
 }
 
 export type PeriodSort = "default" | "start" | "end";

@@ -2,6 +2,7 @@ import type { CalendarEvent, Task } from "./types";
 import { CATEGORY_LABEL, KIND_LABEL } from "./types";
 import {
   filterByPeriod,
+  formatDeadlineRange,
   overlapsPeriod,
   taskDateRange,
   todayIso,
@@ -55,10 +56,9 @@ export function filterEventsByPeriod(
 }
 
 function taskWhenLabel(task: Task): string {
-  const r = taskDateRange(task);
-  if (!r) return "날짜 없음";
-  if (r.start === r.end) return r.start;
-  return `${r.start} ~ ${r.end}`;
+  const label = formatDeadlineRange(task);
+  if (!label) return "날짜 없음";
+  return label;
 }
 
 function taskToItem(task: Task): UnifiedItem {

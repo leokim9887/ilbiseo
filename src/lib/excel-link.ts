@@ -24,7 +24,7 @@ export {
   needsDatedExcelRename,
   resolveSaveStrategy,
 };
-export { datedExcelFilename };
+export { datedExcelFilename, msUntilNextKstMidnight } from "./excel-filename";
 
 const DB_NAME = "ilbiseo-fs";
 const STORE = "handles";
@@ -236,6 +236,42 @@ export async function renameExcelHandle(
   await handle.move(newName);
   await saveExcelHandle(handle);
   return handle;
+}
+
+export type EnsureDatedExcelResult =
+  | { status: "skipped"; reason: "no-fs" | "no-handle" | "same-name" }
+  | { status: "renamed"; fileName: string }
+  | { status: "failed"; reason: string; fileName?: string };
+
+/**
+ * If a linked Excel handle exists and its name is not today’s KST stamp,
+ * rename in place via `move()`. Never opens a save picker (father-friendly
+ * day-roll path). Call on load / focus / visibility / midnight.
+ */
+export async function ensureDatedExcelFilename(
+  now: Date = new Date(),
+): Promise<EnsureDatedExcelResult> {
+  if (!supportsFileSystemAccess()) {
+    return { status: "skipped", reason: "no-fs" };
+  }
+  const handle = await loadExcelHandle();
+  if (!handle) {
+    return { status: "skipped", reason: "no-handle" };
+  }
+  const desired = datedExcelFilename(now);
+  if (!needsDatedExcelRename(handle.name, desired)) {
+    return { status: "skipped", reason: "same-name" };
+  }
+  try {
+    const next = await renameExcelHandle(handle, desired);
+    return { status: "renamed", fileName: next.name || desired };
+  } catch (e) {
+    return {
+      status: "failed",
+      reason: e instanceof Error ? e.message : "파일 이름을 바꾸지 못했습니다.",
+      fileName: handle.name,
+    };
+  }
 }
 
 export async function pickExcelFile(

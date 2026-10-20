@@ -23,7 +23,9 @@ import { buildWorkbook } from "@/lib/excel";
 import {
   classifyExcelWriteError,
   datedExcelFilename,
+  ensureDatedExcelFilename,
   loadExcelHandle,
+  msUntilNextKstMidnight,
   needsDatedExcelRename,
   renameExcelHandle,
   supportsFileSystemAccess,
@@ -67,6 +69,62 @@ export function useAppState() {
       setStatus("error");
     }
   }, []);
+
+  /**
+   * Auto-rename linked Excel to today’s KST stamp when the calendar day
+   * rolls — no 「엑셀 파일 저장」 click required. Never opens a picker.
+   */
+  const refreshDatedExcelName = useCallback(async () => {
+    if (!supportsFileSystemAccess()) return;
+    const result = await ensureDatedExcelFilename();
+    if (result.status === "renamed") {
+      setExcelLinked(true);
+      setExcelStatus(`엑셀 이름 · ${result.fileName}`);
+    } else if (result.status === "skipped" && result.reason === "no-handle") {
+      setExcelLinked(false);
+    } else if (result.status === "failed") {
+      // Silent — father can still save manually; no unsolicited picker.
+      setExcelLinked(true);
+    } else if (result.status === "skipped" && result.reason === "same-name") {
+      setExcelLinked(true);
+    }
+  }, []);
+
+  // Load + focus / visibility → ensure dated name
+  useEffect(() => {
+    if (status !== "ready") return;
+    void refreshDatedExcelName();
+
+    const onResume = () => {
+      if (document.visibilityState === "visible") {
+        void refreshDatedExcelName();
+      }
+    };
+    const onFocus = () => void refreshDatedExcelName();
+
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [status, refreshDatedExcelName]);
+
+  // Quiet timer until next KST midnight, then rename and reschedule
+  useEffect(() => {
+    if (status !== "ready") return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void refreshDatedExcelName().finally(() => schedule());
+      }, msUntilNextKstMidnight());
+    };
+    schedule();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [status, refreshDatedExcelName]);
 
   const syncExcel = useCallback(async (next: AppState) => {
     if (!supportsFileSystemAccess()) return;

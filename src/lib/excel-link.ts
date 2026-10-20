@@ -194,15 +194,27 @@ function toArrayBuffer(
   ) as ArrayBuffer;
 }
 
+/**
+ * @param interactive When false (auto day-roll / timers), never call
+ * `requestPermission` — that requires a user gesture and otherwise fails
+ * silently after refresh, which blocked overnight filename updates.
+ */
 export async function ensureWritePermission(
   handle: FileSystemFileHandle,
+  options?: { interactive?: boolean },
 ): Promise<boolean> {
+  const interactive = options?.interactive !== false;
   const opts = { mode: "readwrite" as const };
   try {
     if (typeof handle.queryPermission === "function") {
       const current = await handle.queryPermission(opts);
       if (current === "granted") return true;
       if (current === "denied") return false;
+      // "prompt" — only elevate with a user gesture
+      if (!interactive) return false;
+    } else if (!interactive) {
+      // No query API: avoid blind requestPermission outside a gesture
+      return false;
     }
     if (typeof handle.requestPermission !== "function") return true;
     const next = await handle.requestPermission(opts);
@@ -219,9 +231,10 @@ export async function ensureWritePermission(
 export async function renameExcelHandle(
   handle: FileSystemFileHandle,
   newName: string,
+  options?: { interactive?: boolean },
 ): Promise<FileSystemFileHandle> {
   if (!newName || handle.name === newName) return handle;
-  const ok = await ensureWritePermission(handle);
+  const ok = await ensureWritePermission(handle, options);
   if (!ok) {
     throw Object.assign(
       new Error("파일 이름 바꾸기 권한이 없습니다."),
@@ -246,10 +259,14 @@ export type EnsureDatedExcelResult =
 /**
  * If a linked Excel handle exists and its name is not today’s KST stamp,
  * rename in place via `move()`. Never opens a save picker (father-friendly
- * day-roll path). Call on load / focus / visibility / midnight.
+ * day-roll path). Call on load / focus / visibility / periodic KST check.
+ *
+ * Auto paths must pass `{ interactive: false }` so we only rename when
+ * write permission is already granted (no gesture-less requestPermission).
  */
 export async function ensureDatedExcelFilename(
   now: Date = new Date(),
+  options?: { interactive?: boolean },
 ): Promise<EnsureDatedExcelResult> {
   if (!supportsFileSystemAccess()) {
     return { status: "skipped", reason: "no-fs" };
@@ -263,7 +280,9 @@ export async function ensureDatedExcelFilename(
     return { status: "skipped", reason: "same-name" };
   }
   try {
-    const next = await renameExcelHandle(handle, desired);
+    const next = await renameExcelHandle(handle, desired, {
+      interactive: options?.interactive === true,
+    });
     return { status: "renamed", fileName: next.name || desired };
   } catch (e) {
     return {

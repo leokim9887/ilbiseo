@@ -49,6 +49,13 @@ export function useAppState() {
   const excelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** When true, next persist came from remote hydrate — skip push echo. */
   const skipRemotePushRef = useRef(false);
+  /** Latest state for day-roll rewrite without stale closures. */
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  /** Last KST calendar day we successfully aligned the linked Excel name to. */
+  const lastKstDateRef = useRef<string | null>(null);
+  const datingBusyRef = useRef(false);
+  const syncExcelRef = useRef<(next: AppState) => Promise<void>>(async () => {});
 
   useEffect(() => {
     try {
@@ -69,62 +76,6 @@ export function useAppState() {
       setStatus("error");
     }
   }, []);
-
-  /**
-   * Auto-rename linked Excel to today’s KST stamp when the calendar day
-   * rolls — no 「엑셀 파일 저장」 click required. Never opens a picker.
-   */
-  const refreshDatedExcelName = useCallback(async () => {
-    if (!supportsFileSystemAccess()) return;
-    const result = await ensureDatedExcelFilename();
-    if (result.status === "renamed") {
-      setExcelLinked(true);
-      setExcelStatus(`엑셀 이름 · ${result.fileName}`);
-    } else if (result.status === "skipped" && result.reason === "no-handle") {
-      setExcelLinked(false);
-    } else if (result.status === "failed") {
-      // Silent — father can still save manually; no unsolicited picker.
-      setExcelLinked(true);
-    } else if (result.status === "skipped" && result.reason === "same-name") {
-      setExcelLinked(true);
-    }
-  }, []);
-
-  // Load + focus / visibility → ensure dated name
-  useEffect(() => {
-    if (status !== "ready") return;
-    void refreshDatedExcelName();
-
-    const onResume = () => {
-      if (document.visibilityState === "visible") {
-        void refreshDatedExcelName();
-      }
-    };
-    const onFocus = () => void refreshDatedExcelName();
-
-    document.addEventListener("visibilitychange", onResume);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      document.removeEventListener("visibilitychange", onResume);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [status, refreshDatedExcelName]);
-
-  // Quiet timer until next KST midnight, then rename and reschedule
-  useEffect(() => {
-    if (status !== "ready") return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const schedule = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        void refreshDatedExcelName().finally(() => schedule());
-      }, msUntilNextKstMidnight());
-    };
-    schedule();
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [status, refreshDatedExcelName]);
 
   const syncExcel = useCallback(async (next: AppState) => {
     if (!supportsFileSystemAccess()) return;
@@ -174,6 +125,105 @@ export function useAppState() {
       );
     }
   }, []);
+
+  syncExcelRef.current = syncExcel;
+
+  /**
+   * Auto-rename linked Excel to today’s KST stamp when the calendar day
+   * rolls — no 「엑셀 파일 저장」 click required. Never opens a picker.
+   * On rename (or day roll with already-correct name), rewrite workbook too.
+   */
+  const refreshDatedExcelName = useCallback(async () => {
+    if (!supportsFileSystemAccess()) return;
+    if (datingBusyRef.current) return;
+    datingBusyRef.current = true;
+    try {
+      const today = todayIsoKst();
+      const prev = lastKstDateRef.current;
+      const rolled = prev !== null && prev !== today;
+
+      // Auto path: only move when permission already granted (no gesture).
+      const result = await ensureDatedExcelFilename(new Date(), {
+        interactive: false,
+      });
+
+      if (result.status === "renamed") {
+        lastKstDateRef.current = today;
+        setExcelLinked(true);
+        setExcelStatus(`엑셀 이름 · ${result.fileName}`);
+        await syncExcelRef.current(stateRef.current);
+        return;
+      }
+
+      if (result.status === "skipped" && result.reason === "no-handle") {
+        setExcelLinked(false);
+        lastKstDateRef.current = today;
+        return;
+      }
+
+      if (result.status === "skipped" && result.reason === "same-name") {
+        setExcelLinked(true);
+        if (rolled) {
+          // Name already today’s — still refresh content for the new day.
+          await syncExcelRef.current(stateRef.current);
+        }
+        lastKstDateRef.current = today;
+        return;
+      }
+
+      if (result.status === "failed") {
+        setExcelLinked(true);
+        // Keep lastKstDate unset/old so the minute timer retries until move works
+        // (permission sticky after a save click, or file unlocked after Excel closed).
+        if (rolled || prev === null) {
+          const desired = datedExcelFilename();
+          if (needsDatedExcelRename(result.fileName, desired)) {
+            setExcelStatus(
+              "날짜가 바뀌었습니다. 엑셀 파일을 닫은 뒤 이 창을 다시 보거나 「엑셀 파일 저장」을 눌러 주세요.",
+            );
+          }
+        }
+      }
+    } finally {
+      datingBusyRef.current = false;
+    }
+  }, []);
+
+  // Load + focus / visibility + every minute → align dated name to KST today
+  useEffect(() => {
+    if (status !== "ready") return;
+    void refreshDatedExcelName();
+
+    const onResume = () => {
+      if (document.visibilityState === "visible") {
+        void refreshDatedExcelName();
+      }
+    };
+    const onFocus = () => void refreshDatedExcelName();
+
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onFocus);
+    // Periodic check: long midnight setTimeout is throttled in background tabs.
+    const interval = window.setInterval(() => {
+      void refreshDatedExcelName();
+    }, 60_000);
+    // Also fire near KST midnight (backup; interval covers missed fires).
+    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleMidnight = () => {
+      if (midnightTimer) clearTimeout(midnightTimer);
+      midnightTimer = setTimeout(() => {
+        void refreshDatedExcelName().finally(() => scheduleMidnight());
+      }, msUntilNextKstMidnight());
+    };
+    scheduleMidnight();
+
+    return () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(interval);
+      if (midnightTimer) clearTimeout(midnightTimer);
+    };
+  }, [status, refreshDatedExcelName]);
 
   const persist = useCallback(
     (next: AppState, opts?: { fromRemote?: boolean; updatedAt?: string }) => {

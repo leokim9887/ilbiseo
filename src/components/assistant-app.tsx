@@ -178,7 +178,7 @@ export function AssistantApp() {
                 ? "border-destructive/30 bg-[var(--sheet)] text-destructive"
                 : sync.toast.kind === "info"
                   ? "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)]"
-                  : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:text-[var(--toss-blue)]"
+                  : "border-[var(--toss-blue)]/30 bg-[var(--sheet)] text-[var(--toss-blue)]"
             }`}
             role="status"
           >
@@ -197,7 +197,7 @@ export function AssistantApp() {
         </header>
         <WelcomeBanner onStart={() => setView("todo")} />
 
-        <div className="shrink-0 sm:sticky sm:top-0 sm:z-30 sm:bg-background/90 sm:py-1 sm:backdrop-blur-sm">
+        <div className="shrink-0 sm:sticky sm:top-0 sm:z-30 sm:-mx-1 sm:bg-background/85 sm:px-1 sm:py-1.5 sm:backdrop-blur-md">
           <AppNav
             value={view}
             onChange={handleViewChange}

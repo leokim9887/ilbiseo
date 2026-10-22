@@ -33,8 +33,8 @@ export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
   };
 
   return (
-    <div className="animate-fade-up rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-4 shadow-[0_1px_0_rgba(26,43,54,0.04)] max-sm:rounded-[1rem] max-sm:shadow-none sm:px-6 sm:py-5">
-      <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--brand)] max-sm:font-sans max-sm:text-[1.35rem] max-sm:tracking-tight">
+    <div className="animate-fade-up rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-4 shadow-[0_1px_0_rgba(26,43,54,0.04)] max-sm:rounded-[1rem] max-sm:shadow-none sm:rounded-[1.125rem] sm:px-6 sm:py-5 sm:shadow-none">
+      <p className="font-sans text-2xl font-bold tracking-tight text-[var(--brand)] max-sm:text-[1.35rem]">
         일비서
       </p>
       <p className="mt-2 text-[15px] leading-relaxed text-[var(--ink-muted)]">

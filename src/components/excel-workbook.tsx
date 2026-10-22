@@ -744,10 +744,10 @@ export function ExcelWorkbook({
   }, [focus]);
 
   const chipClass = (c: typeof chip) =>
-    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border max-sm:rounded-full max-sm:font-semibold ${
+    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border max-sm:rounded-full max-sm:font-semibold sm:rounded-full sm:font-semibold ${
       chip === c
-        ? "border-[#217346] bg-[#217346] text-white max-sm:border-[var(--toss-blue)] max-sm:bg-[var(--toss-blue)]"
-        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#2a3a32] max-sm:border-[var(--grid-line)]"
+        ? "border-[var(--toss-blue)] bg-[var(--toss-blue)] text-white"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#2a3a32] max-sm:border-[var(--grid-line)] sm:border-[var(--grid-line)] sm:hover:bg-[var(--row-hover)]"
     }`;
 
   const applyGcalChip = (c: "today" | "week" | "month" | "all") => {
@@ -781,18 +781,18 @@ export function ExcelWorkbook({
   };
 
   const gcalChipClass = (c: typeof gcalChip) =>
-    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border max-sm:rounded-full max-sm:font-semibold ${
+    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border max-sm:rounded-full max-sm:font-semibold sm:rounded-full sm:font-semibold ${
       gcalChip === c
-        ? "border-[#3b6ea5] bg-[#3b6ea5] text-white max-sm:border-[var(--toss-blue)] max-sm:bg-[var(--toss-blue)]"
-        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#1e2a38] max-sm:border-[var(--grid-line)]"
+        ? "border-[var(--toss-blue)] bg-[var(--toss-blue)] text-white"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#1e2a38] max-sm:border-[var(--grid-line)] sm:border-[var(--grid-line)] sm:hover:bg-[var(--row-hover)]"
     }`;
 
   return (
-    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)] max-sm:rounded-[1rem] max-sm:border-[var(--grid-line)] max-sm:bg-[var(--sheet)] max-sm:shadow-none dark:border-[#3a4a42] dark:bg-[#1a221e]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2 dark:border-[#3a4a42] dark:from-[#24302a] dark:to-[#1e2823]">
-        <p className="truncate text-[16px] font-semibold text-[#1a2420] dark:text-[#e8ece9]">
+    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)] max-sm:rounded-[1rem] max-sm:border-[var(--grid-line)] max-sm:bg-[var(--sheet)] max-sm:shadow-none sm:rounded-[1.125rem] sm:border-[var(--grid-line)] sm:bg-[var(--sheet)] sm:shadow-none dark:border-[#3a4a42] dark:bg-[#1a221e]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2 dark:border-[#3a4a42] dark:from-[#24302a] dark:to-[#1e2823] sm:border-[var(--grid-line)] sm:bg-[var(--sheet-header)] sm:bg-none">
+        <p className="truncate text-[16px] font-semibold tracking-tight text-[#1a2420] dark:text-[#e8ece9] sm:text-[var(--ink)]">
           {datedExcelFilename()}
-          <span className="ml-2 text-[13px] font-normal text-[#454d48] dark:text-[#a8b3ad]">
+          <span className="ml-2 text-[13px] font-normal text-[#454d48] dark:text-[#a8b3ad] sm:text-[var(--ink-muted)]">
             — TO DO LIST
           </span>
         </p>
@@ -831,7 +831,7 @@ export function ExcelWorkbook({
               <Button
                 type="button"
                 size="sm"
-                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[#217346] px-2 text-[12.5px] font-semibold text-white hover:bg-[#1a5c38] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:bg-[var(--toss-blue)] max-sm:px-3 max-sm:hover:bg-[#1b64da] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[var(--toss-blue)] px-2 text-[12.5px] font-semibold text-white hover:bg-[#1b64da] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:px-3 sm:h-9 sm:min-h-9 sm:rounded-lg sm:px-3 sm:text-[14px]"
                 onClick={onAdd}
                 data-excel-add-row
               >

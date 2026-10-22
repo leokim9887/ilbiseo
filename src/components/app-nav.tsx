@@ -42,10 +42,11 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
 
   return (
     <>
-      {/* Desktop / tablet: unchanged grid tabs */}
+      {/* Desktop / tablet: Toss-style segment tabs */}
       <nav
         aria-label="주요 메뉴"
-        className="hidden gap-1.5 sm:grid sm:grid-cols-3 lg:grid-cols-5"
+        data-toss-desktop-nav
+        className="hidden gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5"
       >
         {NAV.map((item) => {
           const active = value === item.id;
@@ -62,20 +63,33 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
                   ? `${item.label} ${count}건`
                   : item.label
               }
-              className={`flex min-h-[3.75rem] items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left transition-colors ${
+              className={`toss-press flex min-h-[3.5rem] items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-left ${
                 active
-                  ? "border-[var(--brand)] bg-[var(--brand)] text-[var(--primary-foreground)] shadow-sm"
+                  ? "border-[var(--toss-blue)]/35 bg-[var(--toss-blue-soft)] text-[var(--toss-blue)] shadow-[0_1px_0_rgba(49,130,246,0.08)]"
                   : "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)] hover:bg-[var(--row-hover)]"
               }`}
             >
-              <Icon className="size-5 shrink-0 opacity-90" aria-hidden />
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
+                  active
+                    ? "bg-[var(--toss-blue)]/15 text-[var(--toss-blue)]"
+                    : "bg-[var(--muted)] text-[var(--ink-muted)]"
+                }`}
+                aria-hidden
+              >
+                <Icon className="size-5" strokeWidth={active ? 2.35 : 1.9} />
+              </span>
               <span className="min-w-0">
-                <span className="block text-[15px] font-semibold leading-snug">
+                <span className="block text-[15px] font-semibold leading-snug tracking-tight">
                   {item.label}
                 </span>
                 {typeof count === "number" ? (
                   <span
-                    className={`block text-[13px] ${active ? "text-white/80" : "text-[var(--ink-muted)]"}`}
+                    className={`block text-[13px] tabular-nums ${
+                      active
+                        ? "text-[var(--toss-blue)]/80"
+                        : "text-[var(--ink-muted)]"
+                    }`}
                     aria-hidden
                   >
                     {count}건

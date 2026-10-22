@@ -169,7 +169,7 @@ export function AssistantApp() {
       {sync.toast ? (
         <div
           data-status-chip
-          className={`fixed left-1/2 top-3 z-50 w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border px-4 py-3.5 text-center text-[15px] shadow-md max-sm:top-[max(0.85rem,env(safe-area-inset-top))] max-sm:border-transparent max-sm:bg-[var(--sheet)]/95 max-sm:px-5 ${
+          className={`fixed inset-x-3 top-3 z-50 mx-auto w-auto max-w-[min(22rem,calc(100%-1.5rem))] rounded-xl border px-4 py-3.5 text-center text-[15px] shadow-md max-sm:inset-x-4 max-sm:top-[max(0.85rem,env(safe-area-inset-top))] max-sm:border-transparent max-sm:bg-[var(--sheet)]/95 max-sm:px-5 ${
             sync.toast.kind === "error"
               ? "border-destructive/30 bg-[var(--sheet)] text-destructive"
               : sync.toast.kind === "info"

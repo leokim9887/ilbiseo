@@ -356,9 +356,15 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-  /* Product-grade toast */
+  /* Product-grade toast — inset-x centered (no left:50% + translateX; avoids double -50%) */
   [data-status-chip],
   [data-sync-chip] {
+    left: max(1rem, env(safe-area-inset-left, 0px)) !important;
+    right: max(1rem, env(safe-area-inset-right, 0px)) !important;
+    width: auto !important;
+    max-width: min(22rem, calc(100% - 2rem)) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
     min-height: 2.85rem;
     border-radius: 1rem;
     font-weight: 600;
@@ -367,6 +373,8 @@
     animation: toss-toast-in 0.34s cubic-bezier(0.34, 1.4, 0.64, 1) both;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    /* Kill any leftover horizontal translate from utilities / prior anim */
+    translate: none;
   }
   .dark [data-status-chip],
   .dark [data-sync-chip] {
@@ -540,14 +548,16 @@
   }
 }
 
+/* Vertical-only motion — do NOT translateX(-50%); Tailwind v4 `translate` +
+   keyframe `transform: translate(-50%)` double-shifted and clipped the toast. */
 @keyframes toss-toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -0.75rem) scale(0.94);
+    transform: translateY(-0.75rem) scale(0.94);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 

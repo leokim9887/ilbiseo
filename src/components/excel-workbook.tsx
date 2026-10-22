@@ -744,10 +744,10 @@ export function ExcelWorkbook({
   }, [focus]);
 
   const chipClass = (c: typeof chip) =>
-    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border ${
+    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border max-sm:rounded-full max-sm:font-semibold ${
       chip === c
-        ? "border-[#217346] bg-[#217346] text-white"
-        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#2a3a32]"
+        ? "border-[#217346] bg-[#217346] text-white max-sm:border-[var(--toss-blue)] max-sm:bg-[var(--toss-blue)]"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef7f1] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#2a3a32] max-sm:border-[var(--grid-line)]"
     }`;
 
   const applyGcalChip = (c: "today" | "week" | "month" | "all") => {
@@ -781,10 +781,10 @@ export function ExcelWorkbook({
   };
 
   const gcalChipClass = (c: typeof gcalChip) =>
-    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border ${
+    `min-h-10 h-10 touch-manipulation rounded-sm px-3 text-[14px] font-medium border max-sm:rounded-full max-sm:font-semibold ${
       gcalChip === c
-        ? "border-[#3b6ea5] bg-[#3b6ea5] text-white"
-        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#1e2a38]"
+        ? "border-[#3b6ea5] bg-[#3b6ea5] text-white max-sm:border-[var(--toss-blue)] max-sm:bg-[var(--toss-blue)]"
+        : "border-[#8a939a] bg-white text-[#1a2420] hover:bg-[#eef3fa] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8ece9] dark:hover:bg-[#1e2a38] max-sm:border-[var(--grid-line)]"
     }`;
 
   return (
@@ -831,7 +831,7 @@ export function ExcelWorkbook({
               <Button
                 type="button"
                 size="sm"
-                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[#217346] px-2 text-[12.5px] text-white hover:bg-[#1a5c38] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[#217346] px-2 text-[12.5px] font-semibold text-white hover:bg-[#1a5c38] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:bg-[var(--toss-blue)] max-sm:px-3 max-sm:hover:bg-[#1b64da] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
                 onClick={onAdd}
                 data-excel-add-row
               >
@@ -944,6 +944,7 @@ export function ExcelWorkbook({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              data-gcal-chip
               className={gcalChipClass("today")}
               onClick={() => applyGcalChip("today")}
             >
@@ -951,6 +952,7 @@ export function ExcelWorkbook({
             </button>
             <button
               type="button"
+              data-gcal-chip
               className={gcalChipClass("week")}
               onClick={() => applyGcalChip("week")}
             >
@@ -958,6 +960,7 @@ export function ExcelWorkbook({
             </button>
             <button
               type="button"
+              data-gcal-chip
               className={gcalChipClass("month")}
               onClick={() => applyGcalChip("month")}
             >
@@ -965,6 +968,7 @@ export function ExcelWorkbook({
             </button>
             <button
               type="button"
+              data-gcal-chip
               className={gcalChipClass("all")}
               onClick={() => applyGcalChip("all")}
             >
@@ -1023,16 +1027,16 @@ export function ExcelWorkbook({
           <div className="flex flex-wrap items-center gap-2">
             {sheet === "todo" ? (
               <>
-                <button type="button" className={chipClass("today")} onClick={() => applyChip("today")}>
+                <button type="button" data-period-chip className={chipClass("today")} onClick={() => applyChip("today")}>
                   오늘
                 </button>
-                <button type="button" className={chipClass("week")} onClick={() => applyChip("week")}>
+                <button type="button" data-period-chip className={chipClass("week")} onClick={() => applyChip("week")}>
                   이번 주
                 </button>
-                <button type="button" className={chipClass("month")} onClick={() => applyChip("month")}>
+                <button type="button" data-period-chip className={chipClass("month")} onClick={() => applyChip("month")}>
                   이번 달
                 </button>
-                <button type="button" className={chipClass("all")} onClick={() => applyChip("all")}>
+                <button type="button" data-period-chip className={chipClass("all")} onClick={() => applyChip("all")}>
                   전체
                 </button>
               </>

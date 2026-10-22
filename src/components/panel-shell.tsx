@@ -23,22 +23,25 @@ export function PanelShell({
   return (
     <section
       data-panel-shell
-      className={`overflow-hidden rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] shadow-[0_1px_0_rgba(26,43,54,0.04)] max-sm:rounded-[1rem] max-sm:shadow-none ${className}`}
+      className={`overflow-hidden rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] shadow-[0_1px_0_rgba(26,43,54,0.04)] max-sm:rounded-[1.125rem] max-sm:shadow-none ${className}`}
     >
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--grid-line)] bg-[var(--sheet-header)] px-4 py-4 max-sm:py-3.5 sm:px-5">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--grid-line)] bg-[var(--sheet-header)] px-4 py-4 max-sm:border-[var(--grid-line)] max-sm:py-3.5 sm:px-5">
         <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {icon ? (
-              <span className="text-[var(--brand)] max-sm:text-[var(--toss-blue)]" aria-hidden>
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--group-bg)] text-[var(--brand)] max-sm:bg-[var(--toss-blue-soft)] max-sm:text-[var(--toss-blue)]"
+                aria-hidden
+              >
                 {icon}
               </span>
             ) : null}
-            <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--brand)] max-sm:font-sans max-sm:text-[1.2rem] max-sm:tracking-tight sm:text-2xl">
+            <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--brand)] max-sm:font-sans max-sm:text-[1.22rem] max-sm:font-bold max-sm:tracking-tight sm:text-2xl">
               {title}
             </h2>
           </div>
           {description ? (
-            <p className="max-w-2xl text-[15px] leading-relaxed text-[var(--ink-muted)]">
+            <p className="max-w-2xl text-[15px] leading-relaxed text-[var(--ink-muted)] max-sm:text-[14px] max-sm:leading-snug">
               {description}
             </p>
           ) : null}

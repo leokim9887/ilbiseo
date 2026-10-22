@@ -242,7 +242,7 @@
     background-color: var(--background);
   }
 
-  /* Soft hairline panels — no multi-shadow “AI cards” */
+  /* Soft hairline panels — product-grade, not multi-shadow cards */
   [data-panel-shell],
   [data-side-kind],
   [data-device-sync],
@@ -251,23 +251,54 @@
   }
 
   [data-panel-shell] {
-    border-radius: 1rem;
+    border-radius: 1.125rem;
     border-color: var(--grid-line);
+    overflow: hidden;
   }
 
-  /* Comfortable tap feedback */
+  [data-panel-shell] > header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* Press: scale + opacity (Toss-like tactile) */
+  .toss-press {
+    transition:
+      transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1),
+      opacity 0.15s ease,
+      color 0.2s ease,
+      background-color 0.2s ease;
+  }
   .toss-press:active,
-  nav[aria-label="주요 메뉴"] button:active,
-  [data-side-item]:active {
-    opacity: 0.72;
+  nav[data-toss-tabbar] button:active,
+  [data-side-item]:active,
+  [data-excel-toolbar-actions] button:active,
+  [data-slot="button"]:active {
+    opacity: 0.78;
+    transform: scale(0.96);
   }
 
-  /* Tab / view switch — calm fade-up (already keyed on view) */
+  /* View switch — springier enter + light stagger for children */
   .animate-sheet-in {
-    animation: toss-view-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: toss-view-in 0.36s cubic-bezier(0.34, 1.35, 0.64, 1) both;
+  }
+  .animate-sheet-in > * {
+    animation: toss-stagger-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-sheet-in > *:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .animate-sheet-in > *:nth-child(2) {
+    animation-delay: 0.06s;
+  }
+  .animate-sheet-in > *:nth-child(3) {
+    animation-delay: 0.1s;
   }
 
-  /* Dialog → bottom sheet feel on phone */
+  /* Dialog → snappier bottom sheet + grab handle */
   [data-slot="dialog-content"] {
     top: auto !important;
     bottom: 0 !important;
@@ -277,16 +308,27 @@
     max-width: 100% !important;
     translate: none !important;
     transform: none !important;
-    border-radius: 1.25rem 1.25rem 0 0 !important;
-    padding: 1.25rem 1.15rem calc(1.15rem + env(safe-area-inset-bottom));
+    border-radius: 1.35rem 1.35rem 0 0 !important;
+    padding: 1.35rem 1.15rem calc(1.15rem + env(safe-area-inset-bottom));
     border: 1px solid var(--grid-line);
     border-bottom: none;
-    box-shadow: 0 -8px 32px rgba(25, 31, 40, 0.08);
-    animation: toss-sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+    box-shadow: 0 -12px 40px rgba(25, 31, 40, 0.12);
+    animation: toss-sheet-up 0.38s cubic-bezier(0.32, 1.2, 0.42, 1) both;
   }
-
+  [data-slot="dialog-content"]::before {
+    content: "";
+    display: block;
+    width: 2.25rem;
+    height: 0.25rem;
+    margin: -0.35rem auto 0.85rem;
+    border-radius: 999px;
+    background: var(--toss-gray-200);
+  }
+  .dark [data-slot="dialog-content"]::before {
+    background: #4a4a54;
+  }
   .dark [data-slot="dialog-content"] {
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
   }
 
   [data-slot="dialog-footer"] {
@@ -296,47 +338,177 @@
     margin-bottom: calc(-1.15rem - env(safe-area-inset-bottom));
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
+  [data-slot="dialog-footer"] [data-slot="button"] {
+    min-height: 2.85rem;
+    border-radius: 0.85rem;
+    font-weight: 600;
+  }
 
-  /* Sheet bottoms already slide; keep soft overlay */
   [data-slot="dialog-overlay"],
   [data-slot="sheet-overlay"] {
-    background: rgba(25, 31, 40, 0.45) !important;
+    background: rgba(25, 31, 40, 0.48) !important;
+    animation: toss-overlay-in 0.22s ease-out both;
   }
 
-  /* Sync / status chips — less cramped */
-  [data-sync-chip],
-  [data-status-chip] {
-    min-height: 2.75rem;
-    border-radius: 0.75rem;
+  [data-slot="sheet-content"][data-side="bottom"] {
+    animation: toss-sheet-up 0.38s cubic-bezier(0.32, 1.2, 0.42, 1) both;
+    border-radius: 1.35rem 1.35rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
-  /* Cheer CTA — Toss blue primary on phone */
+  /* Product-grade toast */
+  [data-status-chip],
+  [data-sync-chip] {
+    min-height: 2.85rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    box-shadow: 0 8px 28px rgba(25, 31, 40, 0.14) !important;
+    animation: toss-toast-in 0.34s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .dark [data-status-chip],
+  .dark [data-sync-chip] {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  /* Cheer CTA — blue primary + press */
   [data-daily-cheer-confirm] {
     background-color: var(--toss-blue) !important;
     color: #fff !important;
-    border-radius: 0.875rem !important;
-    box-shadow: none !important;
+    border-radius: 0.95rem !important;
+    box-shadow: 0 6px 20px rgba(49, 130, 246, 0.35) !important;
+    font-weight: 700 !important;
   }
-
+  [data-daily-cheer-confirm]:active {
+    transform: scale(0.97);
+    box-shadow: 0 3px 12px rgba(49, 130, 246, 0.28) !important;
+  }
   [data-daily-cheer-confirm]:hover {
     background-color: #1b64da !important;
   }
 
-  /* Excel toolbar: soft gray sections (keep cell green for Excel fidelity) */
+  /* Excel chrome → Toss shell (grid cells stay functional) */
+  .excel-wb {
+    border-radius: 1.125rem !important;
+    border-color: var(--grid-line) !important;
+    background: var(--sheet) !important;
+    overflow: hidden;
+  }
   .excel-wb > div:first-child {
-    background: linear-gradient(to bottom, #f9fafb, #f2f4f6) !important;
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: rgba(249, 250, 251, 0.92) !important;
+    border-color: var(--grid-line) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding-top: 0.7rem !important;
+    padding-bottom: 0.7rem !important;
+  }
+  .dark .excel-wb > div:first-child {
+    background: rgba(44, 44, 52, 0.92) !important;
+  }
+  .excel-wb > div:first-child p {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .excel-wb > div:nth-child(2),
+  .excel-wb > div:nth-child(3) {
+    background: var(--sheet-header) !important;
     border-color: var(--grid-line) !important;
   }
+  .excel-wb select,
+  .excel-wb input[type="date"],
+  .excel-wb [data-excel-toolbar-actions] button {
+    border-radius: 0.75rem !important;
+    min-height: 2.75rem;
+  }
+  /* Primary add on phone: Toss blue pops; cell greens stay in grid */
+  .excel-wb [data-excel-add-row] {
+    background-color: var(--toss-blue) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 14px rgba(49, 130, 246, 0.28);
+  }
+  .excel-wb [data-excel-add-row]:hover {
+    background-color: #1b64da !important;
+  }
+  .excel-wb [data-excel-add-row]:active {
+    transform: scale(0.97);
+  }
+  /* Secondary toolbar quieter */
+  .excel-wb [data-excel-toolbar-actions] button[data-slot="button"]:not([data-excel-add-row]) {
+    font-weight: 600;
+    border-color: var(--grid-line) !important;
+  }
+  /* Period chips — calmer pills */
+  .excel-wb [data-period-chip],
+  .excel-wb button[data-gcal-chip] {
+    border-radius: 999px !important;
+    font-weight: 600;
+    min-height: 2.35rem;
+  }
 
-  .dark .excel-wb > div:first-child {
-    background: linear-gradient(to bottom, #2c2c34, #212529) !important;
+  /* Side lists — denser calm rows */
+  [data-side-kind] {
+    border-radius: 1.125rem !important;
+  }
+  [data-side-item] {
+    transition:
+      transform 0.16s ease,
+      opacity 0.16s ease,
+      background-color 0.2s ease,
+      border-color 0.2s ease;
+  }
+  [data-side-list-scroll] ul > li {
+    animation: toss-stagger-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  [data-side-list-scroll] ul > li:nth-child(1) {
+    animation-delay: 0.03s;
+  }
+  [data-side-list-scroll] ul > li:nth-child(2) {
+    animation-delay: 0.06s;
+  }
+  [data-side-list-scroll] ul > li:nth-child(3) {
+    animation-delay: 0.09s;
+  }
+  [data-side-list-scroll] ul > li:nth-child(4) {
+    animation-delay: 0.12s;
+  }
+  [data-side-list-scroll] ul > li:nth-child(n + 5) {
+    animation-delay: 0.14s;
+  }
+
+  /* Section titles denser */
+  [data-panel-shell] h2 {
+    letter-spacing: -0.03em;
+    font-weight: 700;
+  }
+
+  /* Bottom tabbar elevation already in component; dark soft lift */
+  .dark nav[data-toss-tabbar] {
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35) !important;
   }
 }
 
 @keyframes toss-view-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toss-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -346,8 +518,12 @@
 
 @keyframes toss-sheet-up {
   from {
-    opacity: 0.6;
-    transform: translateY(1.25rem);
+    opacity: 0.55;
+    transform: translateY(2rem);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-0.15rem);
   }
   to {
     opacity: 1;
@@ -355,10 +531,42 @@
   }
 }
 
+@keyframes toss-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes toss-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -0.75rem) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 @media (max-width: 639px) and (prefers-reduced-motion: reduce) {
   .animate-sheet-in,
-  [data-slot="dialog-content"] {
+  .animate-sheet-in > *,
+  [data-slot="dialog-content"],
+  [data-slot="sheet-content"],
+  [data-status-chip],
+  [data-sync-chip],
+  [data-side-list-scroll] ul > li,
+  [data-toss-tab-indicator] {
     animation: none !important;
+    transition: none !important;
+  }
+  .toss-press:active,
+  nav[data-toss-tabbar] button:active,
+  [data-side-item]:active {
+    transform: none;
   }
 }
 

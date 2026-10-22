@@ -169,12 +169,12 @@ export function AssistantApp() {
       {sync.toast ? (
         <div
           data-status-chip
-          className={`fixed left-1/2 top-3 z-50 w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-[15px] shadow-md max-sm:top-[max(0.75rem,env(safe-area-inset-top))] max-sm:rounded-2xl max-sm:shadow-none ${
+          className={`fixed left-1/2 top-3 z-50 w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border px-4 py-3.5 text-center text-[15px] shadow-md max-sm:top-[max(0.85rem,env(safe-area-inset-top))] max-sm:border-transparent max-sm:bg-[var(--sheet)]/95 max-sm:px-5 ${
             sync.toast.kind === "error"
               ? "border-destructive/30 bg-[var(--sheet)] text-destructive"
               : sync.toast.kind === "info"
-                ? "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)]"
-                : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:border-[var(--toss-blue)]/35 max-sm:text-[var(--toss-blue)]"
+                ? "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)] max-sm:text-[var(--ink)]"
+                : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:text-[var(--toss-blue)]"
           }`}
           role="status"
         >

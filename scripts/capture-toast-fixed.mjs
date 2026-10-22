@@ -49,17 +49,22 @@ fs.mkdirSync(OUT, { recursive: true });
       "nextjs-portal,[data-nextjs-toast],[data-nextjs-dev-overlay],[data-daily-cheer]{display:none!important}",
   });
 
-  // Inject toast in React tree via DOM (same markup/classes as app)
+  // Inject same structure as assistant-app toast (flex root + chip)
   await page.evaluate(() => {
-    const existing = document.querySelector("[data-status-chip]");
-    if (existing) existing.remove();
+    document.querySelector("[data-status-toast-root]")?.remove();
+    document.querySelector("[data-status-chip]")?.remove();
+    const root = document.createElement("div");
+    root.setAttribute("data-status-toast-root", "");
+    root.className =
+      "pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4 max-sm:top-[max(0.85rem,env(safe-area-inset-top))] max-sm:px-[max(1rem,env(safe-area-inset-left))] max-sm:pr-[max(1rem,env(safe-area-inset-right))]";
     const el = document.createElement("div");
     el.setAttribute("data-status-chip", "");
     el.setAttribute("role", "status");
     el.className =
-      "fixed inset-x-3 top-3 z-50 mx-auto w-auto max-w-[min(22rem,calc(100%-1.5rem))] rounded-xl border px-4 py-3.5 text-center text-[15px] shadow-md max-sm:inset-x-4 max-sm:top-[max(0.85rem,env(safe-area-inset-top))] max-sm:border-transparent max-sm:bg-[var(--sheet)]/95 max-sm:px-5 border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:text-[var(--toss-blue)]";
+      "pointer-events-auto w-full max-w-[22rem] rounded-xl border px-5 py-3.5 text-center text-[15px] shadow-md max-sm:border-transparent max-sm:bg-[var(--sheet)]/95 border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:text-[var(--toss-blue)]";
     el.textContent = "동기화 완료 · 이미 최신입니다";
-    document.body.appendChild(el);
+    root.appendChild(el);
+    document.body.appendChild(root);
   });
   await page.waitForTimeout(400);
 
@@ -67,13 +72,15 @@ fs.mkdirSync(OUT, { recursive: true });
   await page.screenshot({ path: dest, fullPage: false });
   console.log("wrote", dest);
 
-  // Assert not clipped: toast box fully within viewport
   const box = await page.locator("[data-status-chip]").boundingBox();
   if (!box) throw new Error("toast missing");
-  if (box.x < 4) throw new Error(`toast clipped left: x=${box.x}`);
-  if (box.x + box.width > 390 - 4)
+  if (box.x < 8) throw new Error(`toast clipped left: x=${box.x}`);
+  if (box.x + box.width > 390 - 8)
     throw new Error(`toast clipped right: right=${box.x + box.width}`);
-  console.log("toast box ok", box);
+  const mid = box.x + box.width / 2;
+  if (Math.abs(mid - 195) > 24)
+    throw new Error(`toast not centered: mid=${mid}`);
+  console.log("toast box ok", box, "mid", mid);
 
   await browser.close();
 })().catch((e) => {

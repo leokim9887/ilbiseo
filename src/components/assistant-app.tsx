@@ -168,17 +168,22 @@ export function AssistantApp() {
       <InstallHint />
       {sync.toast ? (
         <div
-          data-status-chip
-          className={`fixed inset-x-3 top-3 z-50 mx-auto w-auto max-w-[min(22rem,calc(100%-1.5rem))] rounded-xl border px-4 py-3.5 text-center text-[15px] shadow-md max-sm:inset-x-4 max-sm:top-[max(0.85rem,env(safe-area-inset-top))] max-sm:border-transparent max-sm:bg-[var(--sheet)]/95 max-sm:px-5 ${
-            sync.toast.kind === "error"
-              ? "border-destructive/30 bg-[var(--sheet)] text-destructive"
-              : sync.toast.kind === "info"
-                ? "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)] max-sm:text-[var(--ink)]"
-                : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:text-[var(--toss-blue)]"
-          }`}
-          role="status"
+          data-status-toast-root
+          className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4 max-sm:top-[max(0.85rem,env(safe-area-inset-top))] max-sm:px-[max(1rem,env(safe-area-inset-left))] max-sm:pr-[max(1rem,env(safe-area-inset-right))]"
         >
-          {sync.toast.text}
+          <div
+            data-status-chip
+            className={`pointer-events-auto w-full max-w-[22rem] rounded-xl border px-5 py-3.5 text-center text-[15px] shadow-md max-sm:border-transparent max-sm:bg-[var(--sheet)]/95 ${
+              sync.toast.kind === "error"
+                ? "border-destructive/30 bg-[var(--sheet)] text-destructive"
+                : sync.toast.kind === "info"
+                  ? "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)]"
+                  : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:text-[var(--toss-blue)]"
+            }`}
+            role="status"
+          >
+            {sync.toast.text}
+          </div>
         </div>
       ) : null}
       {/* Fullscreen-first shell: fill viewport width/height; wide screens use near-full width */}

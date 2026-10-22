@@ -22,17 +22,18 @@ export function PanelShell({
 }: PanelShellProps) {
   return (
     <section
-      className={`overflow-hidden rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] shadow-[0_1px_0_rgba(26,43,54,0.04)] ${className}`}
+      data-panel-shell
+      className={`overflow-hidden rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] shadow-[0_1px_0_rgba(26,43,54,0.04)] max-sm:rounded-[1rem] max-sm:shadow-none ${className}`}
     >
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--grid-line)] bg-[var(--sheet-header)] px-4 py-4 sm:px-5">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--grid-line)] bg-[var(--sheet-header)] px-4 py-4 max-sm:py-3.5 sm:px-5">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
             {icon ? (
-              <span className="text-[var(--brand)]" aria-hidden>
+              <span className="text-[var(--brand)] max-sm:text-[var(--toss-blue)]" aria-hidden>
                 {icon}
               </span>
             ) : null}
-            <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--brand)] sm:text-2xl">
+            <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[var(--brand)] max-sm:font-sans max-sm:text-[1.2rem] max-sm:tracking-tight sm:text-2xl">
               {title}
             </h2>
           </div>
@@ -48,7 +49,7 @@ export function PanelShell({
           </div>
         ) : null}
       </header>
-      <div className="p-4 sm:p-5">{children}</div>
+      <div className="p-4 max-sm:px-3.5 max-sm:py-3.5 sm:p-5">{children}</div>
     </section>
   );
 }

@@ -33,9 +33,9 @@ export function ThemeToggle() {
               type="button"
               variant={active ? "default" : "outline"}
               size="lg"
-              className={`min-h-12 justify-start gap-3 px-4 text-[15px] ${
+              className={`min-h-12 justify-start gap-3 px-4 text-[15px] max-sm:rounded-xl ${
                 active
-                  ? "bg-[var(--brand)] text-[var(--primary-foreground)] hover:bg-[var(--brand)]"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : ""
               }`}
               aria-pressed={active}

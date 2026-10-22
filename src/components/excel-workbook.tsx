@@ -788,7 +788,7 @@ export function ExcelWorkbook({
     }`;
 
   return (
-    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)] dark:border-[#3a4a42] dark:bg-[#1a221e]">
+    <div className="excel-wb flex flex-col overflow-hidden rounded-sm border border-[#7a8288] bg-[#dfe3e6] shadow-[0_2px_10px_rgba(26,43,54,0.12)] max-sm:rounded-[1rem] max-sm:border-[var(--grid-line)] max-sm:bg-[var(--sheet)] max-sm:shadow-none dark:border-[#3a4a42] dark:bg-[#1a221e]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#9aa5ad] bg-gradient-to-b from-[#f7f8f9] to-[#e4e7ea] px-3 py-2 dark:border-[#3a4a42] dark:from-[#24302a] dark:to-[#1e2823]">
         <p className="truncate text-[16px] font-semibold text-[#1a2420] dark:text-[#e8ece9]">
           {datedExcelFilename()}

@@ -37,6 +37,7 @@ interface AppNavProps {
 export function AppNav({ value, onChange, counts }: AppNavProps) {
   return (
     <>
+      {/* Desktop / tablet: unchanged grid tabs */}
       <nav
         aria-label="주요 메뉴"
         className="hidden gap-1.5 sm:grid sm:grid-cols-3 lg:grid-cols-5"
@@ -81,16 +82,18 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
         })}
       </nav>
 
+      {/* Phone: Toss-like bottom tab bar */}
       <nav
         aria-label="주요 메뉴"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--grid-line)] bg-[var(--sheet)]/95 backdrop-blur-md sm:hidden"
+        data-toss-tabbar
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--grid-line)] bg-[var(--sheet)]/98 backdrop-blur-md sm:hidden"
         style={{
-          paddingBottom: "max(0.4rem, env(safe-area-inset-bottom))",
+          paddingBottom: "max(0.35rem, env(safe-area-inset-bottom))",
           paddingLeft: "env(safe-area-inset-left)",
           paddingRight: "env(safe-area-inset-right)",
         }}
       >
-        <ul className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pt-1">
+        <ul className="mx-auto grid max-w-lg grid-cols-5 gap-0 px-1 pt-1">
           {NAV.map((item) => {
             const active = value === item.id;
             const Icon = item.icon;
@@ -100,13 +103,25 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
                   type="button"
                   onClick={() => onChange(item.id)}
                   aria-current={active ? "page" : undefined}
-                  className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 rounded-lg px-0.5 py-2 text-[12px] font-semibold leading-tight touch-manipulation ${
+                  className={`toss-press flex min-h-14 w-full flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[11.5px] font-semibold leading-tight touch-manipulation transition-[color,background-color,opacity] duration-200 ${
                     active
-                      ? "bg-[var(--group-bg)] text-[var(--brand)]"
-                      : "text-[var(--ink-muted)]"
+                      ? "text-[var(--toss-blue)]"
+                      : "text-[var(--toss-gray-500)]"
                   }`}
                 >
-                  <Icon className="size-6 shrink-0" aria-hidden />
+                  <span
+                    className={`flex size-8 items-center justify-center rounded-full transition-colors duration-200 ${
+                      active ? "bg-[var(--toss-blue-soft)]" : "bg-transparent"
+                    }`}
+                    aria-hidden
+                  >
+                    <Icon
+                      className={`size-[1.35rem] shrink-0 transition-transform duration-200 ${
+                        active ? "scale-105" : "scale-100"
+                      }`}
+                      strokeWidth={active ? 2.35 : 1.9}
+                    />
+                  </span>
                   <span className="max-w-full truncate leading-none">
                     {item.short}
                   </span>

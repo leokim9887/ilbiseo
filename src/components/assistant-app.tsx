@@ -168,12 +168,13 @@ export function AssistantApp() {
       <InstallHint />
       {sync.toast ? (
         <div
-          className={`fixed left-1/2 top-3 z-50 w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-[15px] shadow-md ${
+          data-status-chip
+          className={`fixed left-1/2 top-3 z-50 w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-[15px] shadow-md max-sm:top-[max(0.75rem,env(safe-area-inset-top))] max-sm:rounded-2xl max-sm:shadow-none ${
             sync.toast.kind === "error"
               ? "border-destructive/30 bg-[var(--sheet)] text-destructive"
               : sync.toast.kind === "info"
                 ? "border-[var(--grid-line)] bg-[var(--sheet)] text-[var(--ink)]"
-                : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)]"
+                : "border-[var(--brand)]/30 bg-[var(--sheet)] text-[var(--brand)] max-sm:border-[var(--toss-blue)]/35 max-sm:text-[var(--toss-blue)]"
           }`}
           role="status"
         >
@@ -181,7 +182,7 @@ export function AssistantApp() {
         </div>
       ) : null}
       {/* Fullscreen-first shell: fill viewport width/height; wide screens use near-full width */}
-      <div className="mx-auto flex w-full max-w-none flex-1 flex-col gap-3 overflow-x-clip px-2 pb-[calc(6.25rem+env(safe-area-inset-bottom))] pt-2 sm:gap-3 sm:px-4 sm:pb-6 sm:pt-3 md:px-5 lg:px-6 xl:max-w-[100rem] 2xl:max-w-[110rem]">
+      <div className="mx-auto flex w-full max-w-none flex-1 flex-col gap-3 overflow-x-clip px-2 pb-[calc(6.25rem+env(safe-area-inset-bottom))] pt-2 max-sm:gap-2.5 sm:gap-3 sm:px-4 sm:pb-6 sm:pt-3 md:px-5 lg:px-6 xl:max-w-[100rem] 2xl:max-w-[110rem]">
         <header className="shrink-0">
           <FamilyBanner
             activeCount={app.allActive.length}

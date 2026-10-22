@@ -20,7 +20,7 @@ export function FamilyBanner({
 }: FamilyBannerProps) {
   return (
     <section
-      className="relative -mx-2 overflow-hidden sm:mx-0 sm:rounded-lg"
+      className="relative -mx-2 overflow-hidden max-sm:rounded-b-[1rem] sm:mx-0 sm:rounded-lg"
       aria-label="가족 응원 배너"
       data-family-banner
     >

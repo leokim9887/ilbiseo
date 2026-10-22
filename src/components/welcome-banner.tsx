@@ -33,8 +33,8 @@ export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
   };
 
   return (
-    <div className="animate-fade-up rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-4 shadow-[0_1px_0_rgba(26,43,54,0.04)] sm:px-6 sm:py-5">
-      <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--brand)]">
+    <div className="animate-fade-up rounded-2xl border border-[var(--grid-line)] bg-[var(--sheet)] px-4 py-4 shadow-[0_1px_0_rgba(26,43,54,0.04)] max-sm:rounded-[1rem] max-sm:shadow-none sm:px-6 sm:py-5">
+      <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-[var(--brand)] max-sm:font-sans max-sm:text-[1.35rem] max-sm:tracking-tight">
         일비서
       </p>
       <p className="mt-2 text-[15px] leading-relaxed text-[var(--ink-muted)]">
@@ -44,7 +44,7 @@ export function WelcomeBanner({ onStart }: WelcomeBannerProps) {
         <Button
           type="button"
           size="lg"
-          className="min-h-12 w-full touch-manipulation sm:min-h-11 sm:w-auto"
+          className="min-h-12 w-full touch-manipulation rounded-xl max-sm:text-[1.02rem] sm:min-h-11 sm:w-auto"
           onClick={close}
         >
           시작하기

@@ -143,8 +143,9 @@ export function SideListSection({
 
   return (
     <section
-      className={`overflow-hidden rounded-sm border ${accent.border} bg-white shadow-sm dark:bg-[#1a221e]`}
+      className={`overflow-hidden rounded-sm border ${accent.border} bg-white shadow-sm max-sm:rounded-[1rem] max-sm:border-[var(--grid-line)] max-sm:shadow-none dark:bg-[#1a221e]`}
       data-side-list={kind}
+      data-side-kind={kind}
       data-side-list-unified="1"
     >
       <div
@@ -230,10 +231,10 @@ export function SideListSection({
                   key={item.id}
                   data-side-item={item.id}
                   data-side-item-selected={checked ? "1" : "0"}
-                  className={`flex flex-col gap-0.5 rounded-sm border px-1.5 py-1 sm:flex-row sm:items-start sm:px-2 ${
+                  className={`flex flex-col gap-0.5 rounded-sm border px-1.5 py-1 max-sm:min-h-11 max-sm:rounded-xl max-sm:px-2 max-sm:py-2 sm:flex-row sm:items-start sm:px-2 ${
                     checked
-                      ? "border-[#217346]/50 bg-[#e8f5ee] dark:border-[#3d8f82]/50 dark:bg-[#1e332d]"
-                      : "border-[#c5ccd2] bg-[#fafbfc] dark:border-[#3a4a42] dark:bg-[#222c27]"
+                      ? "border-[#217346]/50 bg-[#e8f5ee] max-sm:border-[var(--toss-blue)]/40 max-sm:bg-[var(--toss-blue-soft)] dark:border-[#3d8f82]/50 dark:bg-[#1e332d]"
+                      : "border-[#c5ccd2] bg-[#fafbfc] max-sm:border-[var(--grid-line)] max-sm:bg-[var(--sheet)] dark:border-[#3a4a42] dark:bg-[#222c27]"
                   }`}
                 >
                   <div

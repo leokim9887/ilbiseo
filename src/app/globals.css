@@ -96,6 +96,15 @@
   --accent-spot: #b86b2c;
   --accent-ongoing: #1a4d45;
   --accent-someday: #5a635e;
+
+  /* Toss-leaning accent (mobile overrides use these) */
+  --toss-blue: #3182f6;
+  --toss-blue-soft: #e8f3ff;
+  --toss-gray-100: #f2f4f6;
+  --toss-gray-200: #e5e8eb;
+  --toss-gray-500: #8b95a1;
+  --toss-gray-700: #4e5968;
+  --toss-gray-900: #191f28;
 }
 
 /* Dark — deep teal/stone, same brand family (not purple) */
@@ -143,6 +152,214 @@
   --accent-spot: #d4924a;
   --accent-ongoing: #3d8f82;
   --accent-someday: #8a9490;
+
+  --toss-blue: #3182f6;
+  --toss-blue-soft: #1a2a3d;
+  --toss-gray-100: #17171c;
+  --toss-gray-200: #2c2c34;
+  --toss-gray-500: #8b95a1;
+  --toss-gray-700: #b0b8c1;
+  --toss-gray-900: #f2f4f6;
+}
+
+/*
+ * Phone-only Toss-leaning surfaces (max-width: 639px = Tailwind `sm` breakpoint).
+ * Desktop (≥640px) keeps the existing warm teal/stone chrome unchanged.
+ */
+@media (max-width: 639px) {
+  :root {
+    --background: #f2f4f6;
+    --foreground: #191f28;
+    --card: #ffffff;
+    --card-foreground: #191f28;
+    --popover: #ffffff;
+    --popover-foreground: #191f28;
+    --primary: #3182f6;
+    --primary-foreground: #ffffff;
+    --secondary: #e5e8eb;
+    --secondary-foreground: #191f28;
+    --muted: #f2f4f6;
+    --muted-foreground: #4e5968;
+    --accent: #e8f3ff;
+    --accent-foreground: #1b64da;
+    --border: #e5e8eb;
+    --input: #e5e8eb;
+    --ring: #3182f6;
+    --radius: 0.75rem;
+
+    --brand: #191f28;
+    --ink: #191f28;
+    --ink-muted: #4e5968;
+    --sheet: #ffffff;
+    --sheet-header: #f9fafb;
+    --grid-line: #e5e8eb;
+    --row-hover: #f2f4f6;
+    --group-bg: #e8f3ff;
+    --accent-spot: #3182f6;
+    --accent-ongoing: #3182f6;
+    --accent-someday: #8b95a1;
+  }
+
+  .dark {
+    --background: #17171c;
+    --foreground: #f2f4f6;
+    --card: #212529;
+    --card-foreground: #f2f4f6;
+    --popover: #2c2c34;
+    --popover-foreground: #f2f4f6;
+    --primary: #3182f6;
+    --primary-foreground: #ffffff;
+    --secondary: #2c2c34;
+    --secondary-foreground: #f2f4f6;
+    --muted: #212529;
+    --muted-foreground: #b0b8c1;
+    --accent: #1a2a3d;
+    --accent-foreground: #a8cfff;
+    --border: #3a3a44;
+    --input: #3a3a44;
+    --ring: #3182f6;
+
+    --brand: #f2f4f6;
+    --ink: #f2f4f6;
+    --ink-muted: #b0b8c1;
+    --sheet: #212529;
+    --sheet-header: #2c2c34;
+    --grid-line: #3a3a44;
+    --row-hover: #2c2c34;
+    --group-bg: #1a2a3d;
+    --accent-spot: #4d9fff;
+    --accent-ongoing: #4d9fff;
+    --accent-someday: #8b95a1;
+  }
+
+  body {
+    background-image: none;
+    background-color: var(--background);
+  }
+
+  .dark body {
+    background-image: none;
+    background-color: var(--background);
+  }
+
+  /* Soft hairline panels — no multi-shadow “AI cards” */
+  [data-panel-shell],
+  [data-side-kind],
+  [data-device-sync],
+  .excel-wb {
+    box-shadow: none !important;
+  }
+
+  [data-panel-shell] {
+    border-radius: 1rem;
+    border-color: var(--grid-line);
+  }
+
+  /* Comfortable tap feedback */
+  .toss-press:active,
+  nav[aria-label="주요 메뉴"] button:active,
+  [data-side-item]:active {
+    opacity: 0.72;
+  }
+
+  /* Tab / view switch — calm fade-up (already keyed on view) */
+  .animate-sheet-in {
+    animation: toss-view-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Dialog → bottom sheet feel on phone */
+  [data-slot="dialog-content"] {
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    translate: none !important;
+    transform: none !important;
+    border-radius: 1.25rem 1.25rem 0 0 !important;
+    padding: 1.25rem 1.15rem calc(1.15rem + env(safe-area-inset-bottom));
+    border: 1px solid var(--grid-line);
+    border-bottom: none;
+    box-shadow: 0 -8px 32px rgba(25, 31, 40, 0.08);
+    animation: toss-sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .dark [data-slot="dialog-content"] {
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
+  }
+
+  [data-slot="dialog-footer"] {
+    border-radius: 0;
+    margin-left: -1.15rem;
+    margin-right: -1.15rem;
+    margin-bottom: calc(-1.15rem - env(safe-area-inset-bottom));
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  /* Sheet bottoms already slide; keep soft overlay */
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"] {
+    background: rgba(25, 31, 40, 0.45) !important;
+  }
+
+  /* Sync / status chips — less cramped */
+  [data-sync-chip],
+  [data-status-chip] {
+    min-height: 2.75rem;
+    border-radius: 0.75rem;
+  }
+
+  /* Cheer CTA — Toss blue primary on phone */
+  [data-daily-cheer-confirm] {
+    background-color: var(--toss-blue) !important;
+    color: #fff !important;
+    border-radius: 0.875rem !important;
+    box-shadow: none !important;
+  }
+
+  [data-daily-cheer-confirm]:hover {
+    background-color: #1b64da !important;
+  }
+
+  /* Excel toolbar: soft gray sections (keep cell green for Excel fidelity) */
+  .excel-wb > div:first-child {
+    background: linear-gradient(to bottom, #f9fafb, #f2f4f6) !important;
+    border-color: var(--grid-line) !important;
+  }
+
+  .dark .excel-wb > div:first-child {
+    background: linear-gradient(to bottom, #2c2c34, #212529) !important;
+  }
+}
+
+@keyframes toss-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toss-sheet-up {
+  from {
+    opacity: 0.6;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 639px) and (prefers-reduced-motion: reduce) {
+  .animate-sheet-in,
+  [data-slot="dialog-content"] {
+    animation: none !important;
+  }
 }
 
 @layer base {

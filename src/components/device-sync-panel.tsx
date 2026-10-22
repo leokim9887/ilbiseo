@@ -83,9 +83,12 @@ export function DeviceSyncPanel({
   };
 
   return (
-    <div className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4">
+    <div
+      data-device-sync
+      className="rounded-xl border border-[var(--grid-line)] bg-[var(--sheet-header)]/60 px-4 py-4 max-sm:rounded-[1rem] max-sm:bg-[var(--sheet)]"
+    >
       <div className="flex items-start gap-3">
-        <Smartphone className="mt-0.5 size-5 shrink-0 text-[var(--brand)]" />
+        <Smartphone className="mt-0.5 size-5 shrink-0 text-[var(--brand)] max-sm:text-[var(--toss-blue)]" />
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <p className="text-[15px] font-semibold text-[var(--ink)]">

@@ -139,7 +139,7 @@ export function DailyCheerOverlay() {
 
   return (
     <div
-      className="cheer-backdrop fixed inset-0 z-[80] flex items-center justify-center px-3 sm:px-6"
+      className="cheer-backdrop fixed inset-0 z-[80] flex items-end justify-center px-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:items-center sm:px-6 sm:pb-6"
       role="dialog"
       aria-modal="true"
       aria-label="에이스 응원"
@@ -194,7 +194,7 @@ export function DailyCheerOverlay() {
         <Button
           type="button"
           size="lg"
-          className="cheer-cta mt-4 min-h-12 w-[min(100%,15rem)] touch-manipulation rounded-full text-[1.08rem] font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] sm:mt-5 sm:min-h-11"
+          className="cheer-cta mt-4 min-h-12 w-[min(100%,15rem)] touch-manipulation rounded-full text-[1.08rem] font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] max-sm:min-h-14 max-sm:rounded-xl max-sm:shadow-none sm:mt-5 sm:min-h-11"
           onClick={dismiss}
           data-daily-cheer-confirm
         >

@@ -3,68 +3,62 @@ import fs from "fs";
 import path from "path";
 
 /**
- * 일비서 own-brand icons — sage teal + champagne gold (product DNA).
- * Not Toss blue / Kakao yellow / Notion mono.
+ * 일비서 icon — refined layout of the classic mark:
+ * dark teal field · white rounded card · 3 list lines (dark / tan / dark).
+ * Layout polish only; same identity as media/ilbiseo-icon-reference.png
  */
-const SAGE = "#163F39";
-const SAGE_MID = "#1A4D45";
-const GOLD = "#C9B27C";
-const CREAM = "#FFFCF8";
-const INK_LINE = "#1A4D45";
+const FIELD = "#0B5058"; // classic teal from prior icon DNA
+const CARD = "#F4F7F8";
+const LINE_DARK = "#0B5058";
+const LINE_ACCENT = "#D4B896"; // muted tan middle line
 
 const OUT = path.join(process.cwd(), "public", "icons");
-const SRC_DIR = path.join(OUT, "source");
+const SRC = path.join(OUT, "source");
 fs.mkdirSync(OUT, { recursive: true });
-fs.mkdirSync(SRC_DIR, { recursive: true });
+fs.mkdirSync(SRC, { recursive: true });
 
-/** Full mark: cream note card + gold check + two sage lines */
+/**
+ * viewBox 0–100. Optical centering: card nudged ~0.6 up.
+ * Tiny: slightly larger card + thicker bars for 16px clarity.
+ */
 function iconSvg(size, { maskable = false, tiny = false } = {}) {
-  const s = size;
-  const inset = maskable ? s * 0.18 : 0;
-  // Card geometry in 0–100 viewBox units then scale
   const vb = 100;
-  const scale = s / vb;
-  // Card
-  const cx = 50;
-  const cy = maskable ? 50 : 50;
-  const cardW = tiny ? 58 : 54;
-  const cardH = tiny ? 64 : 60;
-  const cardX = cx - cardW / 2;
-  const cardY = cy - cardH / 2;
-  const r = tiny ? 10 : 12;
+  // Card footprint — polished padding (~21% margin → card ~58%)
+  const cardW = tiny ? 62 : 56;
+  const cardH = tiny ? 68 : 62;
+  const cardX = (vb - cardW) / 2;
+  // Optical vertical center (cards read low if dead-centered)
+  const cardY = (vb - cardH) / 2 - (tiny ? 0.4 : 0.8);
+  const cardR = tiny ? 14 : 13.5;
 
-  const checkCx = cardX + (tiny ? 14 : 13);
-  const checkCy = cardY + (tiny ? 20 : 18);
-  const checkR = tiny ? 8 : 7.5;
+  // Three bars — equal length, pill ends, even rhythm
+  const barW = cardW * (tiny ? 0.58 : 0.55);
+  const barH = tiny ? 5.8 : 5.2;
+  const barR = barH / 2;
+  const barX = cardX + (cardW - barW) / 2;
+  // Vertical stack: gap ≈ barH * 1.05 for breathability
+  const gap = barH * 1.08;
+  const stackH = barH * 3 + gap * 2;
+  const stackTop = cardY + (cardH - stackH) / 2 + 0.3;
 
-  const line1X = checkCx + checkR + (tiny ? 5 : 6);
-  const line1Y = checkCy;
-  const line2Y = checkCy + (tiny ? 16 : 15);
-  const lineW = cardX + cardW - line1X - (tiny ? 10 : 9);
+  const bars = [0, 1, 2].map((i) => {
+    const y = stackTop + i * (barH + gap);
+    const fill = i === 1 ? LINE_ACCENT : LINE_DARK;
+    return `<rect x="${barX.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${barH.toFixed(2)}" rx="${barR.toFixed(2)}" fill="${fill}"/>`;
+  });
+
+  // Maskable: keep same art but field-only outside safe zone already via smaller card
+  const cardScale = maskable ? 0.92 : 1;
+  const ox = maskable ? (vb - vb * cardScale) / 2 : 0;
+  const oy = maskable ? (vb - vb * cardScale) / 2 : 0;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 ${vb} ${vb}">
-  <rect width="${vb}" height="${vb}" fill="${SAGE}"/>
-  ${
-    maskable
-      ? ""
-      : ""
-  }
-  <!-- cream task card -->
-  <rect x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}" rx="${r}" ry="${r}" fill="${CREAM}"/>
-  <!-- gold check circle -->
-  <circle cx="${checkCx}" cy="${checkCy}" r="${checkR}" fill="${GOLD}"/>
-  <path d="M${checkCx - 3.2} ${checkCy + 0.3} L${checkCx - 0.8} ${checkCy + 2.8} L${checkCx + 3.5} ${checkCy - 2.6}"
-    fill="none" stroke="${SAGE}" stroke-width="${tiny ? 2.4 : 2.2}" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- task lines -->
-  <rect x="${line1X}" y="${line1Y - 1.6}" width="${lineW}" height="${tiny ? 3.2 : 3}" rx="1.5" fill="${INK_LINE}" opacity="0.85"/>
-  <rect x="${checkCx - checkR}" y="${line2Y - 1.6}" width="${lineW + checkR * 2 + (tiny ? 5 : 6)}" height="${tiny ? 3.2 : 3}" rx="1.5" fill="${INK_LINE}" opacity="0.45"/>
-  ${
-    tiny
-      ? ""
-      : `<!-- third quiet line -->
-  <rect x="${checkCx - checkR}" y="${line2Y + 12}" width="${lineW * 0.72 + checkR * 2}" height="2.6" rx="1.3" fill="${INK_LINE}" opacity="0.28"/>`
-  }
+<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${vb} ${vb}">
+  <rect width="${vb}" height="${vb}" fill="${FIELD}"/>
+  <g transform="${maskable ? `translate(${ox},${oy}) scale(${cardScale})` : ""}">
+    <rect x="${cardX.toFixed(2)}" y="${cardY.toFixed(2)}" width="${cardW}" height="${cardH}" rx="${cardR}" ry="${cardR}" fill="${CARD}"/>
+    ${bars.join("\n    ")}
+  </g>
 </svg>`;
 }
 
@@ -112,73 +106,97 @@ function buildIco(images) {
 }
 
 async function buildPreview(outPath, files) {
-  const W = 1200;
-  const H = 700;
-  const bg = "#EBE6DF";
+  const W = 1280;
+  const H = 720;
+  const bg = "#E8EEF0";
   const cells = [
-    { label: "1024", file: files.master, size: 220 },
-    { label: "512", file: files.s512, size: 160 },
-    { label: "maskable", file: files.mask, size: 160 },
-    { label: "192", file: files.s192, size: 120 },
-    { label: "180 apple", file: files.s180, size: 110 },
+    { label: "1024", file: files.master, size: 200 },
+    { label: "512", file: files.s512, size: 140 },
+    { label: "maskable", file: files.mask, size: 140 },
+    { label: "192", file: files.s192, size: 110 },
+    { label: "180", file: files.s180, size: 100 },
     { label: "48", file: files.s48, size: 48 },
     { label: "32", file: files.s32, size: 32 },
     { label: "16", file: files.s16, size: 16 },
   ];
   const parts = [];
-  let x = 48;
-  let y = 100;
+  let x = 40;
+  let y = 120;
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i];
     if (i === 5) {
-      x = 48;
-      y = 380;
+      x = 40;
+      y = 400;
     }
     const img = await sharp(c.file).resize(c.size, c.size).png().toBuffer();
-    const cardW = Math.max(c.size + 40, 100);
-    const cardH = c.size + 70;
+    const cardW = Math.max(c.size + 36, 96);
+    const cardH = c.size + 64;
     const card = await sharp({
       create: {
         width: cardW,
         height: cardH,
         channels: 4,
-        background: "#FFFCF8",
+        background: "#FFFFFF",
       },
     })
       .png()
       .toBuffer();
     const labelSvg = Buffer.from(`<?xml version="1.0"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${cardW}" height="28">
-  <text x="50%" y="20" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#454D48">${c.label}</text>
+  <text x="50%" y="20" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#5A6A6E">${c.label}</text>
 </svg>`);
     const cell = await sharp(card)
       .composite([
         {
           input: img,
           left: Math.round((cardW - c.size) / 2),
-          top: 16,
+          top: 14,
         },
         {
           input: await sharp(labelSvg).png().toBuffer(),
           left: 0,
-          top: cardH - 32,
+          top: cardH - 30,
         },
       ])
       .png()
       .toBuffer();
     parts.push({ input: cell, left: x, top: y });
-    x += cardW + 28;
+    x += cardW + 24;
   }
-  const title = Buffer.from(`<?xml version="1.0"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="70">
-  <text x="48" y="44" font-family="sans-serif" font-size="26" font-weight="700" fill="#163F39">일비서 app icon</text>
-  <text x="300" y="44" font-family="sans-serif" font-size="15" fill="#6B736C">sage #163F39 · cream · gold #C9B27C</text>
+
+  // Optional before/after strip at top-right
+  let beforeAfter = [];
+  const refPath = "/cursor/stores/self/media/ilbiseo-icon-reference.png";
+  if (fs.existsSync(refPath)) {
+    const before = await sharp(refPath)
+      .resize(72, 72, { kernel: sharp.kernel.nearest })
+      .png()
+      .toBuffer();
+    const after = await sharp(files.s192).resize(72, 72).png().toBuffer();
+    const baSvg = Buffer.from(`<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="100">
+  <text x="36" y="14" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5A6A6E">before</text>
+  <text x="140" y="14" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#5A6A6E">after</text>
 </svg>`);
+    beforeAfter = [
+      { input: await sharp(baSvg).png().toBuffer(), left: 980, top: 18 },
+      { input: before, left: 1000, top: 36 },
+      { input: after, left: 1104, top: 36 },
+    ];
+  }
+
+  const title = Buffer.from(`<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="80">
+  <text x="40" y="42" font-family="sans-serif" font-size="26" font-weight="700" fill="#0B5058">일비서 icon · layout refine</text>
+  <text x="40" y="66" font-family="sans-serif" font-size="14" fill="#6B7A7E">teal field · white card · 3 lines (dark / tan / dark)</text>
+</svg>`);
+
   await sharp({
     create: { width: W, height: H, channels: 3, background: bg },
   })
     .composite([
-      { input: await sharp(title).png().toBuffer(), left: 0, top: 10 },
+      { input: await sharp(title).png().toBuffer(), left: 0, top: 8 },
+      ...beforeAfter,
       ...parts,
     ])
     .png()
@@ -187,10 +205,9 @@ async function buildPreview(outPath, files) {
 }
 
 async function main() {
-  const masterSvg = iconSvg(1024);
-  const masterPath = path.join(SRC_DIR, "ilbiseo-icon-1024.png");
-  await raster(masterSvg, masterPath, 1024);
-  fs.writeFileSync(path.join(SRC_DIR, "ilbiseo-icon.svg"), iconSvg(512));
+  const masterPath = path.join(SRC, "ilbiseo-icon-1024.png");
+  await raster(iconSvg(1024), masterPath, 1024);
+  fs.writeFileSync(path.join(SRC, "ilbiseo-icon.svg"), iconSvg(512));
 
   await raster(iconSvg(512), path.join(OUT, "icon-512.png"), 512);
   await raster(iconSvg(192), path.join(OUT, "icon-192.png"), 192);
@@ -200,7 +217,6 @@ async function main() {
     path.join(OUT, "maskable-512.png"),
     512,
   );
-
   await raster(iconSvg(48, { tiny: true }), path.join(OUT, "icon-48.png"), 48);
   await raster(
     iconSvg(32, { tiny: true }),
@@ -229,7 +245,6 @@ async function main() {
   ]);
   fs.writeFileSync(path.join(OUT, "favicon.ico"), ico);
   fs.writeFileSync(path.join(process.cwd(), "public", "favicon.ico"), ico);
-  console.log("wrote favicon.ico");
 
   await buildPreview("/cursor/stores/self/media/ilbiseo-icon-preview.png", {
     master: masterPath,

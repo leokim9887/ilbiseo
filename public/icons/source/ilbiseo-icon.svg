@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#3182F6"/>
+  <text
+    x="50%"
+    y="279.76"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="Apple SD Gothic Neo, Noto Sans KR, Malgun Gothic, Pretendard, sans-serif"
+    font-size="297"
+    font-weight="700"
+    fill="#FFFFFF"
+    letter-spacing="-0.04em"
+  >일</text>
+  <!-- tiny check accent: readable at 32+, fades into 일 at 16 -->
+  <g transform="translate(348.16, 337.92) scale(1)">
+    <circle cx="0" cy="0" r="48" fill="#FFFFFF"/>
+    <path d="M-22 2 L-6 18 L24 -16" fill="none" stroke="#3182F6" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

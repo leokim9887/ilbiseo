@@ -10,8 +10,8 @@
   "display": "standalone",
   "display_override": ["standalone", "fullscreen", "minimal-ui", "browser"],
   "orientation": "any",
-  "background_color": "#F2F4F6",
-  "theme_color": "#3182F6",
+  "background_color": "#ebe6df",
+  "theme_color": "#163f39",
   "categories": ["productivity", "utilities"],
   "prefer_related_applications": false,
   "icons": [

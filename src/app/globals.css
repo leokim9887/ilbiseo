@@ -1014,6 +1014,12 @@
   .cheer-cta {
     animation: none !important;
   }
+
+  /* Scroll-to-top: no spring scale/fade travel */
+  .scroll-to-top-btn {
+    transition: opacity 0.15s ease !important;
+    transform: none !important;
+  }
 }
 
 /* Excel workbook cell controls — readable + father-friendly density */

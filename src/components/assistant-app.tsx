@@ -17,6 +17,7 @@ import { AppNav, type MainView } from "@/components/app-nav";
 import { PanelShell } from "@/components/panel-shell";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ScrollToTop } from "@/components/scroll-to-top";
 import { Button } from "@/components/ui/button";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import {
@@ -160,6 +161,7 @@ export function AssistantApp() {
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
       <DailyCheerOverlay />
+      <ScrollToTop />
       <PullToRefreshIndicator
         pullPx={pullPx}
         refreshing={refreshing}

@@ -1014,11 +1014,241 @@
   .cheer-cta {
     animation: none !important;
   }
+}
 
-  /* Scroll-to-top: no spring scale/fade travel */
+/*
+ * Scroll-to-top — dedicated 일비서 teal (NOT --brand/--primary).
+ * Toss shell remaps --brand → #f2f4f6 in .dark, which made a pale disc
+ * with a near-invisible white chevron. These tokens stay teal in all shells.
+ */
+:root {
+  --scroll-top-teal: #163f39;
+  --scroll-top-teal-mid: #1a4d45;
+  --scroll-top-ink: #f4faf8;
+  --scroll-top-cream: #fffcf8;
+  /* ~72% teal — glass without looking washed out */
+  --scroll-top-fill: color-mix(in srgb, var(--scroll-top-teal) 72%, transparent);
+  --scroll-top-border: color-mix(
+    in srgb,
+    var(--scroll-top-cream) 42%,
+    var(--scroll-top-teal)
+  );
+  --scroll-top-ring: color-mix(in srgb, var(--scroll-top-cream) 22%, transparent);
+  --scroll-top-shadow: 0 8px 22px rgba(22, 63, 57, 0.3);
+}
+
+.dark {
+  /* Rich teal glass — not pale gray (Toss --brand trap) */
+  --scroll-top-teal: #1f5c52;
+  --scroll-top-teal-mid: #3d9a88;
+  --scroll-top-ink: #f7fffc;
+  --scroll-top-cream: #c8efe4;
+  --scroll-top-fill: color-mix(in srgb, #176055 78%, transparent);
+  --scroll-top-border: color-mix(in srgb, #5ec4ae 55%, #0d2e29);
+  --scroll-top-ring: color-mix(in srgb, #3d9a88 32%, transparent);
+  --scroll-top-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes scroll-top-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.72);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes scroll-top-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--scroll-top-ring),
+      inset 0 1px 0 color-mix(in srgb, var(--scroll-top-cream) 35%, transparent),
+      var(--scroll-top-shadow);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--scroll-top-teal-mid) 36%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--scroll-top-cream) 45%, transparent),
+      0 12px 28px rgba(22, 63, 57, 0.34);
+  }
+}
+
+@keyframes scroll-top-sheen {
+  0% {
+    transform: translateX(-120%) rotate(18deg);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.55;
+  }
+  55% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateX(140%) rotate(18deg);
+    opacity: 0;
+  }
+}
+
+.scroll-to-top-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.05rem;
+  height: 3.05rem;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 9999px;
+  border: 1.5px solid var(--scroll-top-border);
+  background-color: var(--scroll-top-fill);
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--scroll-top-cream) 22%, transparent) 0%,
+    transparent 42%,
+    color-mix(in srgb, #000 18%, transparent) 100%
+  );
+  color: var(--scroll-top-ink);
+  backdrop-filter: blur(16px) saturate(1.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  box-shadow:
+    0 0 0 2px var(--scroll-top-ring),
+    inset 0 1px 0 color-mix(in srgb, var(--scroll-top-cream) 35%, transparent),
+    var(--scroll-top-shadow);
+  outline: none;
+  touch-action: manipulation;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px) scale(0.88);
+  pointer-events: none;
+  transition:
+    opacity 0.28s cubic-bezier(0.34, 1.45, 0.64, 1),
+    transform 0.32s cubic-bezier(0.34, 1.45, 0.64, 1),
+    box-shadow 0.28s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .scroll-to-top-btn {
+    width: 3.15rem;
+    height: 3.15rem;
+  }
+}
+
+.scroll-to-top-btn[data-visible="1"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  /* no fill-mode on enter — frees transform for hover after pop */
+  animation:
+    scroll-top-in 0.48s cubic-bezier(0.34, 1.45, 0.64, 1),
+    scroll-top-pulse 2.8s ease-in-out 0.55s infinite;
+}
+
+.scroll-to-top-btn:hover {
+  background-color: color-mix(in srgb, var(--scroll-top-teal) 84%, transparent);
+  transform: translateY(-3px) scale(1.1);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--scroll-top-cream) 40%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--scroll-top-cream) 50%, transparent),
+    0 16px 36px rgba(22, 63, 57, 0.38);
+}
+
+.dark .scroll-to-top-btn:hover {
+  background-color: color-mix(in srgb, #1f6b5c 86%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--scroll-top-teal-mid) 48%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #9fd9cc 40%, transparent),
+    0 16px 38px rgba(0, 0, 0, 0.6);
+}
+
+.scroll-to-top-btn:active {
+  transform: translateY(2px) scale(0.88);
+  transition-duration: 0.1s;
+}
+
+.scroll-to-top-btn:focus-visible {
+  box-shadow:
+    0 0 0 3px var(--scroll-top-ring),
+    0 0 0 6px color-mix(in srgb, var(--scroll-top-teal-mid) 45%, transparent),
+    var(--scroll-top-shadow);
+}
+
+.scroll-to-top-icon {
+  position: relative;
+  z-index: 1;
+  width: 1.55rem;
+  height: 1.55rem;
+  color: var(--scroll-top-ink);
+  stroke: var(--scroll-top-ink);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .scroll-to-top-icon {
+    width: 1.65rem;
+    height: 1.65rem;
+  }
+}
+
+.dark .scroll-to-top-icon {
+  color: #f7fffc;
+  stroke: #f7fffc;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
+}
+
+/* Soft diagonal sheen while visible */
+.scroll-to-top-sheen {
+  pointer-events: none;
+  position: absolute;
+  inset: -20% -40%;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    color-mix(in srgb, var(--scroll-top-cream) 45%, transparent) 50%,
+    transparent 65%
+  );
+  opacity: 0;
+}
+
+.scroll-to-top-btn[data-visible="1"] .scroll-to-top-sheen {
+  animation: scroll-top-sheen 2.6s ease-in-out 0.7s infinite;
+}
+
+.dark .scroll-to-top-sheen {
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    color-mix(in srgb, #9fd9cc 40%, transparent) 50%,
+    transparent 65%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
   .scroll-to-top-btn {
     transition: opacity 0.15s ease !important;
     transform: none !important;
+    animation: none !important;
+  }
+  .scroll-to-top-btn[data-visible="1"] {
+    transform: none !important;
+  }
+  .scroll-to-top-btn:hover,
+  .scroll-to-top-btn:active {
+    transform: none !important;
+  }
+  .scroll-to-top-sheen {
+    animation: none !important;
+    opacity: 0 !important;
   }
 }
 

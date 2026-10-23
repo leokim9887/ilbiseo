@@ -12,7 +12,7 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Floating “맨 위로” — teal brand, above mobile tab bar.
+ * Floating “맨 위로” — 일비서 teal glass (not Toss --brand, which flips pale in dark).
  * Appears past SHOW_AFTER_PX; one tap scrolls to top (instant if reduced motion).
  */
 export function ScrollToTop() {
@@ -57,22 +57,16 @@ export function ScrollToTop() {
       <button
         type="button"
         data-scroll-to-top
+        data-visible={visible ? "1" : "0"}
         aria-label="맨 위로"
         title="맨 위로"
         tabIndex={visible ? 0 : -1}
         aria-hidden={!visible}
         onClick={scrollTop}
-        className={`scroll-to-top-btn flex size-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--sheet)_70%,var(--brand))] bg-[var(--brand)] text-[var(--primary-foreground)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--sheet)_82%,transparent),0_8px_24px_rgba(22,63,57,0.28)] outline-none touch-manipulation transition-[opacity,transform,box-shadow] duration-300 ease-[cubic-bezier(0.34,1.45,0.64,1)] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--sheet)_90%,transparent),0_10px_28px_rgba(22,63,57,0.34)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] active:scale-[0.94] sm:size-[3.15rem] dark:border-[color-mix(in_srgb,var(--brand)_45%,var(--sheet))] dark:shadow-[0_0_0_3px_rgba(26,34,30,0.65),0_8px_28px_rgba(0,0,0,0.45)] ${
-          visible
-            ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
-            : "pointer-events-none translate-y-2 scale-90 opacity-0"
-        }`}
+        className="scroll-to-top-btn"
       >
-        <ChevronUp
-          className="size-[1.35rem] sm:size-6"
-          strokeWidth={2.4}
-          aria-hidden
-        />
+        <span className="scroll-to-top-sheen" aria-hidden />
+        <ChevronUp className="scroll-to-top-icon" strokeWidth={3} aria-hidden />
       </button>
     </div>
   );

@@ -9,11 +9,16 @@ const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
 const IDX_KEY = "ilbiseo-daily-cheer-idx";
 
 /**
- * QA / TEMP toggle for Ace daily cheer (keep `false` in production).
+ * TEMPORARY QA FLAG — cotton candy verification (mobile center placement).
+ * Currently `true` so cheer shows on EVERY refresh/load.
+ *
+ * REVERT AFTER USER CONFIRMS: set back to `false` so production returns to
+ * once-daily via cheerDayIsoKst() + localStorage (07:00 Asia/Seoul boundary).
+ *
  * `true`  → show overlay on every page refresh/load (ignore 07:00 KST day gate).
  * `false` → once per cheer day via `cheerDayIsoKst()` + localStorage (07:00 Asia/Seoul).
  */
-const FORCE_CHEER_EVERY_LOAD = false;
+const FORCE_CHEER_EVERY_LOAD = true;
 
 /** Father-friendly rotating pool — Ace cheering grandpa. */
 export const CHEER_MESSAGES = [
@@ -89,8 +94,10 @@ function writeShownDay(day: string) {
 
 /**
  * Ace cheer overlay — Ace face dominates; cheer copy floats over the real photo.
+ * Placement: viewport-centered (items-center + justify-center) on all breakpoints,
+ * including phone (`max-width: 639px` / Tailwind default below `sm`).
  * Once per cheer day: Asia/Seoul day boundary at 07:00 (not midnight).
- * Optional QA: set FORCE_CHEER_EVERY_LOAD = true to show on every refresh.
+ * TEMP QA: FORCE_CHEER_EVERY_LOAD is currently true — revert to false after confirm.
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);
@@ -139,7 +146,7 @@ export function DailyCheerOverlay() {
 
   return (
     <div
-      className="cheer-backdrop fixed inset-0 z-[80] flex items-end justify-center px-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:items-center sm:px-6 sm:pb-6"
+      className="cheer-backdrop fixed inset-0 z-[80] flex items-center justify-center px-3 py-[max(1rem,env(safe-area-inset-top),env(safe-area-inset-bottom))] sm:px-6 sm:py-6"
       role="dialog"
       aria-modal="true"
       aria-label="에이스 응원"

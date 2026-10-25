@@ -93,9 +93,10 @@ function writeShownDay(day: string) {
 }
 
 /**
- * Ace cheer overlay — Ace face dominates; cheer copy floats over the real photo.
- * Placement: viewport-centered (items-center + justify-center) on all breakpoints,
- * including phone (`max-width: 639px` / Tailwind default below `sm`).
+ * Ace cheer overlay — Ace face dominates; cheer copy sits BELOW the circular face
+ * with a reserved gap (never overlaid on cheeks/eyes).
+ * Placement: viewport-centered stage (items-center + justify-center), including phone
+ * (`max-width: 639px` / Tailwind default below `sm`).
  * Once per cheer day: Asia/Seoul day boundary at 07:00 (not midnight).
  * TEMP QA: FORCE_CHEER_EVERY_LOAD is currently true — revert to false after confirm.
  */
@@ -153,7 +154,7 @@ export function DailyCheerOverlay() {
       data-daily-cheer
       onClick={dismiss}
     >
-      {/* Portrait stage — Ace fills most of the surface; no dialog chrome */}
+      {/* Portrait stage — Ace face + reserved text lane below (no face overlap) */}
       <div
         className="cheer-stage relative flex w-[min(94vw,24rem)] flex-col items-center sm:w-[min(86vmin,36rem)]"
         onClick={(e) => e.stopPropagation()}
@@ -162,7 +163,7 @@ export function DailyCheerOverlay() {
           {/* Warm ambient light behind Ace */}
           <div className="cheer-glow pointer-events-none absolute inset-[-10%] rounded-full" aria-hidden />
 
-          {/* Soft circular frame — real Ace pixels, soft vignette edge */}
+          {/* Soft circular frame — real Ace pixels only; no text overlaid */}
           <div className="cheer-face-frame absolute inset-0 overflow-hidden rounded-full shadow-[0_28px_72px_rgba(0,0,0,0.5)]">
             <div className="cheer-face-alive absolute inset-0">
               <Image
@@ -186,22 +187,22 @@ export function DailyCheerOverlay() {
               aria-hidden
             />
           </div>
+        </div>
 
-          {/* Cheer copy floats over Ace chest / lower face */}
-          <div
-            className="cheer-bubble absolute inset-x-[7%] bottom-[15%] z-10 sm:inset-x-[10%] sm:bottom-[16%]"
-            data-daily-cheer-bubble
-          >
-            <p className="rounded-[1.25rem] bg-[rgba(10,22,20,0.74)] px-4 py-3 text-center font-sans text-[1.08rem] font-semibold leading-snug text-[#f7f3ea] shadow-[0_10px_28px_rgba(0,0,0,0.38)] backdrop-blur-[6px] ring-1 ring-[#c9b27c]/40 sm:px-5 sm:py-3.5 sm:text-[1.22rem]">
-              {message}
-            </p>
-          </div>
+        {/* Cheer copy BELOW the face — reserved gap so Korean lines never sit on cheeks/eyes */}
+        <div
+          className="cheer-bubble relative z-10 mt-5 w-full px-1 sm:mt-6 sm:px-2"
+          data-daily-cheer-bubble
+        >
+          <p className="rounded-[1.25rem] bg-[rgba(10,22,20,0.82)] px-4 py-3 text-center font-sans text-[1.08rem] font-semibold leading-snug text-[#f7f3ea] shadow-[0_10px_28px_rgba(0,0,0,0.38)] backdrop-blur-[6px] ring-1 ring-[#c9b27c]/40 sm:px-5 sm:py-3.5 sm:text-[1.22rem]">
+            {message}
+          </p>
         </div>
 
         <Button
           type="button"
           size="lg"
-          className="cheer-cta mt-4 min-h-12 w-[min(100%,15rem)] touch-manipulation rounded-full text-[1.08rem] font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] max-sm:min-h-14 max-sm:rounded-xl max-sm:shadow-none sm:mt-5 sm:min-h-11"
+          className="cheer-cta mt-3.5 min-h-12 w-[min(100%,15rem)] touch-manipulation rounded-full text-[1.08rem] font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] max-sm:min-h-14 max-sm:rounded-xl max-sm:shadow-none sm:mt-4 sm:min-h-11"
           onClick={dismiss}
           data-daily-cheer-confirm
         >

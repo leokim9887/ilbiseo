@@ -9,16 +9,13 @@ const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
 const IDX_KEY = "ilbiseo-daily-cheer-idx";
 
 /**
- * TEMPORARY QA FLAG — cotton candy verification (mobile center placement).
- * Currently `true` so cheer shows on EVERY refresh/load.
- *
- * REVERT AFTER USER CONFIRMS: set back to `false` so production returns to
- * once-daily via cheerDayIsoKst() + localStorage (07:00 Asia/Seoul boundary).
+ * QA toggle for Ace daily cheer (keep `false` in production).
+ * User confirmed layout — TEMP every-load ended; once-daily gate restored.
  *
  * `true`  → show overlay on every page refresh/load (ignore 07:00 KST day gate).
  * `false` → once per cheer day via `cheerDayIsoKst()` + localStorage (07:00 Asia/Seoul).
  */
-const FORCE_CHEER_EVERY_LOAD = true;
+const FORCE_CHEER_EVERY_LOAD = false;
 
 /** Father-friendly rotating pool — Ace cheering grandpa. */
 export const CHEER_MESSAGES = [
@@ -98,7 +95,7 @@ function writeShownDay(day: string) {
  * Placement: viewport-centered stage (items-center + justify-center), including phone
  * (`max-width: 639px` / Tailwind default below `sm`).
  * Once per cheer day: Asia/Seoul day boundary at 07:00 (not midnight).
- * TEMP QA: FORCE_CHEER_EVERY_LOAD is currently true — revert to false after confirm.
+ * FORCE_CHEER_EVERY_LOAD = false (TEMP every-load QA ended after user confirm).
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);

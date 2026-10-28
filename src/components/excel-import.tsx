@@ -20,7 +20,6 @@ import {
   isIlbiseoTemplate,
   listFrameTodoSheets,
   loadSavedMapping,
-  mappingHasCategory,
   mappingHasTitle,
   parseExcelFile,
   pickAllTodoSheet,
@@ -136,9 +135,8 @@ export function ExcelImport({
     [plan],
   );
   const applyCount = deltaCommit ? workbookDeltaApplyCount(deltaCommit) : 0;
-  const hasFrameCol = Boolean(
-    plan?.todo && mappingHasCategory(plan.todo.mapping),
-  );
+  /** Preview rows always carry category (틀 column or frame sheet name). */
+  const showTodoFrames = Boolean(plan?.todo);
 
   const allSimilar = useMemo(() => {
     if (!plan) return null;
@@ -258,7 +256,9 @@ export function ExcelImport({
           const tasks = previewToReplaceTasks(plan.todo.preview);
           if (tasks.length > 0) {
             saveMapping(plan.todo.mapping);
-            if (hasFrameCol && onReplaceByCategories) {
+            // Frame sheets have no「틀」column but forceCategory still sets
+            // task.category — always prefer multi-틀 replace when available.
+            if (onReplaceByCategories) {
               onReplaceByCategories(tasks);
             } else if (onReplaceCategory) {
               onReplaceCategory(category, tasks);
@@ -524,7 +524,7 @@ export function ExcelImport({
                     <SheetPreviewBlock
                       key={slice.kind}
                       slice={slice}
-                      showFrame={slice.kind === "todo" && hasFrameCol}
+                      showFrame={slice.kind === "todo" && showTodoFrames}
                       showDeadline={slice.kind === "todo"}
                     />
                   ) : null,

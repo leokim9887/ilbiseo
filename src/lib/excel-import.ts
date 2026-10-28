@@ -1349,9 +1349,39 @@ const SHEET_LABEL: Record<ImportSheetKind, string> = {
   habit: "습관",
 };
 
+/** How strongly a preview row should win a title+틀 collision. */
+function todoMergeInterest(row: MappedPreviewRow): number {
+  if (row.delta === "changed" || row.delta === "new") return 3;
+  if (row.delta === "unchanged") return 1;
+  return 0;
+}
+
+function mappingForFrameSheet(
+  sheet: ParsedSheet,
+  primaryMapping: ColumnMapping,
+): ColumnMapping {
+  const mapping = sanitizeMapping(
+    applySavedOrAuto(sheet.headers, null, "todo"),
+  );
+  // Overlay primary (usually「전체」) field targets when header text matches.
+  // Frame sheets have no「틀」— category comes from sheet name via forceCategory.
+  const mergedMap: ColumnMapping = { ...mapping };
+  for (const h of sheet.headers) {
+    if (primaryMapping[h] && primaryMapping[h] !== "skip") {
+      mergedMap[h] = primaryMapping[h];
+    }
+  }
+  return sanitizeMapping(mergedMap);
+}
+
 /**
  * Merge frame sheets + 「전체」/legacy「할 일」without title+틀 dupes.
- * Frame sheets win when the same title+category also appears in「전체」.
+ *
+ * Collision policy (father edits one surface, leaves the other stale):
+ * - Prefer the row that is **new/changed vs in-app** over an unchanged twin
+ * - If both equally interesting, prefer「전체」(canonical edit surface)
+ * - Frame-only or 전체-only keys are kept
+ * - Frame sheets need no「틀」column — category = sheet name
  */
 export function mergeTodoPreviewFromSheets(
   workbook: ParsedWorkbook,
@@ -1373,60 +1403,77 @@ export function mergeTodoPreviewFromSheets(
       : applySavedOrAuto(primarySheet.headers, loadSavedMapping(), "todo"),
   );
 
-  const seen = new Set<string>();
-  const preview: MappedPreviewRow[] = [];
+  type Winner = { row: MappedPreviewRow; fromAll: boolean };
+  const winners = new Map<string, Winner>();
 
-  const pushUnique = (rows: MappedPreviewRow[]) => {
+  const consider = (rows: MappedPreviewRow[], fromAll: boolean) => {
     for (const r of rows) {
-      if (!r.title) {
-        // Keep empty rows out of merge — they only clutter delta
+      if (!r.title) continue;
+      const k = taskMatchKey(r.title, r.category);
+      const prev = winners.get(k);
+      if (!prev) {
+        winners.set(k, { row: r, fromAll });
         continue;
       }
-      const k = taskMatchKey(r.title, r.category);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      preview.push(r);
+      const prevScore = todoMergeInterest(prev.row);
+      const nextScore = todoMergeInterest(r);
+      if (nextScore > prevScore) {
+        winners.set(k, { row: r, fromAll });
+      } else if (nextScore === prevScore && fromAll && !prev.fromAll) {
+        // Tie →「전체」wins (father’s aggregate sheet)
+        winners.set(k, { row: r, fromAll });
+      }
     }
   };
 
-  // 1) Frame sheets first (category from sheet name; no「틀」column needed)
+  // Build frame previews (category from sheet name; no「틀」needed)
+  const framePreviews: MappedPreviewRow[][] = [];
   for (const { category, sheet } of frames) {
-    const mapping = sanitizeMapping(
-      applySavedOrAuto(sheet.headers, null, "todo"),
-    );
-    // Prefer primary mapping field targets when headers match
-    const mergedMap: ColumnMapping = { ...mapping };
-    for (const h of sheet.headers) {
-      if (primaryMapping[h] && primaryMapping[h] !== "skip") {
-        mergedMap[h] = primaryMapping[h];
-      }
-    }
-    pushUnique(
-      buildPreviewRows(
-        sheet,
-        mergedMap,
-        category,
-        opts.existingTasks,
-        { forceCategory: category },
-      ),
+    const mergedMap = mappingForFrameSheet(sheet, primaryMapping);
+    framePreviews.push(
+      buildPreviewRows(sheet, mergedMap, category, opts.existingTasks, {
+        forceCategory: category,
+      }),
     );
   }
 
-  // 2) 「전체」/legacy「할 일」— skip rows already taken from a frame sheet
+  let allPreview: MappedPreviewRow[] = [];
   if (allSheet) {
     const mapping = sanitizeMapping(
       Object.keys(opts.todoMapping).length
         ? opts.todoMapping
         : applySavedOrAuto(allSheet.headers, loadSavedMapping(), "todo"),
     );
-    pushUnique(
-      buildPreviewRows(
-        allSheet,
-        mapping,
-        opts.defaultCategory,
-        opts.existingTasks,
-      ),
+    allPreview = buildPreviewRows(
+      allSheet,
+      mapping,
+      opts.defaultCategory,
+      opts.existingTasks,
     );
+  }
+
+  // Seed with frames, then let「전체」override when it carries the real edit
+  for (const rows of framePreviews) consider(rows, false);
+  consider(allPreview, true);
+
+  // Emit:「전체」order first (newest-first export), then frame-only leftovers
+  const preview: MappedPreviewRow[] = [];
+  const emitted = new Set<string>();
+  const emitWinner = (k: string) => {
+    const w = winners.get(k);
+    if (!w || emitted.has(k)) return;
+    emitted.add(k);
+    preview.push(w.row);
+  };
+  for (const r of allPreview) {
+    if (!r.title) continue;
+    emitWinner(taskMatchKey(r.title, r.category));
+  }
+  for (const rows of framePreviews) {
+    for (const r of rows) {
+      if (!r.title) continue;
+      emitWinner(taskMatchKey(r.title, r.category));
+    }
   }
 
   return {

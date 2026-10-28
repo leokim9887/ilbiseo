@@ -226,7 +226,7 @@ async function main() {
     );
   }
 
-  // Dedupe: same task on 업무용 + 전체 → one row
+  // Dedupe: same task on 업무용 + 전체 → one row (empty app: tie → 전체)
   {
     const xwb = new ExcelJS.Workbook();
     const allSh = xwb.addWorksheet("전체");
@@ -235,7 +235,7 @@ async function main() {
     allSh.addRow([2, "개인용", "개인만전체", "언젠가", 1]);
     const fr = xwb.addWorksheet("업무용");
     fr.addRow(["순서", "할 일", "마감목표", "중요도"]);
-    fr.addRow([1, "중복후보", "언젠가", 3]); // frame wins (importance 3)
+    fr.addRow([1, "중복후보", "언젠가", 3]); // both new → 전체 wins (imp 2)
     const ab = Buffer.from(await xwb.xlsx.writeBuffer());
     const parsed2 = await parseExcelFile(new File([ab], "dup.xlsx"));
     const plan2 = buildWorkbookImportPlan(parsed2, {
@@ -245,17 +245,93 @@ async function main() {
       existingHabits: [],
     });
     const news = plan2.todo!.preview.filter((r) => r.delta === "new");
-    ok("dedupe-frame-wins", news.length === 2, news);
+    ok("dedupe-one-row", news.length === 2, news);
     const dup = news.find((r) => r.title === "중복후보");
     ok(
-      "frame-importance-kept",
-      dup?.importance === 3 && dup?.category === "work",
+      "전체-wins-on-tie-empty-app",
+      dup?.importance === 2 && dup?.category === "work",
       dup,
     );
     ok(
       "전체-only-personal-kept",
       news.some((r) => r.title === "개인만전체" && r.category === "personal"),
       news,
+    );
+  }
+
+  // Father edits「전체」only; frame sheet still has stale export → take 전체
+  {
+    const existing: Task[] = [
+      baseTask({
+        id: "1",
+        title: "업무A",
+        category: "work",
+        importance: 2,
+        memo: "원본",
+        startDate: "2026-10-28",
+        targetDate: "2026-10-28",
+      }),
+    ];
+    const xwb = new ExcelJS.Workbook();
+    const allSh = xwb.addWorksheet("전체");
+    allSh.addRow(["순서", "틀", "할 일", "마감목표", "중요도"]);
+    allSh.addRow([1, "업무용", "업무A\n수정됨", "2026-10-28", 3]);
+    const fr = xwb.addWorksheet("업무용");
+    fr.addRow(["순서", "할 일", "마감목표", "중요도"]);
+    fr.addRow([1, "업무A\n원본", "2026-10-28", 2]);
+    const ab = Buffer.from(await xwb.xlsx.writeBuffer());
+    const parsed3 = await parseExcelFile(new File([ab], "edit-all.xlsx"));
+    const plan3 = buildWorkbookImportPlan(parsed3, {
+      defaultCategory: "work",
+      existingTasks: existing,
+      existingGuidelines: [],
+      existingHabits: [],
+    });
+    const changed = plan3.todo!.preview.find((r) => r.title === "업무A");
+    ok(
+      "전체-edit-beats-stale-frame",
+      changed?.delta === "changed" &&
+        changed.importance === 3 &&
+        changed.memo === "수정됨",
+      changed,
+    );
+  }
+
+  // Father edits frame only;「전체」stale → take frame
+  {
+    const existing: Task[] = [
+      baseTask({
+        id: "1",
+        title: "업무A",
+        category: "work",
+        importance: 2,
+        memo: "원본",
+        startDate: "2026-10-28",
+        targetDate: "2026-10-28",
+      }),
+    ];
+    const xwb = new ExcelJS.Workbook();
+    const allSh = xwb.addWorksheet("전체");
+    allSh.addRow(["순서", "틀", "할 일", "마감목표", "중요도"]);
+    allSh.addRow([1, "업무용", "업무A\n원본", "2026-10-28", 2]);
+    const fr = xwb.addWorksheet("업무용");
+    fr.addRow(["순서", "할 일", "마감목표", "중요도"]);
+    fr.addRow([1, "업무A\n프레임수정", "2026-10-28", 3]);
+    const ab = Buffer.from(await xwb.xlsx.writeBuffer());
+    const parsed4 = await parseExcelFile(new File([ab], "edit-frame.xlsx"));
+    const plan4 = buildWorkbookImportPlan(parsed4, {
+      defaultCategory: "work",
+      existingTasks: existing,
+      existingGuidelines: [],
+      existingHabits: [],
+    });
+    const changed = plan4.todo!.preview.find((r) => r.title === "업무A");
+    ok(
+      "frame-edit-beats-stale-전체",
+      changed?.delta === "changed" &&
+        changed.importance === 3 &&
+        changed.memo === "프레임수정",
+      changed,
     );
   }
 

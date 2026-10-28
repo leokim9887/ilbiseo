@@ -16,10 +16,17 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  VoiceDeadlineFields,
+  VoiceSheetBody,
+  VoiceSheetFooter,
+  VoiceSheetHeader,
+  VOICE_SHEET_CONTENT_CLASS,
+  voiceFieldClass,
+} from "@/components/voice-sheet-shell";
 import {
   createKoreanSpeechRecognition,
   isSpeechRecognitionSupported,
@@ -131,9 +138,6 @@ function draftToCommit(d: Draft): VoiceRowCommit | null {
     category: d.category,
   };
 }
-
-const fieldClass =
-  "h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-3 text-[16px] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-11 sm:min-h-11 sm:rounded-lg sm:text-[15px]";
 
 export function SamsungVoiceMemoImport({
   frame,
@@ -425,43 +429,45 @@ export function SamsungVoiceMemoImport({
       }}
     >
       <DialogContent
-        className="gap-3 max-sm:max-h-[min(92dvh,100%)] max-sm:gap-3 max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:px-4 max-sm:pt-4 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-md"
+        className={VOICE_SHEET_CONTENT_CLASS}
         data-samsung-voice-memo-dialog
         showCloseButton
       >
-        <DialogHeader className="pr-8">
-          <DialogTitle className="text-[18px] font-semibold tracking-tight text-[var(--ink)] max-sm:text-[19px]">
-            삼성 음성메모
-          </DialogTitle>
-          <DialogDescription className="text-[14px] leading-relaxed text-[var(--ink-muted)] max-sm:text-[14.5px]">
-            음성 파일을 고른 뒤 재생·받아쓰기 또는 글 붙여넣기로 할 일을
-            만듭니다.
-            {frame !== pickedCategory ? (
-              <> (열었을 때 화면 틀: {FRAME_LABEL[frame]})</>
-            ) : null}
-          </DialogDescription>
-        </DialogHeader>
+        <VoiceSheetHeader>
+          <DialogHeader className="gap-1.5 text-left">
+            <DialogTitle className="text-[18px] font-semibold tracking-tight text-[var(--ink)] max-sm:text-[19px]">
+              음성파일 불러오기
+            </DialogTitle>
+            <DialogDescription className="text-[14px] leading-relaxed text-[var(--ink-muted)]">
+              음성 파일을 고른 뒤 재생·받아쓰기 또는 글 붙여넣기로 할 일을
+              만듭니다.
+              {frame !== pickedCategory ? (
+                <> (화면 틀: {FRAME_LABEL[frame]})</>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+        </VoiceSheetHeader>
 
-        <p
-          className="whitespace-pre-line rounded-xl bg-[#f0f4f8] px-3.5 py-3 text-[13.5px] leading-relaxed text-[var(--ink-muted)] dark:bg-[#1a221e]"
-          data-samsung-voice-limits
-        >
-          {samsungVoiceMemoLimitsCopy()}
-        </p>
+        <VoiceSheetBody>
+          <p
+            className="rounded-xl bg-[#f0f4f8] px-3.5 py-3 text-[13.5px] leading-relaxed text-[var(--ink-muted)] dark:bg-[#1a221e]"
+            data-samsung-voice-limits
+          >
+            {samsungVoiceMemoLimitsCopy()}
+          </p>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={SAMSUNG_VOICE_AUDIO_ACCEPT}
-          multiple
-          className="sr-only"
-          data-samsung-voice-file
-          onChange={(e) => {
-            void onFilesPicked(e.target.files);
-          }}
-        />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={SAMSUNG_VOICE_AUDIO_ACCEPT}
+            multiple
+            className="sr-only"
+            data-samsung-voice-file
+            onChange={(e) => {
+              void onFilesPicked(e.target.files);
+            }}
+          />
 
-        <div className="space-y-3.5">
           <label className="block space-y-1.5">
             <span className="text-[13px] font-medium text-[var(--ink-muted)]">
               틀
@@ -474,7 +480,7 @@ export function SamsungVoiceMemoImport({
                 setPickedCategory(c);
                 setDraft((d) => (d ? { ...d, category: c } : d));
               }}
-              className={fieldClass + " font-medium"}
+              className={voiceFieldClass + " font-medium"}
               aria-label="틀 선택"
             >
               {TASK_CATEGORIES.map((c) => (
@@ -492,24 +498,24 @@ export function SamsungVoiceMemoImport({
             onClick={() => fileInputRef.current?.click()}
             data-samsung-voice-pick
           >
-            <Upload className="size-4" aria-hidden />
+            <Upload className="size-4 shrink-0" aria-hidden />
             {audioFile ? "다른 파일 고르기" : "음성·글 파일 고르기"}
           </Button>
 
           {audioFile ? (
             <div
-              className="rounded-xl border border-[#d0d5dd] bg-[#f8fafc] px-3.5 py-3 dark:border-[#3a4540] dark:bg-[#1a221e]"
+              className="space-y-2.5 rounded-xl border border-[#d0d5dd] bg-[#f8fafc] px-3.5 py-3 dark:border-[#3a4540] dark:bg-[#1a221e]"
               data-samsung-voice-player
             >
               <p className="flex items-center gap-2 text-[13px] font-medium text-[var(--ink-muted)]">
                 <FileAudio className="size-3.5 shrink-0" aria-hidden />
-                <span className="truncate">{audioFile.name}</span>
+                <span className="min-w-0 truncate">{audioFile.name}</span>
               </p>
               {audioUrl ? (
                 <audio
                   ref={audioRef}
                   src={audioUrl}
-                  className="mt-2 w-full"
+                  className="w-full"
                   controls
                   preload="metadata"
                   onPlay={() => setPlaying(true)}
@@ -524,44 +530,44 @@ export function SamsungVoiceMemoImport({
                   <track kind="captions" />
                 </audio>
               ) : null}
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="min-h-11 flex-1 touch-manipulation rounded-xl text-[14px] sm:rounded-lg"
+                  className="min-h-11 w-full touch-manipulation rounded-xl text-[14px] sm:rounded-lg"
                   onClick={() => void togglePlay()}
                   data-samsung-voice-play
                   disabled={!audioUrl}
                 >
                   {playing ? (
-                    <Pause className="size-4" aria-hidden />
+                    <Pause className="size-4 shrink-0" aria-hidden />
                   ) : (
-                    <Play className="size-4" aria-hidden />
+                    <Play className="size-4 shrink-0" aria-hidden />
                   )}
                   {playing ? "일시정지" : "재생"}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
-                  className="min-h-11 flex-[1.4] touch-manipulation rounded-xl bg-[#217346] text-[14px] text-white hover:bg-[#1a5c38] sm:rounded-lg"
+                  className="min-h-11 w-full touch-manipulation rounded-xl bg-[#217346] text-[14px] text-white hover:bg-[#1a5c38] sm:rounded-lg"
                   onClick={startDictation}
                   disabled={listening}
                   data-samsung-voice-dictate
                 >
-                  <Mic className="size-4" aria-hidden />
+                  <Mic className="size-4 shrink-0" aria-hidden />
                   이 내용으로 받아쓰기
                 </Button>
               </div>
-              <p className="mt-2 text-[12.5px] leading-snug text-[var(--ink-muted)]">
-                Android Chrome: 스피커로 재생하며 받아쓰기를 시도합니다. 잘 안
-                되면 이어폰으로 들으며 말로 다시 하거나, 아래 칸에 적으세요.
+              <p className="text-[12.5px] leading-snug text-[var(--ink-muted)]">
+                스피커로 재생하며 받아쓰기를 시도합니다. 잘 안 되면 이어폰으로
+                들으며 다시 말하거나, 아래 칸에 적으세요.
               </p>
             </div>
           ) : (
             <p className="text-[13.5px] leading-snug text-[var(--ink-muted)]">
-              Samsung Voice Recorder의 .m4a · .mp3 · .wav · .amr 파일을 고르세요.
-              같은 이름의 .txt가 있으면 함께 선택해도 됩니다.
+              .m4a · .mp3 · .wav · .amr 파일을 고르세요. 같은 이름의 .txt가 있으면
+              함께 선택해도 됩니다.
             </p>
           )}
 
@@ -582,18 +588,18 @@ export function SamsungVoiceMemoImport({
             </p>
           ) : null}
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex flex-1 items-stretch gap-2">
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {listening ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="min-h-12 flex-1 touch-manipulation rounded-xl border-[#b42318]/40 text-[15px] text-[#b42318] sm:min-h-11 sm:rounded-lg"
+                  className="min-h-12 w-full touch-manipulation rounded-xl border-[#b42318]/40 text-[15px] text-[#b42318] sm:min-h-11 sm:rounded-lg"
                   onClick={stopRec}
                   data-samsung-voice-stop
                 >
-                  <Square className="size-4" aria-hidden />
+                  <Square className="size-4 shrink-0" aria-hidden />
                   받아쓰기 그만
                 </Button>
               ) : (
@@ -601,12 +607,12 @@ export function SamsungVoiceMemoImport({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="min-h-12 flex-1 touch-manipulation rounded-xl text-[15px] sm:min-h-11 sm:rounded-lg"
+                  className="min-h-12 w-full touch-manipulation rounded-xl text-[15px] sm:min-h-11 sm:rounded-lg"
                   onClick={startDictation}
                   data-samsung-voice-listen
                   disabled={!speechOk && !audioFile}
                 >
-                  <Mic className="size-4" aria-hidden />
+                  <Mic className="size-4 shrink-0" aria-hidden />
                   {rawText ? "다시 받아쓰기" : "말로 받아쓰기"}
                 </Button>
               )}
@@ -614,33 +620,33 @@ export function SamsungVoiceMemoImport({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="min-h-12 min-w-12 touch-manipulation rounded-xl border-[var(--brand)]/30 px-3 text-[14px] text-[var(--brand)] sm:min-h-11 sm:rounded-lg"
+                className="min-h-12 w-full touch-manipulation rounded-xl border-[var(--brand)]/30 text-[15px] text-[var(--brand)] sm:min-h-11 sm:rounded-lg"
                 onClick={focusManual}
                 data-samsung-voice-manual
                 aria-label="직접 적기"
               >
-                <Keyboard className="size-4" aria-hidden />
-                <span className="sm:inline">직접 적기</span>
+                <Keyboard className="size-4 shrink-0" aria-hidden />
+                직접 적기
               </Button>
             </div>
             {listening ? (
-              <span
+              <p
                 className="inline-flex items-center gap-1.5 text-[14px] font-medium text-[#b42318]"
                 data-samsung-voice-listening
               >
                 <MicOff className="size-4 animate-pulse" aria-hidden />
                 듣는 중…
-              </span>
-            ) : null}
+              </p>
+            ) : (
+              <p className="text-[13px] leading-snug text-[var(--ink-muted)]">
+                {speechListenHint()}
+              </p>
+            )}
           </div>
-
-          <p className="text-[13px] leading-snug text-[var(--ink-muted)]">
-            {speechListenHint()}
-          </p>
 
           <label className="block space-y-1.5">
             <span className="text-[13px] font-medium text-[var(--ink-muted)]">
-              받아쓴 글 · 삼성 앱 글 붙여넣기
+              받아쓴 글 · 붙여넣기
             </span>
             <textarea
               data-samsung-voice-raw
@@ -662,7 +668,7 @@ export function SamsungVoiceMemoImport({
                   );
                 }
               }}
-              rows={4}
+              rows={3}
               className="w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-3 py-2.5 text-[16px] leading-relaxed outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a] sm:text-[15px]"
               placeholder="예: 보고서 쓰기 메모 급함 마감 10월 30일부터 11월 2일 중요도 높음"
               enterKeyHint="done"
@@ -685,11 +691,11 @@ export function SamsungVoiceMemoImport({
                   일부 내용을 확실히 이해하지 못했습니다. 아래를 확인·수정한 뒤
                   「추가」를 눌러 주세요.
                 </p>
-              ) : (
+              ) : draft.title.trim() ? (
                 <p className="text-[14px] text-[var(--ink-muted)]">
                   맞으면 「추가」, 틀리면 고친 뒤 「추가」를 눌러 주세요.
                 </p>
-              )}
+              ) : null}
 
               <label className="block space-y-1.5">
                 <span className="text-[13px] font-medium text-[var(--ink-muted)]">
@@ -702,7 +708,7 @@ export function SamsungVoiceMemoImport({
                   onChange={(e) =>
                     setDraft((d) => (d ? { ...d, title: e.target.value } : d))
                   }
-                  className={fieldClass}
+                  className={voiceFieldClass}
                   placeholder="할 일 제목"
                   enterKeyHint="done"
                   autoComplete="off"
@@ -719,62 +725,30 @@ export function SamsungVoiceMemoImport({
                   onChange={(e) =>
                     setDraft((d) => (d ? { ...d, memo: e.target.value } : d))
                   }
-                  className={fieldClass}
+                  className={voiceFieldClass}
                   placeholder="메모"
                   enterKeyHint="done"
                   autoComplete="off"
                 />
               </label>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  data-samsung-voice-field-someday
-                  aria-pressed={draft.someday}
-                  onClick={() =>
-                    setDraft((d) => (d ? { ...d, someday: !d.someday } : d))
-                  }
-                  className={`h-12 min-h-12 touch-manipulation rounded-xl border px-4 text-[15px] font-medium sm:h-10 sm:min-h-10 sm:rounded-lg sm:text-[13.5px] ${
-                    draft.someday
-                      ? "border-[var(--toss-blue)] bg-[#e8f1ff] text-[var(--toss-blue)]"
-                      : "border-[#c5ccd3] bg-white text-[var(--ink)] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                  }`}
-                >
-                  언젠가
-                </button>
-                {!draft.someday ? (
-                  <>
-                    <label className="flex min-w-[9rem] flex-1 flex-col gap-1 text-[13px] text-[var(--ink-muted)] sm:min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
-                      시작
-                      <input
-                        type="date"
-                        data-samsung-voice-field-start
-                        value={draft.startDate}
-                        onChange={(e) =>
-                          setDraft((d) =>
-                            d ? { ...d, startDate: e.target.value } : d,
-                          )
-                        }
-                        className="h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-10 sm:min-h-10 sm:flex-1 sm:rounded-lg sm:text-[14px]"
-                      />
-                    </label>
-                    <label className="flex min-w-[9rem] flex-1 flex-col gap-1 text-[13px] text-[var(--ink-muted)] sm:min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
-                      종료
-                      <input
-                        type="date"
-                        data-samsung-voice-field-end
-                        value={draft.targetDate}
-                        onChange={(e) =>
-                          setDraft((d) =>
-                            d ? { ...d, targetDate: e.target.value } : d,
-                          )
-                        }
-                        className="h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-10 sm:min-h-10 sm:flex-1 sm:rounded-lg sm:text-[14px]"
-                      />
-                    </label>
-                  </>
-                ) : null}
-              </div>
+              <VoiceDeadlineFields
+                someday={draft.someday}
+                onSomedayToggle={() =>
+                  setDraft((d) => (d ? { ...d, someday: !d.someday } : d))
+                }
+                startDate={draft.startDate}
+                targetDate={draft.targetDate}
+                onStartChange={(v) =>
+                  setDraft((d) => (d ? { ...d, startDate: v } : d))
+                }
+                onEndChange={(v) =>
+                  setDraft((d) => (d ? { ...d, targetDate: v } : d))
+                }
+                somedayTestId="data-samsung-voice-field-someday"
+                startTestId="data-samsung-voice-field-start"
+                endTestId="data-samsung-voice-field-end"
+              />
 
               <label className="block space-y-1.5">
                 <span className="text-[13px] font-medium text-[var(--ink-muted)]">
@@ -790,7 +764,7 @@ export function SamsungVoiceMemoImport({
                         : d,
                     )
                   }
-                  className={fieldClass}
+                  className={voiceFieldClass}
                 >
                   {[1, 2, 3].map((n) => (
                     <option key={n} value={n}>
@@ -801,14 +775,14 @@ export function SamsungVoiceMemoImport({
               </label>
             </div>
           ) : null}
-        </div>
+        </VoiceSheetBody>
 
-        <DialogFooter className="sticky bottom-0 z-10 gap-2 border-t border-[#e5e8eb]/80 bg-popover/95 pt-3 backdrop-blur-sm max-sm:-mx-4 max-sm:px-4 max-sm:pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:justify-end">
+        <VoiceSheetFooter>
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="min-h-12 touch-manipulation rounded-xl text-[15px] sm:min-h-11 sm:rounded-lg"
+            className="min-h-12 flex-1 touch-manipulation rounded-xl text-[15px] sm:min-h-11 sm:flex-none sm:rounded-lg sm:px-5"
             onClick={closeDialog}
             data-samsung-voice-cancel
           >
@@ -817,14 +791,14 @@ export function SamsungVoiceMemoImport({
           <Button
             type="button"
             size="sm"
-            className="min-h-12 touch-manipulation rounded-xl bg-[#217346] text-[15px] text-white hover:bg-[#1a5c38] sm:min-h-11 sm:rounded-lg"
+            className="min-h-12 flex-[1.35] touch-manipulation rounded-xl bg-[#217346] text-[15px] text-white hover:bg-[#1a5c38] sm:min-h-11 sm:flex-none sm:rounded-lg sm:px-6"
             disabled={!draft?.title.trim()}
             onClick={confirm}
             data-samsung-voice-confirm
           >
             추가
           </Button>
-        </DialogFooter>
+        </VoiceSheetFooter>
       </DialogContent>
     </Dialog>
   );

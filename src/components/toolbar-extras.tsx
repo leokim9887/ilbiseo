@@ -68,7 +68,7 @@ interface ToolbarExtrasProps {
 }
 
 /**
- * 「추가 기능」— 음성으로 입력 · 삼성 음성메모 · 엑셀 불러오기.
+ * 「추가 기능」— 음성으로 입력 · 음성파일 불러오기 · 엑셀 불러오기.
  */
 export function ToolbarExtras({
   frame,
@@ -124,7 +124,7 @@ export function ToolbarExtras({
             data-toolbar-extras-samsung-voice
           >
             <FileAudio className="size-3.5" />
-            삼성 음성메모
+            음성파일 불러오기
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer gap-2 py-2 text-[14px]"

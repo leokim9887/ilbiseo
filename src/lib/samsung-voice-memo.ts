@@ -137,8 +137,8 @@ export async function pickSamsungVoiceFiles(
 /** Father-facing limit copy (no server STT). */
 export function samsungVoiceMemoLimitsCopy(): string {
   return (
-    "삼성 음성메모 안의 자동 받아쓰기는 브라우저가 읽을 수 없습니다.\n" +
-    "음성 파일을 고른 뒤 ▶ 재생하면서 듣고, 「이 내용으로 받아쓰기」또는 " +
-    "삼성 앱에 있는 글을 붙여 넣어 할 일로 넣습니다. (서버 유료 음성 인식 없음)"
+    "파일 안 자동 받아쓰기는 브라우저가 읽을 수 없습니다. " +
+    "재생하며 「이 내용으로 받아쓰기」하거나, 삼성 음성녹음 앱의 글을 붙여 넣어 주세요. " +
+    "(서버 유료 음성 인식 없음)"
   );
 }

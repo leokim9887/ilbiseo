@@ -7,10 +7,17 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  VoiceDeadlineFields,
+  VoiceSheetBody,
+  VoiceSheetFooter,
+  VoiceSheetHeader,
+  VOICE_SHEET_CONTENT_CLASS,
+  voiceFieldClass,
+} from "@/components/voice-sheet-shell";
 import {
   createKoreanSpeechRecognition,
   isAppleMobileDevice,
@@ -128,9 +135,6 @@ function draftToCommit(d: Draft): VoiceRowCommit | null {
     category: d.category,
   };
 }
-
-const fieldClass =
-  "h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-3 text-[16px] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-11 sm:min-h-11 sm:rounded-lg sm:text-[15px]";
 
 export function VoiceRowAddButton({
   frame,
@@ -378,37 +382,35 @@ export function VoiceRowAddButton({
         }}
       >
         <DialogContent
-          className="gap-3 max-sm:max-h-[min(92dvh,100%)] max-sm:gap-3 max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:px-4 max-sm:pt-4 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-md"
+          className={VOICE_SHEET_CONTENT_CLASS}
           data-voice-row-dialog
           data-voice-ios={isIos ? "1" : "0"}
           showCloseButton
         >
-          <DialogHeader className="pr-8">
-            <DialogTitle className="text-[18px] font-semibold tracking-tight text-[var(--ink)] max-sm:text-[19px]">
-              음성으로 행 추가
-            </DialogTitle>
-            <DialogDescription className="text-[14px] leading-relaxed text-[var(--ink-muted)] max-sm:text-[14.5px]">
-              말씀하신 내용을 확인한 뒤 추가합니다. 틀은 아래에서 바꿀 수
-              있습니다.
-              {frame !== pickedCategory ? (
-                <>
-                  {" "}
-                  (열었을 때 화면 틀: {FRAME_LABEL[frame]})
-                </>
-              ) : null}
-            </DialogDescription>
-          </DialogHeader>
+          <VoiceSheetHeader>
+            <DialogHeader className="gap-1.5 text-left">
+              <DialogTitle className="text-[18px] font-semibold tracking-tight text-[var(--ink)] max-sm:text-[19px]">
+                음성으로 입력
+              </DialogTitle>
+              <DialogDescription className="text-[14px] leading-relaxed text-[var(--ink-muted)]">
+                말씀하신 내용을 확인한 뒤 추가합니다.
+                {frame !== pickedCategory ? (
+                  <> (화면 틀: {FRAME_LABEL[frame]})</>
+                ) : null}
+              </DialogDescription>
+            </DialogHeader>
+          </VoiceSheetHeader>
 
-          {showUnsupportedBanner && !draft?.title && manualMode ? (
-            <p
-              className="whitespace-pre-line rounded-xl bg-[#fff4e5] px-3.5 py-3.5 text-[15px] leading-relaxed text-[#7a4a00] dark:bg-[#3a2a10] dark:text-[#ffd89a]"
-              data-voice-unsupported
-            >
-              {error ?? speechUnsupportedMessage()}
-            </p>
-          ) : null}
+          <VoiceSheetBody>
+            {showUnsupportedBanner && !draft?.title && manualMode ? (
+              <p
+                className="whitespace-pre-line rounded-xl bg-[#fff4e5] px-3.5 py-3 text-[15px] leading-relaxed text-[#7a4a00] dark:bg-[#3a2a10] dark:text-[#ffd89a]"
+                data-voice-unsupported
+              >
+                {error ?? speechUnsupportedMessage()}
+              </p>
+            ) : null}
 
-          <div className="space-y-3.5">
             <label className="block space-y-1.5">
               <span className="text-[13px] font-medium text-[var(--ink-muted)]">
                 틀
@@ -421,7 +423,7 @@ export function VoiceRowAddButton({
                   setPickedCategory(c);
                   setDraft((d) => (d ? { ...d, category: c } : d));
                 }}
-                className={fieldClass + " font-medium"}
+                className={voiceFieldClass + " font-medium"}
                 aria-label="틀 선택"
               >
                 {TASK_CATEGORIES.map((c) => (
@@ -432,30 +434,30 @@ export function VoiceRowAddButton({
               </select>
             </label>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="flex flex-1 items-stretch gap-2">
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {listening ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="min-h-12 flex-1 touch-manipulation rounded-xl border-[#b42318]/40 text-[15px] text-[#b42318] sm:min-h-11 sm:rounded-lg"
+                    className="min-h-12 w-full touch-manipulation rounded-xl border-[#b42318]/40 text-[15px] text-[#b42318] sm:min-h-11 sm:rounded-lg"
                     onClick={stopRec}
                     data-voice-stop
                   >
-                    <Square className="size-4" aria-hidden />
+                    <Square className="size-4 shrink-0" aria-hidden />
                     듣기 그만
                   </Button>
                 ) : (
                   <Button
                     type="button"
                     size="sm"
-                    className="min-h-12 flex-1 touch-manipulation rounded-xl bg-[var(--toss-blue)] text-[15px] text-white hover:bg-[#1b64da] sm:min-h-11 sm:rounded-lg"
+                    className="min-h-12 w-full touch-manipulation rounded-xl bg-[var(--toss-blue)] text-[15px] text-white hover:bg-[#1b64da] sm:min-h-11 sm:rounded-lg"
                     onClick={startListening}
                     data-voice-listen
                     disabled={!speechOk}
                   >
-                    <Mic className="size-4" aria-hidden />
+                    <Mic className="size-4 shrink-0" aria-hidden />
                     {transcript ? "다시 말하기" : "말하기 시작"}
                   </Button>
                 )}
@@ -463,33 +465,33 @@ export function VoiceRowAddButton({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="min-h-12 min-w-12 touch-manipulation rounded-xl border-[var(--brand)]/30 px-3 text-[14px] text-[var(--brand)] sm:min-h-11 sm:rounded-lg"
+                  className="min-h-12 w-full touch-manipulation rounded-xl border-[var(--brand)]/30 text-[15px] text-[var(--brand)] sm:min-h-11 sm:rounded-lg"
                   onClick={enableManual}
                   data-voice-manual
                   aria-label="직접 적기"
                   aria-pressed={manualMode}
                 >
-                  <Keyboard className="size-4" aria-hidden />
-                  <span className="sm:inline">직접 적기</span>
+                  <Keyboard className="size-4 shrink-0" aria-hidden />
+                  직접 적기
                 </Button>
               </div>
               {listening ? (
-                <span
+                <p
                   className="inline-flex items-center gap-1.5 text-[14px] font-medium text-[#b42318]"
                   data-voice-listening
                 >
                   <MicOff className="size-4 animate-pulse" aria-hidden />
                   듣는 중…
-                </span>
-              ) : null}
+                </p>
+              ) : (
+                <p
+                  className="text-[13px] leading-snug text-[var(--ink-muted)]"
+                  data-voice-listen-hint
+                >
+                  {speechListenHint()}
+                </p>
+              )}
             </div>
-
-            <p
-              className="text-[13px] leading-snug text-[var(--ink-muted)]"
-              data-voice-listen-hint
-            >
-              {speechListenHint()}
-            </p>
 
             {!manualMode ? (
               <div
@@ -499,7 +501,7 @@ export function VoiceRowAddButton({
                 <p className="text-[12.5px] font-medium text-[var(--ink-muted)]">
                   인식된 말
                 </p>
-                <p className="mt-1.5 min-h-[2.75rem] whitespace-pre-wrap text-[16px] leading-relaxed text-[var(--ink)] sm:text-[15px]">
+                <p className="mt-1.5 min-h-[2.75rem] whitespace-pre-wrap break-words text-[16px] leading-relaxed text-[var(--ink)] sm:text-[15px]">
                   {transcript || interim || (
                     <span className="text-[var(--ink-muted)]">
                       예: 보고서 쓰기 메모 급함 마감 10월 30일부터 11월 2일
@@ -560,7 +562,7 @@ export function VoiceRowAddButton({
                         d ? { ...d, title: e.target.value } : d,
                       )
                     }
-                    className={fieldClass}
+                    className={voiceFieldClass}
                     placeholder="할 일 제목"
                     enterKeyHint="done"
                     autoComplete="off"
@@ -579,68 +581,30 @@ export function VoiceRowAddButton({
                         d ? { ...d, memo: e.target.value } : d,
                       )
                     }
-                    className={fieldClass}
+                    className={voiceFieldClass}
                     placeholder="메모"
                     enterKeyHint="done"
                     autoComplete="off"
                   />
                 </label>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    data-voice-field-someday
-                    aria-pressed={draft.someday}
-                    onClick={() =>
-                      setDraft((d) =>
-                        d ? { ...d, someday: !d.someday } : d,
-                      )
-                    }
-                    className={`h-12 min-h-12 touch-manipulation rounded-xl border px-4 text-[15px] font-medium sm:h-10 sm:min-h-10 sm:rounded-lg sm:text-[13.5px] ${
-                      draft.someday
-                        ? "border-[var(--toss-blue)] bg-[#e8f1ff] text-[var(--toss-blue)]"
-                        : "border-[#c5ccd3] bg-white text-[var(--ink)] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                    }`}
-                  >
-                    언젠가
-                  </button>
-                  {!draft.someday ? (
-                    <>
-                      <label className="flex min-w-[9rem] flex-1 flex-col gap-1 text-[13px] text-[var(--ink-muted)] sm:min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
-                        시작
-                        <input
-                          type="date"
-                          data-voice-field-start
-                          value={draft.startDate}
-                          onChange={(e) =>
-                            setDraft((d) =>
-                              d
-                                ? { ...d, startDate: e.target.value }
-                                : d,
-                            )
-                          }
-                          className="h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-10 sm:min-h-10 sm:flex-1 sm:rounded-lg sm:text-[14px]"
-                        />
-                      </label>
-                      <label className="flex min-w-[9rem] flex-1 flex-col gap-1 text-[13px] text-[var(--ink-muted)] sm:min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
-                        종료
-                        <input
-                          type="date"
-                          data-voice-field-end
-                          value={draft.targetDate}
-                          onChange={(e) =>
-                            setDraft((d) =>
-                              d
-                                ? { ...d, targetDate: e.target.value }
-                                : d,
-                            )
-                          }
-                          className="h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-10 sm:min-h-10 sm:flex-1 sm:rounded-lg sm:text-[14px]"
-                        />
-                      </label>
-                    </>
-                  ) : null}
-                </div>
+                <VoiceDeadlineFields
+                  someday={draft.someday}
+                  onSomedayToggle={() =>
+                    setDraft((d) => (d ? { ...d, someday: !d.someday } : d))
+                  }
+                  startDate={draft.startDate}
+                  targetDate={draft.targetDate}
+                  onStartChange={(v) =>
+                    setDraft((d) => (d ? { ...d, startDate: v } : d))
+                  }
+                  onEndChange={(v) =>
+                    setDraft((d) => (d ? { ...d, targetDate: v } : d))
+                  }
+                  somedayTestId="data-voice-field-someday"
+                  startTestId="data-voice-field-start"
+                  endTestId="data-voice-field-end"
+                />
 
                 <label className="block space-y-1.5">
                   <span className="text-[13px] font-medium text-[var(--ink-muted)]">
@@ -659,7 +623,7 @@ export function VoiceRowAddButton({
                           : d,
                       )
                     }
-                    className={fieldClass}
+                    className={voiceFieldClass}
                   >
                     {[1, 2, 3].map((n) => (
                       <option key={n} value={n}>
@@ -670,14 +634,14 @@ export function VoiceRowAddButton({
                 </label>
               </div>
             ) : null}
-          </div>
+          </VoiceSheetBody>
 
-          <DialogFooter className="sticky bottom-0 z-10 gap-2 border-t border-[#e5e8eb]/80 bg-popover/95 pt-3 backdrop-blur-sm max-sm:-mx-4 max-sm:px-4 max-sm:pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:justify-end">
+          <VoiceSheetFooter>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="min-h-12 touch-manipulation rounded-xl text-[15px] sm:min-h-11 sm:rounded-lg"
+              className="min-h-12 flex-1 touch-manipulation rounded-xl text-[15px] sm:min-h-11 sm:flex-none sm:rounded-lg sm:px-5"
               onClick={closeDialog}
               data-voice-cancel
             >
@@ -686,14 +650,14 @@ export function VoiceRowAddButton({
             <Button
               type="button"
               size="sm"
-              className="min-h-12 touch-manipulation rounded-xl bg-[#217346] text-[15px] text-white hover:bg-[#1a5c38] sm:min-h-11 sm:rounded-lg"
+              className="min-h-12 flex-[1.35] touch-manipulation rounded-xl bg-[#217346] text-[15px] text-white hover:bg-[#1a5c38] sm:min-h-11 sm:flex-none sm:rounded-lg sm:px-6"
               disabled={!draft?.title.trim()}
               onClick={confirm}
               data-voice-confirm
             >
               추가
             </Button>
-          </DialogFooter>
+          </VoiceSheetFooter>
         </DialogContent>
       </Dialog>
     </>

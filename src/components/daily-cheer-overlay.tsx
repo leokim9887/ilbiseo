@@ -164,7 +164,7 @@ export function DailyCheerOverlay() {
           <div className="cheer-face-frame absolute inset-0 overflow-hidden rounded-full shadow-[0_28px_72px_rgba(0,0,0,0.5)]">
             <div className="cheer-face-alive absolute inset-0">
               <Image
-                src="/ilbiseo-grandson-cheer.png?v=26"
+                src="/ilbiseo-grandson-cheer.jpg?v=27"
                 alt="에이스"
                 width={640}
                 height={640}

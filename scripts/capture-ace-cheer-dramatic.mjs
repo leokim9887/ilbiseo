@@ -68,7 +68,7 @@ async function assertCheer(page, label) {
   console.log(label, { btn, bubble, src });
   if (btn !== "시작") throw new Error(`${label}: button not 시작`);
   if (!bubble) throw new Error(`${label}: empty bubble`);
-  if (!src?.includes("ilbiseo-grandson-cheer.png")) {
+  if (!src?.includes("ilbiseo-grandson-cheer.jpg")) {
     throw new Error(`${label}: wrong face asset ${src}`);
   }
   // Reload once — TEMP every-refresh must show again

@@ -25,16 +25,23 @@ MOBILE = (1170, 780)
 BG = (235, 230, 223)
 TEAL = (22, 63, 57)
 
-# Banner insets use the new Ace (tan-cap) photo; cheer overlay keeps original baby face
+# Banner insets use the new Ace (tan-cap) photo; cheer uses hooded upper-body source
 BABY_SRC = "04-baby-ace-new.png"
-CHEER_SRC = "04-baby.png"
+# Absolute path preferred for cheer — tall phone portrait (hood + torso)
+CHEER_SRC_ABS = Path(
+    "/cursor/stores/self/media/ilbiseo-ace-cheer-source.png"
+)
+CHEER_SRC = "04-baby.png"  # legacy family-source fallback name
 DOG_SRC = "02-dog-new.png"
 # Face + tan cap framing (mobile / shared default)
 BABY_BIAS = (0.52, 0.30)
 # Gemini-match Ace: full cheeks + chin + hat brim (face-centered like ref)
 BABY_BIAS_PC = (0.50, 0.32)
-# Original cheer crop bias (pre Ace-cap replace)
-CHEER_BIAS = (0.50, 0.14)
+# Hooded Ace cheer: upper-body square (head/hood + torso); legs cropped out
+# (cover_crop bias unused when CHEER_BOX_FRAC path is used)
+CHEER_BIAS = (0.42, 0.158)
+# Explicit frac box on 1440×3120 source → ~90% width square upper body
+CHEER_BOX = (60 / 1440, 493 / 3120, 1356 / 1440, 1789 / 3120)
 # New dog: face-forward Maltese; bias keeps eyes in upper-center of square crop
 DOG_BIAS = (0.50, 0.28)
 
@@ -485,14 +492,25 @@ def compose_mobile(fam_src: Image.Image) -> Image.Image:
 
 
 def compose_grandson_cheer_face() -> Image.Image:
-    """Circular Ace face for daily cheer overlay — original baby (not banner Ace-cap)."""
-    baby = cover_crop(load(CHEER_SRC), 640, 640, bias=CHEER_BIAS)
-    baby = ImageEnhance.Contrast(baby).enhance(1.08)
-    baby = ImageEnhance.Brightness(baby).enhance(1.04)
-    baby = unsharp(baby, percent=130, radius=1.3)
-    mask = radial_mask((640, 640), soft=0.72)
-    baby.putalpha(mask)
-    return baby
+    """Square Ace upper-body for daily cheer overlay (CSS clips to circle).
+
+    Source: tall phone portrait — crop favors hood/ears + face + buttoned torso;
+    cuts above empty lower legs. Soft circular alpha no longer baked in (overlay
+    frame + radial vignette handle the circle).
+    """
+    if CHEER_SRC_ABS.exists():
+        raw = ImageOps.exif_transpose(Image.open(CHEER_SRC_ABS)).convert("RGBA")
+        l, t, r, b = CHEER_BOX
+        baby = box_crop_frac(raw, l, t, r, b).resize(
+            (640, 640), Image.Resampling.LANCZOS
+        )
+    else:
+        baby = cover_crop(load(CHEER_SRC), 640, 640, bias=CHEER_BIAS)
+    baby = ImageEnhance.Contrast(baby).enhance(1.06)
+    baby = ImageEnhance.Brightness(baby).enhance(1.03)
+    baby = ImageEnhance.Color(baby).enhance(1.02)
+    baby = unsharp(baby, percent=120, radius=1.2)
+    return baby.convert("RGB")
 
 
 def save_jpeg(im: Image.Image, path: Path) -> None:
@@ -516,12 +534,12 @@ def main() -> None:
     save_jpeg(pc, OUT_PUBLIC / "ilbiseo-family-banner-pc.jpg")
     save_jpeg(mobile, OUT_PUBLIC / "ilbiseo-family-banner-mobile.jpg")
     save_jpeg(pc, OUT_PUBLIC / "ilbiseo-family-banner.jpg")
-    save_png(cheer, OUT_PUBLIC / "ilbiseo-grandson-cheer.png")
+    save_jpeg(cheer, OUT_PUBLIC / "ilbiseo-grandson-cheer.jpg")
 
     save_jpeg(pc, OUT_MEDIA / "ilbiseo-family-banner-pc.jpg")
     save_jpeg(mobile, OUT_MEDIA / "ilbiseo-family-banner-mobile.jpg")
     save_jpeg(pc, OUT_MEDIA / "ilbiseo-family-banner.jpg")
-    save_png(cheer, OUT_MEDIA / "ilbiseo-grandson-cheer.png")
+    save_jpeg(cheer, OUT_MEDIA / "ilbiseo-grandson-cheer.jpg")
 
 
 if __name__ == "__main__":

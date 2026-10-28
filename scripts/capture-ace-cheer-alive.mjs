@@ -69,7 +69,7 @@ async function assertAlive(page, label) {
   console.log(label, { btn, bubble, src, faceW: box?.width, stageW: stage?.width });
   if (btn !== "시작") throw new Error(`${label}: button not 시작`);
   if (!bubble) throw new Error(`${label}: empty bubble`);
-  if (!src?.includes("ilbiseo-grandson-cheer.png")) {
+  if (!src?.includes("ilbiseo-grandson-cheer.jpg")) {
     throw new Error(`${label}: wrong face asset ${src}`);
   }
   // Face should dominate — roughly as wide as the portrait stage

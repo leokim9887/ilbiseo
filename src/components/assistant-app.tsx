@@ -17,8 +17,10 @@ import { AppNav, type MainView } from "@/components/app-nav";
 import { PanelShell } from "@/components/panel-shell";
 import { PullToRefreshIndicator } from "@/components/pull-to-refresh-indicator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BannerBgSettings } from "@/components/banner-bg-settings";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { Button } from "@/components/ui/button";
+import { useBannerBg } from "@/hooks/use-banner-bg";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import {
   isAllFrame,
@@ -45,6 +47,7 @@ function readViewFromUrl(): MainView | null {
 
 export function AssistantApp() {
   const app = useAppState();
+  const bannerBg = useBannerBg();
   const sync = useDeviceSync({
     ready: app.status === "ready",
     state: app.state,
@@ -195,6 +198,8 @@ export function AssistantApp() {
             activeCount={app.allActive.length}
             doneCount={app.allCompleted.length}
             calendarCount={app.calendarEvents.length}
+            mobileSrc={bannerBg.urls.mobile}
+            pcSrc={bannerBg.urls.pc}
           />
         </header>
         <WelcomeBanner onStart={() => setView("todo")} />
@@ -312,6 +317,15 @@ export function AssistantApp() {
             <PanelShell title="설정">
               <div className="space-y-5">
                 <ThemeToggle />
+                <BannerBgSettings
+                  meta={bannerBg.meta}
+                  urls={bannerBg.urls}
+                  busy={bannerBg.busy}
+                  error={bannerBg.error}
+                  onPick={bannerBg.setFromFile}
+                  onReset={bannerBg.reset}
+                  onClearError={bannerBg.clearError}
+                />
                 <DeviceSyncPanel
                   prefs={sync.prefs}
                   busy={sync.busy}

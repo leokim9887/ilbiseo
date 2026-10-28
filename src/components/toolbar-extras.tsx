@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ExcelImport } from "@/components/excel-import";
+import { SamsungVoiceMemoImport } from "@/components/samsung-voice-memo-import";
 import {
   VoiceRowAddButton,
   type VoiceRowCommit,
@@ -20,7 +21,7 @@ import type {
   Task,
   TaskCategory,
 } from "@/lib/types";
-import { ChevronDown, FileSpreadsheet, Mic } from "lucide-react";
+import { ChevronDown, FileAudio, FileSpreadsheet, Mic } from "lucide-react";
 
 interface ToolbarExtrasProps {
   frame: FrameId;
@@ -67,7 +68,7 @@ interface ToolbarExtrasProps {
 }
 
 /**
- * 「추가 기능」— 음성으로 입력 · 엑셀 불러오기 only (no memo / OCR).
+ * 「추가 기능」— 음성으로 입력 · 삼성 음성메모 · 엑셀 불러오기.
  */
 export function ToolbarExtras({
   frame,
@@ -88,6 +89,7 @@ export function ToolbarExtras({
 }: ToolbarExtrasProps) {
   const [excelOpen, setExcelOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [samsungOpen, setSamsungOpen] = useState(false);
 
   return (
     <>
@@ -118,6 +120,14 @@ export function ToolbarExtras({
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer gap-2 py-2 text-[14px]"
+            onClick={() => setSamsungOpen(true)}
+            data-toolbar-extras-samsung-voice
+          >
+            <FileAudio className="size-3.5" />
+            삼성 음성메모
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer gap-2 py-2 text-[14px]"
             onClick={() => setExcelOpen(true)}
             data-toolbar-extras-excel
           >
@@ -133,6 +143,13 @@ export function ToolbarExtras({
         showTrigger={false}
         open={voiceOpen}
         onOpenChange={setVoiceOpen}
+      />
+
+      <SamsungVoiceMemoImport
+        frame={frame}
+        onCommit={onVoiceCommit}
+        open={samsungOpen}
+        onOpenChange={setSamsungOpen}
       />
 
       <ExcelImport

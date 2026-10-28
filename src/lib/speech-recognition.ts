@@ -117,14 +117,20 @@ export type SpeechListenHandlers = {
   onError?: (message: string) => void;
 };
 
+export type SpeechRecognitionOptions = {
+  /** Longer memos / playback re-speak — keep listening until stop. */
+  continuous?: boolean;
+};
+
 export function createKoreanSpeechRecognition(
   handlers: SpeechListenHandlers,
+  options?: SpeechRecognitionOptions,
 ): SpeechRecognitionLike | null {
   const Ctor = getSpeechRecognitionCtor();
   if (!Ctor) return null;
   const rec = new Ctor();
   rec.lang = "ko-KR";
-  rec.continuous = false;
+  rec.continuous = options?.continuous === true;
   rec.interimResults = true;
   rec.maxAlternatives = 1;
 

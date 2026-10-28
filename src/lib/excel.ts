@@ -1,9 +1,11 @@
 import ExcelJS from "exceljs";
 import {
   CATEGORY_LABEL,
+  CATEGORY_ORDER,
   type CalendarEvent,
   type SideListItem,
   type Task,
+  type TaskCategory,
 } from "./types";
 import { listActiveForExport, sortCompleted } from "./sort";
 import type { DailyBriefing } from "./briefing";
@@ -20,6 +22,18 @@ import {
   repairExcelJsTableXml,
   sanitizeExcelText,
 } from "./excel-xlsx-repair";
+
+/** Active-task Excel sheets: 「전체」+ 4 program frames (exact CATEGORY_LABEL). */
+export const EXCEL_ALL_SHEET = "전체";
+export const EXCEL_DONE_SHEET = "한 일";
+/** Legacy single-sheet name — still accepted on import. */
+export const EXCEL_LEGACY_TODO_SHEET = "할 일";
+export const EXCEL_FRAME_SHEETS: readonly TaskCategory[] = [
+  ...CATEGORY_ORDER,
+];
+export function excelFrameSheetName(cat: TaskCategory): string {
+  return CATEGORY_LABEL[cat];
+}
 
 /** Father-facing 마감목표 entry formats (Excel dropdown + input prompt). */
 export const DEADLINE_ENTRY_HELP =
@@ -51,10 +65,12 @@ export function deadlineValidationListFormula(
  * Excel-native 마감목표 entry help — list dropdown only.
  * Do NOT attach cell comments/notes: ExcelJS emits legacyDrawing after
  * tableParts (invalid OOXML order) → Office「내용에 문제가 있습니다」repair.
+ * @param deadlineCol 1-based column index (with 틀 → 4 / D; frame sheet → 3 / C)
  */
 function applyDeadlineEntryAids(
   sheet: ExcelJS.Worksheet,
   dataRowCount: number,
+  deadlineCol: number = 4,
 ) {
   const today = todayIsoKst();
   // Bound validation to a modest pad past data (not far past table end)
@@ -71,12 +87,13 @@ function applyDeadlineEntryAids(
     prompt:
       "언젠가 / YYYY-MM-DD / YYYY-MM-DD ~ YYYY-MM-DD — 목록에서 고르거나 직접 입력",
   };
+  const col = colLetter(deadlineCol);
   // ExcelJS runtime has dataValidations; typings omit it on Worksheet
   (
     sheet as ExcelJS.Worksheet & {
       dataValidations: { add: (address: string, v: ExcelJS.DataValidation) => void };
     }
-  ).dataValidations.add(`D2:D${endRow}`, validation);
+  ).dataValidations.add(`${col}2:${col}${endRow}`, validation);
   // Intentionally no sheet.getCell(...).note — see comment above.
 }
 
@@ -158,16 +175,50 @@ function styleBodyCells(
 }
 
 /**
- * 「할 일」·「한 일」동일 열 — no 완료여부.
- * ▾ only on 틀 · 마감목표 · 중요도.
+ * 「전체」·「한 일」— include「틀」. ▾ only on 틀 · 마감목표 · 중요도.
  */
-const TODO_TABLE_COLUMNS: ExcelJS.TableColumnProperties[] = [
+const TODO_TABLE_COLUMNS_WITH_FRAME: ExcelJS.TableColumnProperties[] = [
   { name: "순서", filterButton: false },
   { name: "틀", filterButton: true },
   { name: "할 일", filterButton: false },
   { name: "마감목표", filterButton: true },
   { name: "중요도", filterButton: true },
 ];
+
+/**
+ * Per-frame sheets (업무용/개인용/과제용/팀원용) — no「틀」column.
+ * ▾ only on 마감목표 · 중요도.
+ */
+const TODO_TABLE_COLUMNS_FRAME: ExcelJS.TableColumnProperties[] = [
+  { name: "순서", filterButton: false },
+  { name: "할 일", filterButton: false },
+  { name: "마감목표", filterButton: true },
+  { name: "중요도", filterButton: true },
+];
+
+type TodoSheetLayout = {
+  includeFrame: boolean;
+  columns: ExcelJS.TableColumnProperties[];
+  titleCol: number;
+  deadlineCol: number;
+  importanceCol: number;
+};
+
+const LAYOUT_WITH_FRAME: TodoSheetLayout = {
+  includeFrame: true,
+  columns: TODO_TABLE_COLUMNS_WITH_FRAME,
+  titleCol: 3,
+  deadlineCol: 4,
+  importanceCol: 5,
+};
+
+const LAYOUT_FRAME_ONLY: TodoSheetLayout = {
+  includeFrame: false,
+  columns: TODO_TABLE_COLUMNS_FRAME,
+  titleCol: 2,
+  deadlineCol: 3,
+  importanceCol: 4,
+};
 
 const MEMO_FONT: Partial<ExcelJS.Font> = {
   name: "Malgun Gothic",
@@ -265,33 +316,34 @@ const TODO_COL_WIDTHS = {
 
 function applyTodoColumnLayout(
   sheet: ExcelJS.Worksheet,
-  columnCount: number,
+  layout: TodoSheetLayout,
 ) {
   sheet.getColumn(1).width = TODO_COL_WIDTHS.order;
-  sheet.getColumn(2).width = TODO_COL_WIDTHS.frame;
-  sheet.getColumn(3).width = TODO_COL_WIDTHS.title;
-  sheet.getColumn(4).width = TODO_COL_WIDTHS.deadline;
-  sheet.getColumn(5).width = TODO_COL_WIDTHS.importance;
-  if (columnCount >= 6) sheet.getColumn(6).width = 8;
   sheet.getColumn(1).alignment = {
     vertical: "middle",
     horizontal: "center",
   };
-  sheet.getColumn(2).alignment = {
-    vertical: "middle",
-    horizontal: "center",
-  };
-  sheet.getColumn(3).alignment = {
+  if (layout.includeFrame) {
+    sheet.getColumn(2).width = TODO_COL_WIDTHS.frame;
+    sheet.getColumn(2).alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
+  }
+  sheet.getColumn(layout.titleCol).width = TODO_COL_WIDTHS.title;
+  sheet.getColumn(layout.titleCol).alignment = {
     wrapText: true,
     vertical: "top",
     horizontal: "left",
   };
-  sheet.getColumn(4).alignment = {
+  sheet.getColumn(layout.deadlineCol).width = TODO_COL_WIDTHS.deadline;
+  sheet.getColumn(layout.deadlineCol).alignment = {
     wrapText: true,
     vertical: "middle",
     horizontal: "center",
   };
-  sheet.getColumn(5).alignment = {
+  sheet.getColumn(layout.importanceCol).width = TODO_COL_WIDTHS.importance;
+  sheet.getColumn(layout.importanceCol).alignment = {
     vertical: "middle",
     horizontal: "center",
   };
@@ -299,25 +351,27 @@ function applyTodoColumnLayout(
 
 /**
  * Sortable todo sheet.
- * - With rows: Excel Table (filter ▾ on 틀·마감·중요도). XML repaired after write
+ * - With rows: Excel Table (filter ▾ on sortable cols). XML repaired after write
  *   (ExcelJS totalsRowShown bug).
  * - Empty: header row only — **no Table** (header-only tables trigger Office repair).
+ * - No cell comments/notes (OOXML corruption).
  */
 function enableSortableTodoTable(
   sheet: ExcelJS.Worksheet,
   tableName: string,
   dataRows: ExcelJS.CellValue[][],
   tasksForDeadlineFmt: Pick<Task, "startDate" | "targetDate" | "kind">[],
-  columns: ExcelJS.TableColumnProperties[],
+  layout: TodoSheetLayout,
 ) {
+  const columns = layout.columns;
   sheet.autoFilter = undefined;
 
   if (dataRows.length === 0) {
     // Header-only — skip Table XML entirely (Office often repairs A1:E1 tables)
     sheet.addRow(columns.map((c) => c.name));
     styleHeader(sheet.getRow(1));
-    applyTodoColumnLayout(sheet, columns.length);
-    applyDeadlineEntryAids(sheet, 0);
+    applyTodoColumnLayout(sheet, layout);
+    applyDeadlineEntryAids(sheet, 0, layout.deadlineCol);
     return;
   }
 
@@ -335,28 +389,30 @@ function enableSortableTodoTable(
     rows: dataRows,
   });
   styleHeader(sheet.getRow(1));
-  applyTodoColumnLayout(sheet, columns.length);
+  applyTodoColumnLayout(sheet, layout);
   tasksForDeadlineFmt.forEach((t, i) => {
-    writeDeadlineCell(sheet.getRow(i + 2).getCell(4), t);
+    writeDeadlineCell(
+      sheet.getRow(i + 2).getCell(layout.deadlineCol),
+      t,
+    );
   });
   // Re-apply rich-text 「할 일」cells (table write may flatten) then style borders
+  const titleIdx = layout.titleCol - 1;
   dataRows.forEach((rowVals, i) => {
-    const v = rowVals[2];
+    const v = rowVals[titleIdx];
     if (v != null && typeof v === "object" && "richText" in (v as object)) {
-      sheet.getRow(i + 2).getCell(3).value = v as ExcelJS.CellRichTextValue;
+      sheet.getRow(i + 2).getCell(layout.titleCol).value =
+        v as ExcelJS.CellRichTextValue;
     }
   });
   styleBodyCells(sheet, dataRows.length, columns.length, {
-    titleCol: 3,
+    titleCol: layout.titleCol,
     titleColWidth: TODO_COL_WIDTHS.title,
-    memoLines: dataRows.map((row) => cellPlainText(row[2]).includes("\n")),
+    memoLines: dataRows.map((row) =>
+      cellPlainText(row[titleIdx]).includes("\n"),
+    ),
   });
-  applyDeadlineEntryAids(sheet, dataRows.length);
-  // Ensure dimension covers table (defensive)
-  const lastCol = colLetter(columns.length);
-  const lastRow = 1 + dataRows.length;
-  void lastCol;
-  void lastRow;
+  applyDeadlineEntryAids(sheet, dataRows.length, layout.deadlineCol);
 }
 
 export type WorkbookPayload = {
@@ -427,14 +483,14 @@ export async function buildWorkbook(
   wb.creator = "일비서";
   wb.created = new Date();
 
-  // Father TO DO LIST: Excel Table — ▾ only on 틀 · 마감목표 · 중요도
-  // (시급성 열은 제거 — 기존 파일 불러오기는 excel-import에서 선택 매핑)
-  const todo = wb.addWorksheet("할 일", {
+  // Active tasks: 「전체」(with 틀) + 4 frame sheets (no 틀).
+  // Newest-first stored order + 「지난 일정」sink — same as UI.
+  const activeTasks = listActiveForExport(tasks);
+
+  const allSheet = wb.addWorksheet(EXCEL_ALL_SHEET, {
     views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
-  // Match UI: stored newest-first order + 「지난 일정」 sink to end.
-  const activeTasks = listActiveForExport(tasks);
-  const todoRows: ExcelJS.CellValue[][] = activeTasks.map((t, i) => [
+  const allRows: ExcelJS.CellValue[][] = activeTasks.map((t, i) => [
     i + 1,
     CATEGORY_LABEL[t.category],
     listUpCell(t),
@@ -442,18 +498,44 @@ export async function buildWorkbook(
     Number(t.importance) || 0,
   ]);
   enableSortableTodoTable(
-    todo,
-    "IlbiseoTodo",
-    todoRows,
+    allSheet,
+    "IlbiseoTodoAll",
+    allRows,
     activeTasks,
-    TODO_TABLE_COLUMNS,
+    LAYOUT_WITH_FRAME,
   );
 
-  const done = wb.addWorksheet("한 일", {
+  const TABLE_NAME_BY_FRAME: Record<TaskCategory, string> = {
+    work: "IlbiseoTodoWork",
+    personal: "IlbiseoTodoPersonal",
+    project: "IlbiseoTodoProject",
+    team: "IlbiseoTodoTeam",
+  };
+  for (const cat of EXCEL_FRAME_SHEETS) {
+    const frameTasks = activeTasks.filter((t) => t.category === cat);
+    const sheet = wb.addWorksheet(excelFrameSheetName(cat), {
+      views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
+    });
+    const rows: ExcelJS.CellValue[][] = frameTasks.map((t, i) => [
+      i + 1,
+      listUpCell(t),
+      deadlineCellValue(t),
+      Number(t.importance) || 0,
+    ]);
+    enableSortableTodoTable(
+      sheet,
+      TABLE_NAME_BY_FRAME[cat],
+      rows,
+      frameTasks,
+      LAYOUT_FRAME_ONLY,
+    );
+  }
+
+  // 「한 일」: keep single sheet with「틀」(same layout as「전체」).
+  const done = wb.addWorksheet(EXCEL_DONE_SHEET, {
     views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
   const completedTasks = sortCompleted(tasks);
-  // Same columns as 「할 일」— no 완료여부 (sheet membership already means done)
   const doneRows: ExcelJS.CellValue[][] = completedTasks.map((t, i) => [
     i + 1,
     CATEGORY_LABEL[t.category],
@@ -466,7 +548,7 @@ export async function buildWorkbook(
     "IlbiseoDone",
     doneRows,
     completedTasks,
-    TODO_TABLE_COLUMNS,
+    LAYOUT_WITH_FRAME,
   );
 
   // 「구글캘린더」: display-only (not in IMPORT_SHEET_ALLOWLIST).

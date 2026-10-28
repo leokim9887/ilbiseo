@@ -11,6 +11,7 @@ import {
 } from "./text-similarity";
 import {
   CATEGORY_LABEL,
+  CATEGORY_ORDER,
   parseTaskCategory,
   type SideListItem,
   type SideListKind,
@@ -131,15 +132,48 @@ export type ParsedWorkbook = {
   sheets: ParsedSheet[];
 };
 
+/** Active-task sheet names written by export (plus legacy「할 일」). */
+export const IMPORT_TODO_ALL_NAMES = ["전체", "할 일", "할일"] as const;
+export const IMPORT_TODO_FRAME_NAMES = CATEGORY_ORDER.map(
+  (c) => CATEGORY_LABEL[c],
+);
+
 /** Sheets father may import — everything else is hidden. */
-export const IMPORT_SHEET_ALLOWLIST = ["할 일", "지침", "습관"] as const;
+export const IMPORT_SHEET_ALLOWLIST = [
+  "전체",
+  "할 일",
+  ...IMPORT_TODO_FRAME_NAMES,
+  "지침",
+  "습관",
+] as const;
 export type ImportableSheetName = (typeof IMPORT_SHEET_ALLOWLIST)[number];
 
 export type ImportSheetKind = "todo" | "guideline" | "habit";
 
+/** Where a todo sheet came from — drives category + dedupe. */
+export type TodoSheetSource =
+  | { role: "all"; name: string }
+  | { role: "frame"; name: string; category: TaskCategory };
+
+export function classifyTodoSheet(name: string): TodoSheetSource | null {
+  const n = name.replace(/\s+/g, " ").trim();
+  if (
+    (IMPORT_TODO_ALL_NAMES as readonly string[]).includes(n) ||
+    n === "할일"
+  ) {
+    return { role: "all", name: n === "할일" ? "할 일" : n };
+  }
+  for (const cat of CATEGORY_ORDER) {
+    if (n === CATEGORY_LABEL[cat]) {
+      return { role: "frame", name: n, category: cat };
+    }
+  }
+  return null;
+}
+
 export function classifyImportSheet(name: string): ImportSheetKind | null {
   const n = name.replace(/\s+/g, " ").trim();
-  if (n === "할 일" || n === "할일") return "todo";
+  if (classifyTodoSheet(n)) return "todo";
   if (n === "지침") return "guideline";
   if (n === "습관") return "habit";
   return null;
@@ -147,6 +181,36 @@ export function classifyImportSheet(name: string): ImportSheetKind | null {
 
 export function isAllowedImportSheet(name: string): boolean {
   return classifyImportSheet(name) != null;
+}
+
+/** Prefer「전체」over legacy「할 일」when both exist. */
+export function pickAllTodoSheet(
+  sheets: readonly ParsedSheet[],
+): ParsedSheet | null {
+  const all = sheets.find(
+    (s) => s.name.replace(/\s+/g, " ").trim() === "전체",
+  );
+  if (all) return all;
+  return (
+    sheets.find((s) => {
+      const n = s.name.replace(/\s+/g, " ").trim();
+      return n === "할 일" || n === "할일";
+    }) ?? null
+  );
+}
+
+export function listFrameTodoSheets(
+  sheets: readonly ParsedSheet[],
+): { category: TaskCategory; sheet: ParsedSheet }[] {
+  const out: { category: TaskCategory; sheet: ParsedSheet }[] = [];
+  for (const cat of CATEGORY_ORDER) {
+    const label = CATEGORY_LABEL[cat];
+    const sheet = sheets.find(
+      (s) => s.name.replace(/\s+/g, " ").trim() === label,
+    );
+    if (sheet) out.push({ category: cat, sheet });
+  }
+  return out;
 }
 
 /** Delta vs current in-app data (program is default truth). */
@@ -378,11 +442,14 @@ export function isIlbiseoTemplate(headers: string[]): boolean {
       n === "할일 list up" ||
       n === "할일list up" ||
       n === "할일 listup" ||
-      n === "할일listup",
+      n === "할일listup" ||
+      n === "할 일" ||
+      n === "할일",
   );
   const hasDeadline = norms.some((n) => n === "마감목표");
   const hasImportance = norms.some((n) => n === "중요도");
   // 시급성 불필요 — 새 양식·예전 양식(시급성 있어도 중요도만으로 일치)
+  // 「틀」열은「전체」에만 있음 — 프레임 시트도 템플릿으로 인정
   return hasListUp && hasDeadline && hasImportance;
 }
 
@@ -754,6 +821,7 @@ export function buildPreviewRows(
   mapping: ColumnMapping,
   defaultCategory: TaskCategory,
   existingTasks: readonly Task[] = [],
+  opts?: { forceCategory?: TaskCategory },
 ): MappedPreviewRow[] {
   const clean = sanitizeMapping(mapping);
   const fieldOf = (field: ImportField): string | null => {
@@ -784,9 +852,12 @@ export function buildPreviewRows(
       importanceCol ? cellToString(row[importanceCol]) : 2,
       2,
     );
-    const category = categoryCol
-      ? parseTaskCategory(cellToString(row[categoryCol]))
-      : defaultCategory;
+    // Frame sheets: category = sheet name. 「전체」/legacy: 틀 column or default.
+    const category = opts?.forceCategory
+      ? opts.forceCategory
+      : categoryCol
+        ? parseTaskCategory(cellToString(row[categoryCol]))
+        : defaultCategory;
 
     let delta: ImportDeltaKind = "empty";
     let matchId: string | null = null;
@@ -1216,16 +1287,23 @@ export async function parseExcelFile(file: File): Promise<ParsedWorkbook> {
 
   if (sheets.length === 0) {
     throw new Error(
-      "가져올 시트가 없습니다. 「할 일」·「지침」·「습관」만 불러올 수 있습니다.",
+      "가져올 시트가 없습니다. 「전체」·틀 시트·「할 일」·「지침」·「습관」만 불러올 수 있습니다.",
     );
   }
 
   return { fileName: name, sheets };
 }
 
-/** Prefer 「할 일」 then 지침 · 습관. */
+/** Prefer 「전체」/legacy 「할 일」 then frame sheets · 지침 · 습관. */
 export function pickDefaultSheetIndex(sheets: ParsedSheet[]): number {
-  const order = ["할 일", "할일", "지침", "습관"];
+  const order = [
+    "전체",
+    "할 일",
+    "할일",
+    ...IMPORT_TODO_FRAME_NAMES,
+    "지침",
+    "습관",
+  ];
   for (const want of order) {
     const i = sheets.findIndex(
       (s) => s.name.replace(/\s+/g, " ").trim() === want,
@@ -1272,7 +1350,94 @@ const SHEET_LABEL: Record<ImportSheetKind, string> = {
 };
 
 /**
- * One-shot plan for 「할 일」+「지침」+「습관」.
+ * Merge frame sheets + 「전체」/legacy「할 일」without title+틀 dupes.
+ * Frame sheets win when the same title+category also appears in「전체」.
+ */
+export function mergeTodoPreviewFromSheets(
+  workbook: ParsedWorkbook,
+  opts: {
+    defaultCategory: TaskCategory;
+    existingTasks: readonly Task[];
+    /** Mapping for the primary all-sheet (or first frame if no all). */
+    todoMapping: ColumnMapping;
+  },
+): { sheet: ParsedSheet; mapping: ColumnMapping; preview: MappedPreviewRow[] } | null {
+  const frames = listFrameTodoSheets(workbook.sheets);
+  const allSheet = pickAllTodoSheet(workbook.sheets);
+  if (!allSheet && frames.length === 0) return null;
+
+  const primarySheet = allSheet ?? frames[0]!.sheet;
+  const primaryMapping = sanitizeMapping(
+    Object.keys(opts.todoMapping).length
+      ? opts.todoMapping
+      : applySavedOrAuto(primarySheet.headers, loadSavedMapping(), "todo"),
+  );
+
+  const seen = new Set<string>();
+  const preview: MappedPreviewRow[] = [];
+
+  const pushUnique = (rows: MappedPreviewRow[]) => {
+    for (const r of rows) {
+      if (!r.title) {
+        // Keep empty rows out of merge — they only clutter delta
+        continue;
+      }
+      const k = taskMatchKey(r.title, r.category);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      preview.push(r);
+    }
+  };
+
+  // 1) Frame sheets first (category from sheet name; no「틀」column needed)
+  for (const { category, sheet } of frames) {
+    const mapping = sanitizeMapping(
+      applySavedOrAuto(sheet.headers, null, "todo"),
+    );
+    // Prefer primary mapping field targets when headers match
+    const mergedMap: ColumnMapping = { ...mapping };
+    for (const h of sheet.headers) {
+      if (primaryMapping[h] && primaryMapping[h] !== "skip") {
+        mergedMap[h] = primaryMapping[h];
+      }
+    }
+    pushUnique(
+      buildPreviewRows(
+        sheet,
+        mergedMap,
+        category,
+        opts.existingTasks,
+        { forceCategory: category },
+      ),
+    );
+  }
+
+  // 2) 「전체」/legacy「할 일」— skip rows already taken from a frame sheet
+  if (allSheet) {
+    const mapping = sanitizeMapping(
+      Object.keys(opts.todoMapping).length
+        ? opts.todoMapping
+        : applySavedOrAuto(allSheet.headers, loadSavedMapping(), "todo"),
+    );
+    pushUnique(
+      buildPreviewRows(
+        allSheet,
+        mapping,
+        opts.defaultCategory,
+        opts.existingTasks,
+      ),
+    );
+  }
+
+  return {
+    sheet: primarySheet,
+    mapping: primaryMapping,
+    preview,
+  };
+}
+
+/**
+ * One-shot plan for todo sheets(전체·틀·legacy)+「지침」+「습관」.
  * Missing sheets are null (skipped quietly). Delta vs in-app data.
  */
 export function buildWorkbookImportPlan(
@@ -1288,28 +1453,14 @@ export function buildWorkbookImportPlan(
 ): WorkbookImportPlan {
   const saved = loadSavedMapping();
 
-  const makeSlice = (
-    kind: ImportSheetKind,
+  const makeSideSlice = (
+    kind: "guideline" | "habit",
     sheet: ParsedSheet | null,
-    existingSide?: readonly SideListItem[],
+    existingSide: readonly SideListItem[],
   ): SheetImportSlice | null => {
     if (!sheet) return null;
-    const mapping =
-      kind === "todo"
-        ? sanitizeMapping(
-            opts.todoMapping ??
-              applySavedOrAuto(sheet.headers, saved, "todo"),
-          )
-        : applySavedOrAuto(sheet.headers, null, kind);
-    const preview =
-      kind === "todo"
-        ? buildPreviewRows(
-            sheet,
-            mapping,
-            opts.defaultCategory,
-            opts.existingTasks,
-          )
-        : buildSidePreviewRows(sheet, mapping, existingSide ?? []);
+    const mapping = applySavedOrAuto(sheet.headers, null, kind);
+    const preview = buildSidePreviewRows(sheet, mapping, existingSide);
     return {
       kind,
       label: SHEET_LABEL[kind],
@@ -1320,13 +1471,38 @@ export function buildWorkbookImportPlan(
     };
   };
 
-  const todo = makeSlice("todo", findSheetByKind(workbook.sheets, "todo"));
-  const guideline = makeSlice(
+  const todoMerged = mergeTodoPreviewFromSheets(workbook, {
+    defaultCategory: opts.defaultCategory,
+    existingTasks: opts.existingTasks,
+    todoMapping: sanitizeMapping(
+      opts.todoMapping ??
+        (() => {
+          const primary =
+            pickAllTodoSheet(workbook.sheets) ??
+            listFrameTodoSheets(workbook.sheets)[0]?.sheet;
+          return primary
+            ? applySavedOrAuto(primary.headers, saved, "todo")
+            : {};
+        })(),
+    ),
+  });
+  const todo: SheetImportSlice | null = todoMerged
+    ? {
+        kind: "todo",
+        label: SHEET_LABEL.todo,
+        sheet: todoMerged.sheet,
+        mapping: todoMerged.mapping,
+        preview: todoMerged.preview,
+        summary: summarizeDeltaCounts(todoMerged.preview),
+      }
+    : null;
+
+  const guideline = makeSideSlice(
     "guideline",
     findSheetByKind(workbook.sheets, "guideline"),
     opts.existingGuidelines,
   );
-  const habit = makeSlice(
+  const habit = makeSideSlice(
     "habit",
     findSheetByKind(workbook.sheets, "habit"),
     opts.existingHabits,

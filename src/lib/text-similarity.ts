@@ -1,4 +1,5 @@
-import type { Task } from "./types";
+import { CATEGORY_LABEL, type Task } from "./types";
+import { listActiveForExport } from "./sort";
 
 /** Korean particles / trivial tokens skipped for wording overlap. */
 const TRIVIAL = new Set([
@@ -311,16 +312,56 @@ export function findExactDuplicateTasks(
   });
 }
 
-/** Short polished Korean copy for in-app alert. */
-export function buildSimilarityAlertMessage(hits: SimilarityHit[]): string | null {
+/**
+ * 1-based order of a task inside its 틀 list (newest-first + 지난 일정 sink),
+ * matching the Excel/app「순서」column when viewing that frame.
+ */
+export function orderInFrame(
+  task: Task,
+  allActive: readonly Task[],
+): number {
+  const frameList = listActiveForExport(
+    allActive.filter((t) => t.category === task.category),
+  );
+  const idx = frameList.findIndex((t) => t.id === task.id);
+  return idx >= 0 ? idx + 1 : 0;
+}
+
+/** One peer location line: 틀 · 행 번호 · 제목 · 겹친 말. */
+export function describeSimilarityHit(
+  hit: SimilarityHit,
+  allActive: readonly Task[],
+): string {
+  const frame = CATEGORY_LABEL[hit.task.category];
+  const order = orderInFrame(hit.task, allActive);
+  const title = hit.task.title.trim() || "(제목 없음)";
+  const where =
+    order > 0
+      ? `「${frame}」 ${order}번 행 「${title}」`
+      : `「${frame}」 「${title}」`;
+  const shared = hit.sharedTokens.slice(0, 5).join(", ");
+  if (shared) return `${where} — 겹친 말: ${shared}`;
+  return where;
+}
+
+/**
+ * Short polished Korean copy for in-app alert.
+ * Includes which 틀 / 행 / overlapped words so father can find the peer.
+ */
+export function buildSimilarityAlertMessage(
+  hits: SimilarityHit[],
+  allActive?: readonly Task[],
+): string | null {
   if (hits.length === 0) return null;
-  const titles = hits.slice(0, 3).map((h) => h.task.title.trim() || "(제목 없음)");
+  const peers = allActive ?? hits.map((h) => h.task);
+  const primary = describeSimilarityHit(hits[0], peers);
   if (hits.length === 1) {
-    return `비슷한 할 일이 있습니다: 「${titles[0]}」`;
+    return `비슷한 할 일이 있습니다: ${primary}`;
   }
   if (hits.length === 2) {
-    return `비슷한 할 일이 있습니다: 「${titles[0]}」, 「${titles[1]}」`;
+    const second = describeSimilarityHit(hits[1], peers);
+    return `비슷한 할 일이 있습니다:\n· ${primary}\n· ${second}`;
   }
-  const extra = hits.length - 2;
-  return `비슷한 할 일이 있습니다: 「${titles[0]}」, 「${titles[1]}」 외 ${extra}건`;
+  const extra = hits.length - 1;
+  return `비슷한 할 일이 있습니다: ${primary}\n(같은 내용 ${extra}건 더)`;
 }

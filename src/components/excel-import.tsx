@@ -18,10 +18,12 @@ import {
   IMPORT_TARGET_FIELDS,
   isImportTargetField,
   isIlbiseoTemplate,
+  listFrameTodoSheets,
   loadSavedMapping,
   mappingHasCategory,
   mappingHasTitle,
   parseExcelFile,
+  pickAllTodoSheet,
   planToWorkbookDelta,
   previewToReplaceSideItems,
   previewToReplaceTasks,
@@ -175,11 +177,11 @@ export function ExcelImport({
   };
 
   const goPreviewOrMap = (wb: ParsedWorkbook) => {
+    // Prefer「전체」/legacy「할 일」(has「틀」) for mapping; else first frame sheet
     const todoSheet =
-      wb.sheets.find((s) => {
-        const n = s.name.replace(/\s+/g, " ").trim();
-        return n === "할 일" || n === "할일";
-      }) ?? null;
+      pickAllTodoSheet(wb.sheets) ??
+      listFrameTodoSheets(wb.sheets)[0]?.sheet ??
+      null;
     if (!todoSheet) {
       // Only side sheets — skip map
       setTodoMapping({});
@@ -356,10 +358,9 @@ export function ExcelImport({
         : "반영";
 
   const todoSheetForMap = workbook
-    ? workbook.sheets.find((s) => {
-        const n = s.name.replace(/\s+/g, " ").trim();
-        return n === "할 일" || n === "할일";
-      })
+    ? pickAllTodoSheet(workbook.sheets) ??
+      listFrameTodoSheets(workbook.sheets)[0]?.sheet ??
+      null
     : null;
 
   return (
@@ -384,7 +385,7 @@ export function ExcelImport({
         <DialogHeader>
           <DialogTitle>엑셀 불러오기</DialogTitle>
           <DialogDescription>
-            엑셀의 할 일·지침·습관을 가져옵니다.
+            엑셀의 전체·틀 시트·지침·습관을 가져옵니다.
           </DialogDescription>
         </DialogHeader>
 

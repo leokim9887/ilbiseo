@@ -96,24 +96,25 @@ async function main() {
         headers.includes("마감목표"),
       headers,
     );
-    const todo = wb.getWorksheet("할 일")!;
+    const todo = wb.getWorksheet("전체")!;
     const th: string[] = [];
     todo.getRow(1).eachCell((c) => th.push(String(c.value)));
     ok(
-      "todo-and-done-same-cols",
+      "전체-and-done-same-cols",
       th.join("|") === headers.join("|"),
       { th, headers },
     );
+    ok("no-legacy-할일", !wb.getWorksheet("할 일"), null);
   }
 
-  // ——— One-shot plan: all three sheets ———
+  // ——— One-shot plan: todo sheets + 지침 + 습관 ———
   const file = new File([buf], "일비서.xlsx");
   const parsed = await parseExcelFile(file);
   ok(
-    "allowlist-three",
-    ["할 일", "지침", "습관"].every((n) =>
+    "allowlist-todo-sides",
+    ["전체", "업무용", "지침", "습관"].every((n) =>
       parsed.sheets.some((s) => s.name === n),
-    ) && parsed.sheets.length === 3,
+    ),
     parsed.sheets.map((s) => s.name),
   );
 

@@ -309,10 +309,12 @@ export function ExcelWorkbook({
   /** Delta import must see completed rows too (same title+틀 → update, not re-add). */
   const importPeers = allTasksForImport ?? similarityPeers;
   const [similarityAlert, setSimilarityAlert] = useState<string | null>(null);
-  /** Conflicting peer row to scroll/highlight when alert opens */
+  /** Conflicting peer — shown in alert; focused after dismiss */
   const [similarityFocusId, setSimilarityFocusId] = useState<string | null>(
     null,
   );
+  /** After alert OK: switch 틀 if needed, then scroll/focus this row */
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const similarityAckRef = useRef<Set<string>>(new Set());
   const similarityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -528,13 +530,32 @@ export function ExcelWorkbook({
       const blob = taskWordingBlob(candidate);
       const fingerprint = `${task.id}|${blob}|${hits.map((h) => h.task.id).join(",")}`;
       if (similarityAckRef.current.has(fingerprint)) return;
-      const msg = buildSimilarityAlertMessage(hits);
+      const msg = buildSimilarityAlertMessage(hits, similarityPeers);
       if (!msg) return;
       similarityAckRef.current.add(fingerprint);
       setSimilarityFocusId(hits[0].task.id);
       setSimilarityAlert(msg);
     },
     [similarityPeers],
+  );
+
+  const focusSimilarPeerRow = useCallback(
+    (peerId: string) => {
+      const peer = similarityPeers.find((t) => t.id === peerId);
+      if (!peer) {
+        setPendingFocusId(peerId);
+        return;
+      }
+      // Ensure the peer's 틀 (or「전체」) is visible so the row exists in DOM
+      if (frame === "gcal" || (isTaskCategory(frame) && frame !== peer.category)) {
+        onFrameChange(peer.category);
+      }
+      if (sheet !== "todo") {
+        // Peer alerts only fire on active wording — stay/return to 할 일 via parent if needed
+      }
+      setPendingFocusId(peerId);
+    },
+    [similarityPeers, frame, onFrameChange, sheet],
   );
 
   const scheduleSimilarityCheck = useCallback(
@@ -554,10 +575,15 @@ export function ExcelWorkbook({
     };
   }, []);
 
-  /** On alert: scroll conflicting peer row into view and briefly highlight */
+  /**
+   * After alert dismiss (or when pendingFocusId set): scroll peer into view,
+   * highlight, and autofocus its title field.
+   */
   useEffect(() => {
-    if (!similarityAlert || !similarityFocusId) return;
-    const id = similarityFocusId;
+    if (!pendingFocusId || similarityAlert) return;
+    const id = pendingFocusId;
+    let tries = 0;
+    let timer: number | undefined;
     const run = () => {
       const safe =
         typeof CSS !== "undefined" && typeof CSS.escape === "function"
@@ -566,17 +592,41 @@ export function ExcelWorkbook({
       const el = document.querySelector(
         `[data-excel-row="${safe}"]`,
       ) as HTMLElement | null;
-      if (!el) return;
+      if (!el) {
+        // Frame switch may still be painting
+        if (tries++ < 12) {
+          timer = window.setTimeout(run, 50);
+        } else {
+          setPendingFocusId(null);
+        }
+        return;
+      }
       el.scrollIntoView({ block: "center", behavior: "smooth" });
       el.setAttribute("data-similarity-focus", "1");
-      // Highlight only while dialog is open — do not steal dialog focus
+      setActiveRow(id);
+      setFocus({ rowId: id, col: "listup" });
+      const titleInput = el.querySelector(
+        'textarea[aria-label="할 일"], textarea[data-excel-cell]',
+      ) as HTMLTextAreaElement | null;
+      if (titleInput && !titleInput.disabled && !titleInput.readOnly) {
+        titleInput.focus({ preventScroll: true });
+        const len = titleInput.value.length;
+        try {
+          titleInput.setSelectionRange(len, len);
+        } catch {
+          /* ignore */
+        }
+      }
       window.setTimeout(() => {
         el.removeAttribute("data-similarity-focus");
-      }, 3200);
+      }, 3600);
+      setPendingFocusId(null);
     };
-    const t = window.setTimeout(run, 80);
-    return () => window.clearTimeout(t);
-  }, [similarityAlert, similarityFocusId]);
+    timer = window.setTimeout(run, 60);
+    return () => {
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [pendingFocusId, similarityAlert, rows]);
 
   const updateListUp = useCallback(
     (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
@@ -1709,8 +1759,10 @@ export function ExcelWorkbook({
         open={Boolean(similarityAlert)}
         onOpenChange={(open) => {
           if (!open) {
+            const peerId = similarityFocusId;
             setSimilarityAlert(null);
             setSimilarityFocusId(null);
+            if (peerId) focusSimilarPeerRow(peerId);
           }
         }}
       >
@@ -1724,7 +1776,7 @@ export function ExcelWorkbook({
             <DialogTitle className="text-[16px] text-[var(--ink)]">
               비슷한 할 일
             </DialogTitle>
-            <DialogDescription className="text-[14px] leading-relaxed text-[var(--ink-muted)]">
+            <DialogDescription className="whitespace-pre-line text-[14px] leading-relaxed text-[var(--ink-muted)]">
               {similarityAlert}
             </DialogDescription>
           </DialogHeader>
@@ -1735,11 +1787,13 @@ export function ExcelWorkbook({
               className="min-h-9 bg-[#217346] text-white hover:bg-[#1a5c38]"
               data-similarity-alert-ok
               onClick={() => {
+                const peerId = similarityFocusId;
                 setSimilarityAlert(null);
                 setSimilarityFocusId(null);
+                if (peerId) focusSimilarPeerRow(peerId);
               }}
             >
-              확인
+              해당 행으로
             </Button>
           </DialogFooter>
         </DialogContent>

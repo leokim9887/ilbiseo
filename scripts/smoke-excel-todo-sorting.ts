@@ -1,5 +1,6 @@
 /**
- * Verify 「할 일」/「한 일」 AutoFilter + sortable 틀·마감목표·중요도 cell types.
+ * Verify 「전체」/「한 일」 AutoFilter + sortable 틀·마감목표·중요도 cell types.
+ * Frame sheets (업무용…) have no「틀」column.
  */
 import fs from "fs";
 import path from "path";
@@ -144,11 +145,11 @@ async function main() {
   };
 
   const tableNameBySheet: Record<string, string> = {
-    "할 일": "IlbiseoTodo",
+    전체: "IlbiseoTodoAll",
     "한 일": "IlbiseoDone",
   };
 
-  for (const name of ["할 일", "한 일"] as const) {
+  for (const name of ["전체", "한 일"] as const) {
     const sh = wb.getWorksheet(name);
     ok(`sheet-${name}`, Boolean(sh), null);
     const table = sh!.getTable(tableNameBySheet[name]);
@@ -183,7 +184,27 @@ async function main() {
     );
   }
 
-  const todo = wb.getWorksheet("할 일")!;
+  // Frame sheet: no 틀 filter
+  {
+    const work = wb.getWorksheet("업무용")!;
+    ok("sheet-업무용", Boolean(work), null);
+    const table = work.getTable("IlbiseoTodoWork");
+    ok("table-업무용", Boolean(table), null);
+    const buttons: Record<string, boolean> = {};
+    for (let i = 0; i < 4; i++) {
+      const col = table.getColumn(i);
+      buttons[col.name] = Boolean(col.filterButton);
+    }
+    ok(
+      "업무용-no-틀-col",
+      !Object.prototype.hasOwnProperty.call(buttons, "틀") &&
+        buttons["마감목표"] === true &&
+        buttons["중요도"] === true,
+      buttons,
+    );
+  }
+
+  const todo = wb.getWorksheet("전체")!;
   const frames: string[] = [];
   const importances: unknown[] = [];
   const deadlines: { type: string; numFmt?: string; iso?: string; text?: string }[] =
@@ -246,7 +267,7 @@ async function main() {
     cellDates: true,
     raw: false,
   });
-  const aoa = XLSX.utils.sheet_to_json<unknown[]>(xwb.Sheets["할 일"], {
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(xwb.Sheets["전체"], {
     header: 1,
     defval: "",
     raw: false,
@@ -287,21 +308,9 @@ async function main() {
       );
     });
     ok("deadline-validation-list-언젠가", hasList, dvEntries);
+    // No cell notes/comments — ExcelJS notes corrupt OOXML (legacyDrawing order)
     const note = todo.getCell(1, 4).note;
-    const noteText =
-      typeof note === "string"
-        ? note
-        : Array.isArray((note as { texts?: { text?: string }[] })?.texts)
-          ? ((note as { texts: { text?: string }[] }).texts)
-              .map((t) => t.text ?? "")
-              .join("")
-          : "";
-    ok(
-      "deadline-header-note",
-      noteText.includes("언젠가") &&
-        (noteText.includes("~") || noteText.includes("구간")),
-      { noteText: noteText.slice(0, 200), help: DEADLINE_ENTRY_HELP.slice(0, 80) },
-    );
+    ok("deadline-header-no-note", note == null || note === "", { note });
     ok(
       "deadline-help-mentions-언젠가",
       DEADLINE_ENTRY_HELP.includes("언젠가"),

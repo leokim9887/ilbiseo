@@ -231,6 +231,26 @@ interface ExcelWorkbookProps {
       update: { id: string; patch: Partial<SideListItem> }[];
     },
   ) => void;
+  /** Atomic 할 일+지침+습관 delta (one persist). */
+  onWorkbookDelta?: (payload: {
+    todo: {
+      add: Task[];
+      update: { id: string; patch: Partial<Task> }[];
+    };
+    guideline: {
+      add: SideListItem[];
+      update: { id: string; patch: Partial<SideListItem> }[];
+    };
+    habit: {
+      add: SideListItem[];
+      update: { id: string; patch: Partial<SideListItem> }[];
+    };
+  }) => void;
+  onWorkbookReplace?: (opts: {
+    tasks?: Task[] | null;
+    guidelines?: SideListItem[] | null;
+    habits?: SideListItem[] | null;
+  }) => void;
   guidelines?: SideListItem[];
   habits?: SideListItem[];
   calendarEvents?: CalendarEvent[];
@@ -259,6 +279,8 @@ export function ExcelWorkbook({
   onImportSide,
   onReplaceSide,
   onSideDelta,
+  onWorkbookDelta,
+  onWorkbookReplace,
   guidelines = [],
   habits = [],
   calendarEvents = [],
@@ -899,6 +921,8 @@ export function ExcelWorkbook({
                 onImportSide={onImportSide}
                 onReplaceSide={onReplaceSide}
                 onSideDelta={onSideDelta}
+                onWorkbookDelta={onWorkbookDelta}
+                onWorkbookReplace={onWorkbookReplace}
                 existingTasks={importPeers}
                 existingGuidelines={guidelines}
                 existingHabits={habits}

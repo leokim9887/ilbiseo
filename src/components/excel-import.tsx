@@ -37,6 +37,7 @@ import {
   type SheetImportSlice,
   type SideDeltaCommit,
   type TodoDeltaCommit,
+  type WorkbookDeltaCommit,
   type WorkbookImportPlan,
 } from "@/lib/excel-import";
 import { formatDeadlineRange } from "@/lib/date-range";
@@ -72,6 +73,16 @@ interface ExcelImportProps {
   onImportSide?: (kind: SideListKind, items: SideListItem[]) => void;
   onReplaceSide?: (kind: SideListKind, items: SideListItem[]) => void;
   onSideDelta?: (kind: SideListKind, payload: SideDeltaCommit) => void;
+  /**
+   * Preferred: apply 할 일+지침+습관 in one persist (avoids last-write-wins).
+   */
+  onWorkbookDelta?: (payload: WorkbookDeltaCommit) => void;
+  /** Preferred: atomic「목록 바꾸기」across sheets. */
+  onWorkbookReplace?: (opts: {
+    tasks?: Task[] | null;
+    guidelines?: SideListItem[] | null;
+    habits?: SideListItem[] | null;
+  }) => void;
   category: TaskCategory;
   existingTasks?: Task[];
   existingGuidelines?: SideListItem[];
@@ -89,6 +100,8 @@ export function ExcelImport({
   onImportSide,
   onReplaceSide,
   onSideDelta,
+  onWorkbookDelta,
+  onWorkbookReplace,
   category,
   existingTasks = [],
   existingGuidelines = [],
@@ -251,47 +264,83 @@ export function ExcelImport({
 
     try {
       if (mode === "replace") {
-        // Replace each present sheet independently
-        if (plan.todo) {
-          const tasks = previewToReplaceTasks(plan.todo.preview);
-          if (tasks.length > 0) {
-            saveMapping(plan.todo.mapping);
-            // Frame sheets have no「틀」column but forceCategory still sets
-            // task.category — always prefer multi-틀 replace when available.
-            if (onReplaceByCategories) {
-              onReplaceByCategories(tasks);
-            } else if (onReplaceCategory) {
-              onReplaceCategory(category, tasks);
-            } else {
-              setError("지금은 바꿀 수 없습니다.");
-              return;
-            }
+        const tasks =
+          plan.todo && plan.todo.preview.some((r) => r.delta !== "empty")
+            ? previewToReplaceTasks(plan.todo.preview)
+            : null;
+        const guidelines = plan.guideline
+          ? previewToReplaceSideItems(plan.guideline.preview)
+          : null;
+        const habits = plan.habit
+          ? previewToReplaceSideItems(plan.habit.preview)
+          : null;
+
+        if (plan.todo && tasks && tasks.length > 0) {
+          saveMapping(plan.todo.mapping);
+        }
+
+        // Atomic path — one persist for all sheets
+        if (onWorkbookReplace) {
+          if (
+            (tasks && tasks.length > 0) ||
+            guidelines != null ||
+            habits != null
+          ) {
+            onWorkbookReplace({
+              tasks: tasks && tasks.length > 0 ? tasks : null,
+              guidelines,
+              habits,
+            });
+          }
+          handleOpenChange(false);
+          return;
+        }
+
+        // Legacy sequential fallback (stateRef-safe in useAppState)
+        if (tasks && tasks.length > 0) {
+          if (onReplaceByCategories) {
+            onReplaceByCategories(tasks);
+          } else if (onReplaceCategory) {
+            onReplaceCategory(category, tasks);
+          } else {
+            setError("지금은 바꿀 수 없습니다.");
+            return;
           }
         }
-        if (plan.guideline) {
+        if (guidelines) {
           if (!onReplaceSide) {
             setError("지침은 지금은 바꿀 수 없습니다.");
             return;
           }
-          const items = previewToReplaceSideItems(plan.guideline.preview);
-          onReplaceSide("guideline", items);
+          onReplaceSide("guideline", guidelines);
         }
-        if (plan.habit) {
+        if (habits) {
           if (!onReplaceSide) {
             setError("습관은 지금은 바꿀 수 없습니다.");
             return;
           }
-          const items = previewToReplaceSideItems(plan.habit.preview);
-          onReplaceSide("habit", items);
+          onReplaceSide("habit", habits);
         }
         handleOpenChange(false);
         return;
       }
 
-      // Delta merge — all three in one confirm
+      // Delta merge — prefer one atomic persist for all three sheets
       if (plan.todo) saveMapping(plan.todo.mapping);
 
       const { todo, guideline, habit } = deltaCommit;
+      if (workbookDeltaApplyCount(deltaCommit) === 0) {
+        setError("바꿀 내용이 없습니다.");
+        return;
+      }
+
+      if (onWorkbookDelta) {
+        onWorkbookDelta(deltaCommit);
+        handleOpenChange(false);
+        return;
+      }
+
+      // Legacy sequential fallback
       let did = false;
 
       if (todo.add.length > 0 || todo.update.length > 0) {

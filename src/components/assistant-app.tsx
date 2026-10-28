@@ -260,6 +260,8 @@ export function AssistantApp() {
                 onImportSide={app.addManySideItems}
                 onReplaceSide={app.replaceSideItems}
                 onSideDelta={app.applySideDelta}
+                onWorkbookDelta={app.applyWorkbookDelta}
+                onWorkbookReplace={app.applyWorkbookReplace}
                 guidelines={app.guidelines}
                 habits={app.habits}
               />

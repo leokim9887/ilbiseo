@@ -34,6 +34,12 @@ import {
 import { clampPriority } from "@/lib/priority";
 import { todayIsoKst } from "@/lib/date-range";
 import { loadSyncPrefs, saveSyncPrefs } from "@/lib/device-sync";
+import {
+  applyWorkbookDeltaToState,
+  applyWorkbookReplaceToState,
+  workbookDeltaApplyCount,
+  type WorkbookDeltaCommit,
+} from "@/lib/excel-import";
 
 type Status = "loading" | "ready" | "error";
 
@@ -228,6 +234,9 @@ export function useAppState() {
   const persist = useCallback(
     (next: AppState, opts?: { fromRemote?: boolean; updatedAt?: string }) => {
       const clean = { ...next, checklists: [] as AppState["checklists"] };
+      // Sync ref before setState so back-to-back persists in one click
+      // (엑셀 불러오기 할 일→지침→습관) see each other’s writes.
+      stateRef.current = clean;
       setState(clean);
       try {
         saveState(clean);
@@ -358,16 +367,17 @@ export function useAppState() {
   const replaceByTaskCategories = useCallback(
     (tasks: Task[]) => {
       if (tasks.length === 0) return;
+      const prev = stateRef.current;
       const normalized = tasks.map((t) => ({
         ...t,
         urgency: clampPriority(t.urgency),
         importance: clampPriority(t.importance),
       }));
       const cats = new Set(normalized.map((t) => t.category));
-      const kept = state.tasks.filter((t) => !cats.has(t.category));
-      persist({ ...state, tasks: [...kept, ...normalized] });
+      const kept = prev.tasks.filter((t) => !cats.has(t.category));
+      persist({ ...prev, tasks: [...kept, ...normalized] });
     },
-    [persist, state],
+    [persist],
   );
 
   /** Apply Excel delta: add new rows + patch changed rows (unchanged skipped). */
@@ -378,8 +388,9 @@ export function useAppState() {
     }) => {
       const { add, update } = payload;
       if (add.length === 0 && update.length === 0) return;
+      const prev = stateRef.current;
       const byId = new Map(update.map((u) => [u.id, u.patch]));
-      let tasks = state.tasks.map((t) => {
+      let tasks = prev.tasks.map((t) => {
         const patch = byId.get(t.id);
         if (!patch) return t;
         const next = { ...t, ...patch };
@@ -397,11 +408,12 @@ export function useAppState() {
           urgency: clampPriority(t.urgency),
           importance: clampPriority(t.importance),
         }));
-        tasks = [...tasks, ...normalized];
+        // Newest first — same as addMany
+        tasks = [...normalized, ...tasks];
       }
-      persist({ ...state, tasks });
+      persist({ ...prev, tasks });
     },
-    [persist, state],
+    [persist],
   );
 
   const applySideDelta = useCallback(
@@ -414,21 +426,46 @@ export function useAppState() {
     ) => {
       const { add, update } = payload;
       if (add.length === 0 && update.length === 0) return;
+      const prev = stateRef.current;
       const key = sideKey(kind);
       const byId = new Map(update.map((u) => [u.id, u.patch]));
-      let items = state[key].map((item) => {
+      let items = prev[key].map((item) => {
         const patch = byId.get(item.id);
         return patch ? { ...item, ...patch, done: false } : item;
       });
       if (add.length > 0) {
         items = [
-          ...items,
           ...add.map((i) => ({ ...i, done: false, completedAt: null })),
+          ...items,
         ];
       }
-      persist({ ...state, [key]: items });
+      persist({ ...prev, [key]: items });
     },
-    [persist, state],
+    [persist],
+  );
+
+  /**
+   * One persist for 할 일+지침+습관 (엑셀 불러오기「반영」).
+   * Avoids last-write-wins when three deltas fire in the same click.
+   */
+  const applyWorkbookDelta = useCallback(
+    (delta: WorkbookDeltaCommit) => {
+      if (workbookDeltaApplyCount(delta) === 0) return;
+      persist(applyWorkbookDeltaToState(stateRef.current, delta));
+    },
+    [persist],
+  );
+
+  /** One persist for import「목록 바꾸기」across sheets. */
+  const applyWorkbookReplace = useCallback(
+    (opts: {
+      tasks?: Task[] | null;
+      guidelines?: SideListItem[] | null;
+      habits?: SideListItem[] | null;
+    }) => {
+      persist(applyWorkbookReplaceToState(stateRef.current, opts));
+    },
+    [persist],
   );
 
   const updateTask = useCallback(
@@ -602,9 +639,10 @@ export function useAppState() {
   const replaceSideItems = useCallback(
     (kind: SideListKind, items: SideListItem[]) => {
       const key = sideKey(kind);
-      persist({ ...state, [key]: items });
+      const prev = stateRef.current;
+      persist({ ...prev, [key]: items });
     },
-    [persist, state],
+    [persist],
   );
 
   const updateSideItem = useCallback(
@@ -716,6 +754,8 @@ export function useAppState() {
     replaceByTaskCategories,
     applyTodoDelta,
     applySideDelta,
+    applyWorkbookDelta,
+    applyWorkbookReplace,
     updateTask,
     completeTask,
     completeTasks,

@@ -1616,3 +1616,143 @@ export function workbookDeltaApplyCount(d: WorkbookDeltaCommit): number {
     d.habit.update.length
   );
 }
+
+/** Minimal app slice needed to commit Excel import (avoids circular imports). */
+export type ImportAppSlice = {
+  tasks: Task[];
+  guidelines: SideListItem[];
+  habits: SideListItem[];
+};
+
+function sideKeyOf(kind: "guideline" | "habit"): "guidelines" | "habits" {
+  return kind === "guideline" ? "guidelines" : "habits";
+}
+
+/** Pure: apply todo delta onto a task list (adds prepended = newest-first). */
+export function applyTodoDeltaToTasks(
+  tasks: readonly Task[],
+  payload: TodoDeltaCommit,
+): Task[] {
+  const { add, update } = payload;
+  if (add.length === 0 && update.length === 0) return [...tasks];
+  const byId = new Map(update.map((u) => [u.id, u.patch]));
+  let next = tasks.map((t) => {
+    const patch = byId.get(t.id);
+    if (!patch) return t;
+    const merged = { ...t, ...patch };
+    if (patch.urgency !== undefined) {
+      merged.urgency = clampPriority(patch.urgency);
+    }
+    if (patch.importance !== undefined) {
+      merged.importance = clampPriority(patch.importance);
+    }
+    return merged;
+  });
+  if (add.length > 0) {
+    const normalized = add.map((t) => ({
+      ...t,
+      urgency: clampPriority(t.urgency),
+      importance: clampPriority(t.importance),
+    }));
+    // Newest first — same as 「행 추가」/ addMany
+    next = [...normalized, ...next];
+  }
+  return next;
+}
+
+/** Pure: apply 지침 or 습관 delta. */
+export function applySideDeltaToItems(
+  items: readonly SideListItem[],
+  payload: SideDeltaCommit,
+): SideListItem[] {
+  const { add, update } = payload;
+  if (add.length === 0 && update.length === 0) return [...items];
+  const byId = new Map(update.map((u) => [u.id, u.patch]));
+  let next = items.map((item) => {
+    const patch = byId.get(item.id);
+    return patch ? { ...item, ...patch, done: false } : item;
+  });
+  if (add.length > 0) {
+    next = [
+      ...add.map((i) => ({ ...i, done: false, completedAt: null })),
+      ...next,
+    ];
+  }
+  return next;
+}
+
+/**
+ * Pure atomic apply of 할 일 + 지침 + 습관 deltas in one state transition.
+ * Fixes the React stale-closure bug where sequential persist({...state})
+ * calls in one click left only the last sheet (습관) in the app.
+ */
+export function applyWorkbookDeltaToState<T extends ImportAppSlice>(
+  state: T,
+  delta: WorkbookDeltaCommit,
+): T {
+  let next: T = state;
+  if (delta.todo.add.length > 0 || delta.todo.update.length > 0) {
+    next = {
+      ...next,
+      tasks: applyTodoDeltaToTasks(next.tasks, delta.todo),
+    };
+  }
+  if (
+    delta.guideline.add.length > 0 ||
+    delta.guideline.update.length > 0
+  ) {
+    next = {
+      ...next,
+      guidelines: applySideDeltaToItems(next.guidelines, delta.guideline),
+    };
+  }
+  if (delta.habit.add.length > 0 || delta.habit.update.length > 0) {
+    next = {
+      ...next,
+      habits: applySideDeltaToItems(next.habits, delta.habit),
+    };
+  }
+  return next;
+}
+
+/** Pure atomic replace for import 「목록 바꾸기」mode. */
+export function applyWorkbookReplaceToState<T extends ImportAppSlice>(
+  state: T,
+  opts: {
+    tasks?: Task[] | null;
+    guidelines?: SideListItem[] | null;
+    habits?: SideListItem[] | null;
+  },
+): T {
+  let next: T = state;
+  if (opts.tasks && opts.tasks.length > 0) {
+    const normalized = opts.tasks.map((t) => ({
+      ...t,
+      urgency: clampPriority(t.urgency),
+      importance: clampPriority(t.importance),
+    }));
+    const cats = new Set(normalized.map((t) => t.category));
+    const kept = next.tasks.filter((t) => !cats.has(t.category));
+    next = { ...next, tasks: [...kept, ...normalized] };
+  }
+  if (opts.guidelines) {
+    next = { ...next, guidelines: opts.guidelines };
+  }
+  if (opts.habits) {
+    next = { ...next, habits: opts.habits };
+  }
+  return next;
+}
+
+/** @deprecated kept for call-site clarity — prefer applyWorkbookDeltaToState */
+export function applySideKindDeltaToState<T extends ImportAppSlice>(
+  state: T,
+  kind: "guideline" | "habit",
+  payload: SideDeltaCommit,
+): T {
+  const key = sideKeyOf(kind);
+  return {
+    ...state,
+    [key]: applySideDeltaToItems(state[key], payload),
+  };
+}

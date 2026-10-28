@@ -247,10 +247,14 @@ export function AssistantApp() {
                 onDelete={app.deleteTask}
                 onDeleteMany={app.deleteTasks}
                 onRestoreMany={app.restoreTasks}
-                onAdd={() =>
+                onAdd={(partial) =>
                   app.addTask({
-                    category: isTaskCategory(frame) ? frame : "work",
                     kind: "spot",
+                    ...partial,
+                    // Active 틀 wins — voice/typed rows always land in the selected frame.
+                    category: isTaskCategory(frame)
+                      ? frame
+                      : (partial?.category ?? "work"),
                   })
                 }
                 onImport={app.addMany}

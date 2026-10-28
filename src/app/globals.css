@@ -1498,6 +1498,16 @@
 .dark textarea {
   color-scheme: dark;
 }
+/* Schedule search: jump to 지침/습관 row */
+[data-side-item][data-search-focus="1"] {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--accent) 70%, white);
+}
+.dark [data-side-item][data-search-focus="1"] {
+  background: color-mix(in srgb, var(--brand) 28%, #1a221e);
+}
+
 /* Similar-task alert: peer row flash so father sees which one overlaps */
 tr[data-similarity-focus="1"] {
   outline: 2px solid #217346;

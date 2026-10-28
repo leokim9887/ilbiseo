@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Square } from "lucide-react";
+import { Keyboard, Mic, MicOff, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +13,9 @@ import {
 } from "@/components/ui/dialog";
 import {
   createKoreanSpeechRecognition,
+  isAppleMobileDevice,
   isSpeechRecognitionSupported,
+  speechListenHint,
   speechUnsupportedMessage,
   type SpeechRecognitionLike,
 } from "@/lib/speech-recognition";
@@ -55,6 +57,18 @@ type Draft = {
 
 function defaultCategory(frame: FrameId): TaskCategory {
   return isTaskCategory(frame) ? frame : "work";
+}
+
+function emptyDraft(category: TaskCategory, today: string): Draft {
+  return {
+    title: "",
+    memo: "",
+    startDate: today,
+    targetDate: today,
+    someday: false,
+    importance: 2,
+    category,
+  };
 }
 
 function fieldsToDraft(
@@ -115,6 +129,9 @@ function draftToCommit(d: Draft): VoiceRowCommit | null {
   };
 }
 
+const fieldClass =
+  "h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-3 text-[16px] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-11 sm:min-h-11 sm:rounded-lg sm:text-[15px]";
+
 export function VoiceRowAddButton({
   frame,
   onCommit,
@@ -153,8 +170,12 @@ export function VoiceRowAddButton({
   const [pickedCategory, setPickedCategory] = useState<TaskCategory>(
     defaultCategory(frame),
   );
+  const [manualMode, setManualMode] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [speechOk, setSpeechOk] = useState(true);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const today = todayIsoKst();
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const stopRec = useCallback(() => {
     try {
@@ -177,18 +198,33 @@ export function VoiceRowAddButton({
       const next = fieldsToDraft(parsed, today, pickedCategory);
       setDraft(next);
       if (parsed.spokenCategory) setPickedCategory(parsed.spokenCategory);
+      setManualMode(false);
     },
     [today, pickedCategory],
   );
 
+  const enableManual = useCallback(() => {
+    stopRec();
+    setManualMode(true);
+    setError(null);
+    setDraft((d) => d ?? emptyDraft(pickedCategory, today));
+    window.setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 80);
+  }, [pickedCategory, stopRec, today]);
+
   const startListening = useCallback(() => {
     setError(null);
+    setManualMode(false);
     if (supported.current === false || !isSpeechRecognitionSupported()) {
       supported.current = false;
+      setSpeechOk(false);
       setError(speechUnsupportedMessage());
+      enableManual();
       return;
     }
     supported.current = true;
+    setSpeechOk(true);
     stopRec();
     const rec = createKoreanSpeechRecognition({
       onStart: () => setListening(true),
@@ -201,20 +237,31 @@ export function VoiceRowAddButton({
       onError: (msg) => {
         setError(msg);
         setListening(false);
+        // iOS / permission failures → keep typing path ready
+        if (
+          msg.includes("직접 적기") ||
+          msg.includes("마이크 권한") ||
+          msg.includes("제한")
+        ) {
+          setDraft((d) => d ?? emptyDraft(pickedCategory, today));
+        }
       },
     });
     if (!rec) {
+      setSpeechOk(false);
       setError(speechUnsupportedMessage());
+      enableManual();
       return;
     }
     recRef.current = rec;
     try {
       rec.start();
     } catch {
-      setError("음성 인식을 시작하지 못했습니다. 다시 시도해 주세요.");
+      setError("음성 인식을 시작하지 못했습니다. 「직접 적기」를 이용해 주세요.");
       setListening(false);
+      enableManual();
     }
-  }, [applyTranscript, stopRec]);
+  }, [applyTranscript, enableManual, pickedCategory, stopRec, today]);
 
   const resetSession = useCallback(() => {
     setTranscript("");
@@ -222,6 +269,7 @@ export function VoiceRowAddButton({
     setParsedHint(null);
     setDraft(null);
     setError(null);
+    setManualMode(false);
     setPickedCategory(defaultCategory(frame));
   }, [frame]);
 
@@ -234,20 +282,44 @@ export function VoiceRowAddButton({
     setOpen(false);
   }, [setOpen, stopRec]);
 
+  // Stable refs so open-effect does not cancel auto-listen when callbacks churn.
+  const startListeningRef = useRef(startListening);
+  startListeningRef.current = startListening;
+  const resetSessionRef = useRef(resetSession);
+  resetSessionRef.current = resetSession;
+  const stopRecRef = useRef(stopRec);
+  stopRecRef.current = stopRec;
+  const frameRef = useRef(frame);
+  frameRef.current = frame;
+
   // Fresh listen session whenever the dialog opens (toolbar or「추가 기능」).
   const wasOpen = useRef(false);
   useEffect(() => {
     if (!open) {
       wasOpen.current = false;
-      stopRec();
+      stopRecRef.current();
       return;
     }
     if (wasOpen.current) return;
     wasOpen.current = true;
-    resetSession();
-    const t = window.setTimeout(() => startListening(), 120);
+    resetSessionRef.current();
+    const apple = isAppleMobileDevice();
+    setIsIos(apple);
+    const ok = isSpeechRecognitionSupported();
+    setSpeechOk(ok);
+    supported.current = ok;
+    // iOS without webkit: skip auto-listen, open typing path immediately.
+    if (!ok) {
+      setError(speechUnsupportedMessage());
+      setManualMode(true);
+      setDraft(emptyDraft(defaultCategory(frameRef.current), todayIsoKst()));
+      return;
+    }
+    // iOS with webkit: still try listen, but delay a bit for sheet settle.
+    const delay = apple ? 280 : 120;
+    const t = window.setTimeout(() => startListeningRef.current(), delay);
     return () => window.clearTimeout(t);
-  }, [open, resetSession, startListening, stopRec]);
+  }, [open]);
 
   useEffect(() => {
     return () => {
@@ -272,11 +344,12 @@ export function VoiceRowAddButton({
     onCommit(commit);
   }, [draft, pickedCategory, onCommit, stopRec, setOpen]);
 
-  const showUnsupportedOnly =
-    error != null &&
-    error.includes("음성 입력을 쓸 수 없습니다") &&
-    !draft &&
-    !transcript;
+  const showUnsupportedBanner =
+    !speechOk ||
+    (error != null &&
+      (error.includes("음성 입력을 쓸 수 없습니다") ||
+        error.includes("말로 넣는 기능이 제한") ||
+        error.includes("한국어 음성 인식을 쓰지 못했")));
 
   return (
     <>
@@ -305,15 +378,16 @@ export function VoiceRowAddButton({
         }}
       >
         <DialogContent
-          className="sm:max-w-md"
+          className="gap-3 max-sm:max-h-[min(92dvh,100%)] max-sm:gap-3 max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:px-4 max-sm:pt-4 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-md"
           data-voice-row-dialog
+          data-voice-ios={isIos ? "1" : "0"}
           showCloseButton
         >
-          <DialogHeader>
-            <DialogTitle className="text-[17px] text-[var(--ink)]">
+          <DialogHeader className="pr-8">
+            <DialogTitle className="text-[18px] font-semibold tracking-tight text-[var(--ink)] max-sm:text-[19px]">
               음성으로 행 추가
             </DialogTitle>
-            <DialogDescription className="text-[13.5px] leading-relaxed text-[var(--ink-muted)]">
+            <DialogDescription className="text-[14px] leading-relaxed text-[var(--ink-muted)] max-sm:text-[14.5px]">
               말씀하신 내용을 확인한 뒤 추가합니다. 틀은 아래에서 바꿀 수
               있습니다.
               {frame !== pickedCategory ? (
@@ -325,82 +399,107 @@ export function VoiceRowAddButton({
             </DialogDescription>
           </DialogHeader>
 
-          {showUnsupportedOnly ? (
+          {showUnsupportedBanner && !draft?.title && manualMode ? (
             <p
-              className="whitespace-pre-line rounded-lg bg-[#fff4e5] px-3 py-3 text-[14px] leading-relaxed text-[#7a4a00] dark:bg-[#3a2a10] dark:text-[#ffd89a]"
+              className="whitespace-pre-line rounded-xl bg-[#fff4e5] px-3.5 py-3.5 text-[15px] leading-relaxed text-[#7a4a00] dark:bg-[#3a2a10] dark:text-[#ffd89a]"
               data-voice-unsupported
             >
-              {error}
+              {error ?? speechUnsupportedMessage()}
             </p>
-          ) : (
-            <div className="space-y-3">
-              <label className="block space-y-1">
-                <span className="text-[12.5px] font-medium text-[var(--ink-muted)]">
-                  틀
-                </span>
-                <select
-                  data-voice-field-category
-                  value={pickedCategory}
-                  onChange={(e) => {
-                    const c = e.target.value as TaskCategory;
-                    setPickedCategory(c);
-                    setDraft((d) => (d ? { ...d, category: c } : d));
-                  }}
-                  className="h-11 w-full rounded-lg border border-[#c5ccd3] bg-white px-3 text-[15px] font-medium outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                  aria-label="틀 선택"
-                >
-                  {TASK_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {CATEGORY_LABEL[c]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          ) : null}
 
-              <div className="flex items-center gap-2">
+          <div className="space-y-3.5">
+            <label className="block space-y-1.5">
+              <span className="text-[13px] font-medium text-[var(--ink-muted)]">
+                틀
+              </span>
+              <select
+                data-voice-field-category
+                value={pickedCategory}
+                onChange={(e) => {
+                  const c = e.target.value as TaskCategory;
+                  setPickedCategory(c);
+                  setDraft((d) => (d ? { ...d, category: c } : d));
+                }}
+                className={fieldClass + " font-medium"}
+                aria-label="틀 선택"
+              >
+                {TASK_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {CATEGORY_LABEL[c]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-1 items-stretch gap-2">
                 {listening ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="min-h-11 flex-1 border-[#b42318]/40 text-[#b42318]"
+                    className="min-h-12 flex-1 touch-manipulation rounded-xl border-[#b42318]/40 text-[15px] text-[#b42318] sm:min-h-11 sm:rounded-lg"
                     onClick={stopRec}
                     data-voice-stop
                   >
-                    <Square className="size-3.5" aria-hidden />
+                    <Square className="size-4" aria-hidden />
                     듣기 그만
                   </Button>
                 ) : (
                   <Button
                     type="button"
                     size="sm"
-                    className="min-h-11 flex-1 bg-[var(--toss-blue)] text-white hover:bg-[#1b64da]"
+                    className="min-h-12 flex-1 touch-manipulation rounded-xl bg-[var(--toss-blue)] text-[15px] text-white hover:bg-[#1b64da] sm:min-h-11 sm:rounded-lg"
                     onClick={startListening}
                     data-voice-listen
+                    disabled={!speechOk}
                   >
-                    <Mic className="size-3.5" aria-hidden />
+                    <Mic className="size-4" aria-hidden />
                     {transcript ? "다시 말하기" : "말하기 시작"}
                   </Button>
                 )}
-                {listening ? (
-                  <span
-                    className="inline-flex items-center gap-1 text-[13px] font-medium text-[#b42318]"
-                    data-voice-listening
-                  >
-                    <MicOff className="size-3.5 animate-pulse" aria-hidden />
-                    듣는 중…
-                  </span>
-                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-12 min-w-12 touch-manipulation rounded-xl border-[var(--brand)]/30 px-3 text-[14px] text-[var(--brand)] sm:min-h-11 sm:rounded-lg"
+                  onClick={enableManual}
+                  data-voice-manual
+                  aria-label="직접 적기"
+                  aria-pressed={manualMode}
+                >
+                  <Keyboard className="size-4" aria-hidden />
+                  <span className="sm:inline">직접 적기</span>
+                </Button>
               </div>
+              {listening ? (
+                <span
+                  className="inline-flex items-center gap-1.5 text-[14px] font-medium text-[#b42318]"
+                  data-voice-listening
+                >
+                  <MicOff className="size-4 animate-pulse" aria-hidden />
+                  듣는 중…
+                </span>
+              ) : null}
+            </div>
 
+            <p
+              className="text-[13px] leading-snug text-[var(--ink-muted)]"
+              data-voice-listen-hint
+            >
+              {speechListenHint()}
+            </p>
+
+            {!manualMode ? (
               <div
-                className="rounded-lg border border-[#d0d5dd] bg-[#f8fafc] px-3 py-2 dark:border-[#3a4540] dark:bg-[#1a221e]"
+                className="rounded-xl border border-[#d0d5dd] bg-[#f8fafc] px-3.5 py-3 dark:border-[#3a4540] dark:bg-[#1a221e]"
                 data-voice-transcript
               >
-                <p className="text-[12px] font-medium text-[var(--ink-muted)]">
+                <p className="text-[12.5px] font-medium text-[var(--ink-muted)]">
                   인식된 말
                 </p>
-                <p className="mt-1 min-h-[2.5rem] whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--ink)]">
+                <p className="mt-1.5 min-h-[2.75rem] whitespace-pre-wrap text-[16px] leading-relaxed text-[var(--ink)] sm:text-[15px]">
                   {transcript || interim || (
                     <span className="text-[var(--ink-muted)]">
                       예: 보고서 쓰기 메모 급함 마감 10월 30일부터 11월 2일
@@ -409,173 +508,191 @@ export function VoiceRowAddButton({
                   )}
                 </p>
               </div>
+            ) : (
+              <p
+                className="rounded-xl bg-[var(--toss-blue-soft)] px-3.5 py-2.5 text-[14px] text-[var(--toss-blue)] dark:bg-[#1a2740]"
+                data-voice-manual-hint
+              >
+                직접 적기 모드입니다. 아래 칸을 채운 뒤 「추가」를 눌러 주세요.
+              </p>
+            )}
 
-              {error && !showUnsupportedOnly ? (
-                <p
-                  className="whitespace-pre-line text-[13.5px] text-[#b42318]"
-                  data-voice-error
-                >
-                  {error}
-                </p>
-              ) : null}
+            {error && !showUnsupportedBanner ? (
+              <p
+                className="whitespace-pre-line rounded-lg bg-[#fff4e5] px-3 py-2.5 text-[14px] text-[#b42318] dark:bg-[#3a2a10] dark:text-[#ffd89a]"
+                data-voice-error
+              >
+                {error}
+              </p>
+            ) : null}
+            {error && showUnsupportedBanner && draft?.title ? (
+              <p
+                className="whitespace-pre-line text-[13.5px] text-[#7a4a00]"
+                data-voice-error
+              >
+                {error}
+              </p>
+            ) : null}
 
-              {draft ? (
-                <div className="space-y-2.5" data-voice-confirm-fields>
-                  {parsedHint && parsedHint.uncertain.length > 0 ? (
-                    <p className="rounded-md bg-[#fff8e8] px-2.5 py-2 text-[13px] text-[#7a4a00] dark:bg-[#2a2410] dark:text-[#ffd89a]">
-                      일부 내용을 확실히 이해하지 못했습니다. 아래를 확인·수정한
-                      뒤 「추가」를 눌러 주세요.
-                    </p>
-                  ) : (
-                    <p className="text-[13px] text-[var(--ink-muted)]">
-                      맞으면 「추가」, 틀리면 고친 뒤 「추가」를 눌러 주세요.
-                    </p>
-                  )}
+            {draft ? (
+              <div className="space-y-3" data-voice-confirm-fields>
+                {parsedHint && parsedHint.uncertain.length > 0 ? (
+                  <p className="rounded-xl bg-[#fff8e8] px-3 py-2.5 text-[14px] text-[#7a4a00] dark:bg-[#2a2410] dark:text-[#ffd89a]">
+                    일부 내용을 확실히 이해하지 못했습니다. 아래를 확인·수정한
+                    뒤 「추가」를 눌러 주세요.
+                  </p>
+                ) : manualMode ? null : (
+                  <p className="text-[14px] text-[var(--ink-muted)]">
+                    맞으면 「추가」, 틀리면 고친 뒤 「추가」를 눌러 주세요.
+                  </p>
+                )}
 
-                  <label className="block space-y-1">
-                    <span className="text-[12.5px] font-medium text-[var(--ink-muted)]">
-                      할 일
-                    </span>
-                    <input
-                      data-voice-field-title
-                      value={draft.title}
-                      onChange={(e) =>
-                        setDraft((d) =>
-                          d ? { ...d, title: e.target.value } : d,
-                        )
-                      }
-                      className="h-11 w-full rounded-lg border border-[#c5ccd3] bg-white px-3 text-[15px] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                      placeholder="할 일 제목"
-                    />
-                  </label>
+                <label className="block space-y-1.5">
+                  <span className="text-[13px] font-medium text-[var(--ink-muted)]">
+                    할 일
+                  </span>
+                  <input
+                    ref={titleInputRef}
+                    data-voice-field-title
+                    value={draft.title}
+                    onChange={(e) =>
+                      setDraft((d) =>
+                        d ? { ...d, title: e.target.value } : d,
+                      )
+                    }
+                    className={fieldClass}
+                    placeholder="할 일 제목"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                  />
+                </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[12.5px] font-medium text-[var(--ink-muted)]">
-                      메모 (선택)
-                    </span>
-                    <input
-                      data-voice-field-memo
-                      value={draft.memo}
-                      onChange={(e) =>
-                        setDraft((d) =>
-                          d ? { ...d, memo: e.target.value } : d,
-                        )
-                      }
-                      className="h-11 w-full rounded-lg border border-[#c5ccd3] bg-white px-3 text-[15px] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                      placeholder="메모"
-                    />
-                  </label>
+                <label className="block space-y-1.5">
+                  <span className="text-[13px] font-medium text-[var(--ink-muted)]">
+                    메모 (선택)
+                  </span>
+                  <input
+                    data-voice-field-memo
+                    value={draft.memo}
+                    onChange={(e) =>
+                      setDraft((d) =>
+                        d ? { ...d, memo: e.target.value } : d,
+                      )
+                    }
+                    className={fieldClass}
+                    placeholder="메모"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                  />
+                </label>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      data-voice-field-someday
-                      aria-pressed={draft.someday}
-                      onClick={() =>
-                        setDraft((d) =>
-                          d ? { ...d, someday: !d.someday } : d,
-                        )
-                      }
-                      className={`h-10 min-h-10 rounded-lg border px-3 text-[13.5px] font-medium ${
-                        draft.someday
-                          ? "border-[var(--toss-blue)] bg-[#e8f1ff] text-[var(--toss-blue)]"
-                          : "border-[#c5ccd3] bg-white text-[var(--ink)] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                      }`}
-                    >
-                      언젠가
-                    </button>
-                    {!draft.someday ? (
-                      <>
-                        <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-[var(--ink-muted)]">
-                          시작
-                          <input
-                            type="date"
-                            data-voice-field-start
-                            value={draft.startDate}
-                            onChange={(e) =>
-                              setDraft((d) =>
-                                d
-                                  ? { ...d, startDate: e.target.value }
-                                  : d,
-                              )
-                            }
-                            className="h-10 min-w-0 flex-1 rounded-lg border border-[#c5ccd3] bg-white px-2 text-[14px] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                          />
-                        </label>
-                        <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[12.5px] text-[var(--ink-muted)]">
-                          종료
-                          <input
-                            type="date"
-                            data-voice-field-end
-                            value={draft.targetDate}
-                            onChange={(e) =>
-                              setDraft((d) =>
-                                d
-                                  ? { ...d, targetDate: e.target.value }
-                                  : d,
-                              )
-                            }
-                            className="h-10 min-w-0 flex-1 rounded-lg border border-[#c5ccd3] bg-white px-2 text-[14px] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                          />
-                        </label>
-                      </>
-                    ) : null}
-                  </div>
-
-                  <label className="block space-y-1">
-                    <span className="text-[12.5px] font-medium text-[var(--ink-muted)]">
-                      중요도 (1 낮음 · 2 보통 · 3 중요)
-                    </span>
-                    <select
-                      data-voice-field-importance
-                      value={draft.importance}
-                      onChange={(e) =>
-                        setDraft((d) =>
-                          d
-                            ? {
-                                ...d,
-                                importance: Number(e.target.value),
-                              }
-                            : d,
-                        )
-                      }
-                      className="h-11 w-full rounded-lg border border-[#c5ccd3] bg-white px-3 text-[15px] dark:border-[#4a5c52] dark:bg-[#24302a]"
-                    >
-                      {[1, 2, 3].map((n) => (
-                        <option key={n} value={n}>
-                          {n} · {importanceLabel(n)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    data-voice-field-someday
+                    aria-pressed={draft.someday}
+                    onClick={() =>
+                      setDraft((d) =>
+                        d ? { ...d, someday: !d.someday } : d,
+                      )
+                    }
+                    className={`h-12 min-h-12 touch-manipulation rounded-xl border px-4 text-[15px] font-medium sm:h-10 sm:min-h-10 sm:rounded-lg sm:text-[13.5px] ${
+                      draft.someday
+                        ? "border-[var(--toss-blue)] bg-[#e8f1ff] text-[var(--toss-blue)]"
+                        : "border-[#c5ccd3] bg-white text-[var(--ink)] dark:border-[#4a5c52] dark:bg-[#24302a]"
+                    }`}
+                  >
+                    언젠가
+                  </button>
+                  {!draft.someday ? (
+                    <>
+                      <label className="flex min-w-[9rem] flex-1 flex-col gap-1 text-[13px] text-[var(--ink-muted)] sm:min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
+                        시작
+                        <input
+                          type="date"
+                          data-voice-field-start
+                          value={draft.startDate}
+                          onChange={(e) =>
+                            setDraft((d) =>
+                              d
+                                ? { ...d, startDate: e.target.value }
+                                : d,
+                            )
+                          }
+                          className="h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-10 sm:min-h-10 sm:flex-1 sm:rounded-lg sm:text-[14px]"
+                        />
+                      </label>
+                      <label className="flex min-w-[9rem] flex-1 flex-col gap-1 text-[13px] text-[var(--ink-muted)] sm:min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
+                        종료
+                        <input
+                          type="date"
+                          data-voice-field-end
+                          value={draft.targetDate}
+                          onChange={(e) =>
+                            setDraft((d) =>
+                              d
+                                ? { ...d, targetDate: e.target.value }
+                                : d,
+                            )
+                          }
+                          className="h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-10 sm:min-h-10 sm:flex-1 sm:rounded-lg sm:text-[14px]"
+                        />
+                      </label>
+                    </>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-          )}
 
-          <DialogFooter className="gap-2 sm:justify-end">
+                <label className="block space-y-1.5">
+                  <span className="text-[13px] font-medium text-[var(--ink-muted)]">
+                    중요도 (1 낮음 · 2 보통 · 3 중요)
+                  </span>
+                  <select
+                    data-voice-field-importance
+                    value={draft.importance}
+                    onChange={(e) =>
+                      setDraft((d) =>
+                        d
+                          ? {
+                              ...d,
+                              importance: Number(e.target.value),
+                            }
+                          : d,
+                      )
+                    }
+                    className={fieldClass}
+                  >
+                    {[1, 2, 3].map((n) => (
+                      <option key={n} value={n}>
+                        {n} · {importanceLabel(n)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="sticky bottom-0 z-10 gap-2 border-t border-[#e5e8eb]/80 bg-popover/95 pt-3 backdrop-blur-sm max-sm:-mx-4 max-sm:px-4 max-sm:pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:justify-end">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="min-h-11"
+              className="min-h-12 touch-manipulation rounded-xl text-[15px] sm:min-h-11 sm:rounded-lg"
               onClick={closeDialog}
               data-voice-cancel
             >
               취소
             </Button>
-            {!showUnsupportedOnly ? (
-              <Button
-                type="button"
-                size="sm"
-                className="min-h-11 bg-[#217346] text-white hover:bg-[#1a5c38]"
-                disabled={!draft?.title.trim()}
-                onClick={confirm}
-                data-voice-confirm
-              >
-                추가
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-12 touch-manipulation rounded-xl bg-[#217346] text-[15px] text-white hover:bg-[#1a5c38] sm:min-h-11 sm:rounded-lg"
+              disabled={!draft?.title.trim()}
+              onClick={confirm}
+              data-voice-confirm
+            >
+              추가
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

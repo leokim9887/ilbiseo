@@ -66,6 +66,13 @@ import {
 } from "@/components/ui/dialog";
 import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
 import { ToolbarExtras } from "@/components/toolbar-extras";
+import { ScheduleSearch } from "@/components/schedule-search";
+import {
+  filterSheetRowsBySearch,
+  filterSideBySearch,
+  normalizeSearchQuery,
+  type SideSearchHit,
+} from "@/lib/schedule-search";
 import {
   ArrowDown,
   ArrowUp,
@@ -339,6 +346,8 @@ export function ExcelWorkbook({
   );
   /** After alert OK: switch 틀 if needed, then scroll/focus this row */
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  /** Father-friendly schedule/task search (filter-as-you-type) */
+  const [searchQuery, setSearchQuery] = useState("");
   const similarityAckRef = useRef<Set<string>>(new Set());
   const similarityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -394,14 +403,68 @@ export function ExcelWorkbook({
     setColumnSort((prev) => cycleColumnSort(prev, key as ColumnSortKey));
   };
 
-  const taskIds = useMemo(
-    () => rows.filter((r) => r.kind === "task").map((r) => r.task.id),
-    [rows],
+  const searchActive = normalizeSearchQuery(searchQuery).length > 0;
+  const displayRows = useMemo(
+    () => filterSheetRowsBySearch(rows, searchQuery),
+    [rows, searchQuery],
   );
-  const calCount = rows.filter((r) => r.kind === "calendar").length;
-  const taskCount = rows.filter((r) => r.kind === "task").length;
+  const sideHits = useMemo((): SideSearchHit[] => {
+    const q = normalizeSearchQuery(searchQuery);
+    if (!q) return [];
+    return [
+      ...filterSideBySearch(guidelines, q).map((item) => ({
+        kind: "guideline" as const,
+        item,
+      })),
+      ...filterSideBySearch(habits, q).map((item) => ({
+        kind: "habit" as const,
+        item,
+      })),
+    ];
+  }, [searchQuery, guidelines, habits]);
+
+  const taskIds = useMemo(
+    () =>
+      displayRows.filter((r) => r.kind === "task").map((r) => r.task.id),
+    [displayRows],
+  );
+  const calCount = displayRows.filter((r) => r.kind === "calendar").length;
+  const taskCount = displayRows.filter((r) => r.kind === "task").length;
   const filterActive = Boolean(filterStart || filterEnd);
   const gcalFilterActive = Boolean(gcalRangeStart || gcalRangeEnd);
+
+  const jumpSideHit = useCallback((hit: SideSearchHit) => {
+    const safe =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape(hit.item.id)
+        : hit.item.id.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const el = document.querySelector(
+      `[data-side-item="${safe}"]`,
+    ) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.setAttribute("data-search-focus", "1");
+    const title = el.querySelector(
+      `[data-side-title="${safe}"]`,
+    ) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (title && !title.disabled && !title.readOnly) {
+      title.focus({ preventScroll: true });
+    }
+    window.setTimeout(() => {
+      el.removeAttribute("data-search-focus");
+    }, 3600);
+  }, []);
+
+  const focusFirstSearchMatch = useCallback(() => {
+    const first = displayRows.find(
+      (r) => r.kind === "task" || r.kind === "calendar",
+    );
+    if (first && first.kind === "task") {
+      setPendingFocusId(first.id);
+      return;
+    }
+    if (sideHits[0]) jumpSideHit(sideHits[0]);
+  }, [displayRows, sideHits, jumpSideHit]);
 
   const selectedCount = selectedIds.size;
   const selectedDeletableIds = useMemo(
@@ -1007,8 +1070,22 @@ export function ExcelWorkbook({
           {!isGcal && filterActive ? " · 기간" : ""}
           {isGcal && sheet === "todo" && gcalFilterActive ? " · 기간" : ""}
           {columnSort ? ` · ${columnSortLabel(columnSort)}` : ""}
+          {searchActive ? " · 검색" : ""}
         </span>
       </div>
+
+      {!isGcal ? (
+        <ScheduleSearch
+          value={searchQuery}
+          onChange={setSearchQuery}
+          matchCount={taskCount}
+          searching={searchActive}
+          sideHits={sideHits}
+          onJumpSide={jumpSideHit}
+          onClear={() => setSearchQuery("")}
+          onSubmit={focusFirstSearchMatch}
+        />
+      ) : null}
 
       {/* Period filter OR Google calendar picker */}
       {isGcal && sheet === "todo" ? (
@@ -1270,13 +1347,26 @@ export function ExcelWorkbook({
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
-              <tr>
+            {displayRows.length === 0 ? (
+              <tr data-schedule-search-empty={searchActive ? "1" : undefined}>
                 <td
                   colSpan={emptyColSpan}
                   className="border border-black px-4 py-16 text-center text-[16px] text-[#3d4641]"
                 >
-                  {filterActive && !isGcal && sheet === "todo" ? (
+                  {searchActive ? (
+                    <div className="space-y-2" data-schedule-search-empty-copy>
+                      <p className="font-medium text-[var(--ink)]">
+                        「{normalizeSearchQuery(searchQuery)}」에 맞는{" "}
+                        {sheet === "todo" ? "할 일" : "한 일"}이 없습니다.
+                      </p>
+                      <p className="text-[14px] text-[var(--ink-muted)]">
+                        다른 말로 찾아 보시거나, 검색어를 지워 주세요.
+                        {sideHits.length > 0
+                          ? ` 아래 지침·습관 ${sideHits.length}건은 있습니다.`
+                          : ""}
+                      </p>
+                    </div>
+                  ) : filterActive && !isGcal && sheet === "todo" ? (
                     <p>
                       이 기간에 할 일이 없습니다.
                     </p>
@@ -1298,7 +1388,7 @@ export function ExcelWorkbook({
                 </td>
               </tr>
             ) : (
-              rows.map((row, idx) => {
+              displayRows.map((row, idx) => {
                 if (row.kind === "past-separator") {
                   return (
                     <tr
@@ -1323,7 +1413,7 @@ export function ExcelWorkbook({
                 if (row.kind === "calendar") {
                   const ev = row.event;
                   const order =
-                    rows
+                    displayRows
                       .slice(0, idx + 1)
                       .filter((r) => r.kind !== "past-separator").length;
                   return (
@@ -1349,7 +1439,7 @@ export function ExcelWorkbook({
 
                 const task = row.task;
                 const order =
-                  rows
+                  displayRows
                     .slice(0, idx + 1)
                     .filter((r) => r.kind === "task" || r.kind === "calendar")
                     .length;

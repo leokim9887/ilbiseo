@@ -7,6 +7,36 @@ const KIND_ORDER: Record<TaskKind, number> = {
   someday: 2,
 };
 
+/** Newest `createdAt` first — used when migrating pre-v5 append-order arrays. */
+export function orderByCreatedAtNewestFirst<
+  T extends { createdAt: string },
+>(items: T[]): T[] {
+  return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * Active tasks in **stored array order** (newest-first after v5).
+ * Does not re-sort by title/importance — keeps 「행 추가」 position stable.
+ */
+export function listActiveInStoredOrder(
+  tasks: Task[],
+  category?: TaskCategory,
+): Task[] {
+  return tasks.filter(
+    (t) =>
+      t.status === "active" &&
+      (category ? t.category === category : true),
+  );
+}
+
+/** Active list for Excel/sync: stored order, then 「지난 일정」 sink to end. */
+export function listActiveForExport(
+  tasks: Task[],
+  today: string = todayIsoKst(),
+): Task[] {
+  return sinkPastUnfinishedTasksLast(listActiveInStoredOrder(tasks), today);
+}
+
 function score(task: Task): number {
     // 중요도만 (시급성 열 제거 후)
   return task.importance;

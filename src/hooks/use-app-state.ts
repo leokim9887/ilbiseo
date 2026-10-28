@@ -308,8 +308,9 @@ export function useAppState() {
         createdAt: new Date().toISOString(),
         completedAt: null,
       };
+      // Newest first: insert at index 0 of the persisted array.
       persist(
-        clearDeletions({ ...state, tasks: [...state.tasks, task] }, [task.id]),
+        clearDeletions({ ...state, tasks: [task, ...state.tasks] }, [task.id]),
       );
       return task;
     },
@@ -324,9 +325,10 @@ export function useAppState() {
         urgency: clampPriority(t.urgency),
         importance: clampPriority(t.importance),
       }));
+      // Imported batch lands on top (same newest-first rule as 「행 추가」).
       persist(
         clearDeletions(
-          { ...state, tasks: [...state.tasks, ...normalized] },
+          { ...state, tasks: [...normalized, ...state.tasks] },
           normalized.map((t) => t.id),
         ),
       );
@@ -574,7 +576,7 @@ export function useAppState() {
         completedAt: null,
       };
       persist(
-        clearDeletions({ ...state, [key]: [...state[key], item] }, [item.id]),
+        clearDeletions({ ...state, [key]: [item, ...state[key]] }, [item.id]),
       );
       return item;
     },
@@ -588,7 +590,7 @@ export function useAppState() {
       const key = sideKey(kind);
       persist(
         clearDeletions(
-          { ...state, [key]: [...state[key], ...items] },
+          { ...state, [key]: [...items, ...state[key]] },
           items.map((i) => i.id),
         ),
       );

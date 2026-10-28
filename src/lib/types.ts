@@ -87,8 +87,8 @@ export interface AppState {
 
 export const STORAGE_KEY = "ilbiseo-state-v2";
 export const LEGACY_STORAGE_KEY = "ilbiseo-tasks-v1";
-/** v4: deletions tombstones for sync-safe delete */
-export const APP_VERSION = 4;
+/** v5: task/side arrays are newest-first (「행 추가」 = index 0) */
+export const APP_VERSION = 5;
 
 export const CATEGORY_ORDER: TaskCategory[] = [...TASK_CATEGORIES];
 

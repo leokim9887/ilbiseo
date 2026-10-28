@@ -133,9 +133,10 @@ export function SideListSection({
 
   const handleAdd = useCallback(() => {
     onAdd();
+    // New row is prepended — keep the top of the list in view.
     requestAnimationFrame(() => {
       listScrollRef.current?.scrollTo({
-        top: listScrollRef.current.scrollHeight,
+        top: 0,
         behavior: "smooth",
       });
     });

@@ -12,7 +12,7 @@ import {
   type Task,
 } from "./types";
 import { createId } from "./id";
-import { inferGroupKey } from "./sort";
+import { inferGroupKey, orderByCreatedAtNewestFirst } from "./sort";
 import { clampPriority } from "./priority";
 import {
   normalizeTaskDeadlineDates,
@@ -196,6 +196,7 @@ export function normalizeState(raw: unknown): AppState | null {
   const obj = raw as Record<string, unknown>;
   if (!Array.isArray(obj.tasks)) return null;
 
+  const rawVersion = Number(obj.version ?? 0);
   const today = todayIsoKst();
   const rawTasks = obj.tasks as Record<string, unknown>[];
   const migratedGuidelines: SideListItem[] = [];
@@ -238,16 +239,22 @@ export function normalizeState(raw: unknown): AppState | null {
     : [];
 
   const deletions = normalizeDeletions(obj.deletions);
-  const tasks = foldChecklistsIntoTasks(keptTasks, legacyChecks).filter(
+  let tasks = foldChecklistsIntoTasks(keptTasks, legacyChecks).filter(
     (t) => !(t.id in deletions),
   );
-  const guidelines = mergeSideLists(
+  let guidelines = mergeSideLists(
     fromFieldGuidelines,
     migratedGuidelines,
   ).filter((i) => !(i.id in deletions));
-  const habits = mergeSideLists(fromFieldHabits, migratedHabits).filter(
+  let habits = mergeSideLists(fromFieldHabits, migratedHabits).filter(
     (i) => !(i.id in deletions),
   );
+  // v5: arrays are newest-first. Pre-v5 data was append-order (oldest first).
+  if (rawVersion < 5) {
+    tasks = orderByCreatedAtNewestFirst(tasks);
+    guidelines = orderByCreatedAtNewestFirst(guidelines);
+    habits = orderByCreatedAtNewestFirst(habits);
+  }
   const calendarEvents = (
     Array.isArray(obj.calendarEvents)
       ? (obj.calendarEvents as CalendarEvent[])

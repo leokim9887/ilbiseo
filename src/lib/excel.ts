@@ -5,7 +5,7 @@ import {
   type SideListItem,
   type Task,
 } from "./types";
-import { sortCompleted, sortTasks } from "./sort";
+import { listActiveForExport, sortCompleted } from "./sort";
 import type { DailyBriefing } from "./briefing";
 import {
   filterCalendarEventsInWindow,
@@ -432,7 +432,8 @@ export async function buildWorkbook(
   const todo = wb.addWorksheet("할 일", {
     views: [{ state: "frozen", ySplit: 1, showGridLines: true }],
   });
-  const activeTasks = sortTasks(tasks);
+  // Match UI: stored newest-first order + 「지난 일정」 sink to end.
+  const activeTasks = listActiveForExport(tasks);
   const todoRows: ExcelJS.CellValue[][] = activeTasks.map((t, i) => [
     i + 1,
     CATEGORY_LABEL[t.category],

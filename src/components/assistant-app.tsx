@@ -251,10 +251,10 @@ export function AssistantApp() {
                   app.addTask({
                     kind: "spot",
                     ...partial,
-                    // Active 틀 wins — voice/typed rows always land in the selected frame.
-                    category: isTaskCategory(frame)
-                      ? frame
-                      : (partial?.category ?? "work"),
+                    // Voice commit carries its own 틀; blank「행 추가」uses the screen frame.
+                    category:
+                      partial?.category ??
+                      (isTaskCategory(frame) ? frame : "work"),
                   })
                 }
                 onImport={app.addMany}

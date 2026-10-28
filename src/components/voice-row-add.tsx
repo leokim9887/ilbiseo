@@ -23,12 +23,24 @@ import {
 } from "@/lib/voice-row-parse";
 import { clampPriority, importanceLabel } from "@/lib/priority";
 import { todayIsoKst } from "@/lib/date-range";
-import type { Task, TaskKind } from "@/lib/types";
-import { FRAME_LABEL, isTaskCategory, type FrameId } from "@/lib/types";
+import type { Task, TaskCategory, TaskKind } from "@/lib/types";
+import {
+  CATEGORY_LABEL,
+  FRAME_LABEL,
+  isTaskCategory,
+  TASK_CATEGORIES,
+  type FrameId,
+} from "@/lib/types";
 
 export type VoiceRowCommit = Pick<
   Task,
-  "title" | "memo" | "startDate" | "targetDate" | "kind" | "importance"
+  | "title"
+  | "memo"
+  | "startDate"
+  | "targetDate"
+  | "kind"
+  | "importance"
+  | "category"
 >;
 
 type Draft = {
@@ -38,9 +50,19 @@ type Draft = {
   targetDate: string;
   someday: boolean;
   importance: number;
+  category: TaskCategory;
 };
 
-function fieldsToDraft(p: VoiceParsedFields, today: string): Draft {
+function defaultCategory(frame: FrameId): TaskCategory {
+  return isTaskCategory(frame) ? frame : "work";
+}
+
+function fieldsToDraft(
+  p: VoiceParsedFields,
+  today: string,
+  fallbackCategory: TaskCategory,
+): Draft {
+  const category = p.spokenCategory ?? fallbackCategory;
   if (p.kind === "someday" || p.deadlineKind === "someday") {
     return {
       title: p.title,
@@ -49,6 +71,7 @@ function fieldsToDraft(p: VoiceParsedFields, today: string): Draft {
       targetDate: today,
       someday: true,
       importance: p.importance,
+      category,
     };
   }
   return {
@@ -58,6 +81,7 @@ function fieldsToDraft(p: VoiceParsedFields, today: string): Draft {
     targetDate: p.targetDate ?? p.startDate ?? today,
     someday: false,
     importance: p.importance,
+    category,
   };
 }
 
@@ -72,6 +96,7 @@ function draftToCommit(d: Draft): VoiceRowCommit | null {
       targetDate: null,
       kind: "someday",
       importance: clampPriority(d.importance, 2),
+      category: d.category,
     };
   }
   const start = d.startDate.trim() || todayIsoKst();
@@ -86,6 +111,7 @@ function draftToCommit(d: Draft): VoiceRowCommit | null {
     targetDate: b,
     kind,
     importance: clampPriority(d.importance, 2),
+    category: d.category,
   };
 }
 
@@ -93,22 +119,42 @@ export function VoiceRowAddButton({
   frame,
   onCommit,
   disabled,
+  /** Hide the toolbar chip — open only via menu / imperative. */
+  showTrigger = true,
+  open: openProp,
+  onOpenChange,
 }: {
   frame: FrameId;
   onCommit: (fields: VoiceRowCommit) => void;
   disabled?: boolean;
+  showTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const supported = useRef<boolean | null>(null);
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!controlled) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [controlled, onOpenChange],
+  );
+
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [parsedHint, setParsedHint] = useState<VoiceParsedFields | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [pickedCategory, setPickedCategory] = useState<TaskCategory>(
+    defaultCategory(frame),
+  );
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const today = todayIsoKst();
-  const frameLabel = FRAME_LABEL[frame];
 
   const stopRec = useCallback(() => {
     try {
@@ -128,9 +174,11 @@ export function VoiceRowAddButton({
       setInterim("");
       const parsed = parseVoiceRowAdd(cleaned, { today });
       setParsedHint(parsed);
-      setDraft(fieldsToDraft(parsed, today));
+      const next = fieldsToDraft(parsed, today, pickedCategory);
+      setDraft(next);
+      if (parsed.spokenCategory) setPickedCategory(parsed.spokenCategory);
     },
-    [today],
+    [today, pickedCategory],
   );
 
   const startListening = useCallback(() => {
@@ -168,21 +216,38 @@ export function VoiceRowAddButton({
     }
   }, [applyTranscript, stopRec]);
 
-  const openDialog = useCallback(() => {
+  const resetSession = useCallback(() => {
     setTranscript("");
     setInterim("");
     setParsedHint(null);
     setDraft(null);
     setError(null);
+    setPickedCategory(defaultCategory(frame));
+  }, [frame]);
+
+  const openDialog = useCallback(() => {
     setOpen(true);
-    // Defer start so dialog paints first (mic permission prompt on Android)
-    window.setTimeout(() => startListening(), 120);
-  }, [startListening]);
+  }, [setOpen]);
 
   const closeDialog = useCallback(() => {
     stopRec();
     setOpen(false);
-  }, [stopRec]);
+  }, [setOpen, stopRec]);
+
+  // Fresh listen session whenever the dialog opens (toolbar or「추가 기능」).
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      wasOpen.current = false;
+      stopRec();
+      return;
+    }
+    if (wasOpen.current) return;
+    wasOpen.current = true;
+    resetSession();
+    const t = window.setTimeout(() => startListening(), 120);
+    return () => window.clearTimeout(t);
+  }, [open, resetSession, startListening, stopRec]);
 
   useEffect(() => {
     return () => {
@@ -196,7 +261,8 @@ export function VoiceRowAddButton({
 
   const confirm = useCallback(() => {
     if (!draft) return;
-    const commit = draftToCommit(draft);
+    const withCat = { ...draft, category: pickedCategory };
+    const commit = draftToCommit(withCat);
     if (!commit) {
       setError("할 일 제목을 입력해 주세요.");
       return;
@@ -204,7 +270,7 @@ export function VoiceRowAddButton({
     stopRec();
     setOpen(false);
     onCommit(commit);
-  }, [draft, onCommit, stopRec]);
+  }, [draft, pickedCategory, onCommit, stopRec, setOpen]);
 
   const showUnsupportedOnly =
     error != null &&
@@ -214,25 +280,28 @@ export function VoiceRowAddButton({
 
   return (
     <>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={disabled}
-        className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[var(--toss-blue)]/40 px-2 text-[12.5px] font-semibold text-[var(--toss-blue)] hover:bg-[#e8f1ff] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:px-3 sm:h-9 sm:min-h-9 sm:rounded-lg sm:px-3 sm:text-[14px] dark:hover:bg-[#1a2740]"
-        onClick={openDialog}
-        data-excel-voice-add
-        aria-label="음성으로 입력"
-        title="음성으로 입력"
-      >
-        <Mic className="size-3.5" aria-hidden />
-        <span className="max-sm:inline">음성으로 입력</span>
-      </Button>
+      {showTrigger ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[var(--toss-blue)]/40 px-2 text-[12.5px] font-semibold text-[var(--toss-blue)] hover:bg-[#e8f1ff] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:px-3 sm:h-9 sm:min-h-9 sm:rounded-lg sm:px-3 sm:text-[14px] dark:hover:bg-[#1a2740]"
+          onClick={openDialog}
+          data-excel-voice-add
+          aria-label="음성으로 입력"
+          title="음성으로 입력"
+        >
+          <Mic className="size-3.5" aria-hidden />
+          <span className="max-sm:inline">음성으로 입력</span>
+        </Button>
+      ) : null}
 
       <Dialog
         open={open}
         onOpenChange={(next) => {
           if (!next) closeDialog();
+          else setOpen(true);
         }}
       >
         <DialogContent
@@ -245,13 +314,14 @@ export function VoiceRowAddButton({
               음성으로 행 추가
             </DialogTitle>
             <DialogDescription className="text-[13.5px] leading-relaxed text-[var(--ink-muted)]">
-              현재 틀:{" "}
-              <strong className="font-semibold text-[var(--ink)]">
-                {frameLabel}
-              </strong>
-              {isTaskCategory(frame)
-                ? " — 말씀하신 내용이 이 틀에 추가됩니다."
-                : " — 음성 추가는 업무·개인·과제·팀원 틀에서만 됩니다."}
+              말씀하신 내용을 확인한 뒤 추가합니다. 틀은 아래에서 바꿀 수
+              있습니다.
+              {frame !== pickedCategory ? (
+                <>
+                  {" "}
+                  (열었을 때 화면 틀: {FRAME_LABEL[frame]})
+                </>
+              ) : null}
             </DialogDescription>
           </DialogHeader>
 
@@ -264,6 +334,29 @@ export function VoiceRowAddButton({
             </p>
           ) : (
             <div className="space-y-3">
+              <label className="block space-y-1">
+                <span className="text-[12.5px] font-medium text-[var(--ink-muted)]">
+                  틀
+                </span>
+                <select
+                  data-voice-field-category
+                  value={pickedCategory}
+                  onChange={(e) => {
+                    const c = e.target.value as TaskCategory;
+                    setPickedCategory(c);
+                    setDraft((d) => (d ? { ...d, category: c } : d));
+                  }}
+                  className="h-11 w-full rounded-lg border border-[#c5ccd3] bg-white px-3 text-[15px] font-medium outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a]"
+                  aria-label="틀 선택"
+                >
+                  {TASK_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {CATEGORY_LABEL[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <div className="flex items-center gap-2">
                 {listening ? (
                   <Button
@@ -476,7 +569,7 @@ export function VoiceRowAddButton({
                 type="button"
                 size="sm"
                 className="min-h-11 bg-[#217346] text-white hover:bg-[#1a5c38]"
-                disabled={!draft?.title.trim() || !isTaskCategory(frame)}
+                disabled={!draft?.title.trim()}
                 onClick={confirm}
                 data-voice-confirm
               >

@@ -56,6 +56,24 @@ eq("bare default today", bare.deadlineKind, "unset");
 const until = parseVoiceRowAdd("보고서 마감 11월 2일까지", { today });
 eq("until end", until.targetDate, `${year}-11-02`);
 
+// Mobile STT often glues markers (no spaces)
+const glued = parseVoiceRowAdd(
+  "보고서쓰기메모급함마감10월30일부터11월2일중요도높음",
+  { today },
+);
+eq("glued title", glued.title, "보고서쓰기");
+eq("glued memo", glued.memo, "급함");
+eq("glued start", glued.startDate, `${year}-10-30`);
+eq("glued end", glued.targetDate, `${year}-11-02`);
+eq("glued imp", glued.importance, 3);
+
+const sameDay = parseVoiceRowAdd("회의 준비 마감 당일 중요도 보통", { today });
+eq("dangil", [sameDay.startDate, sameDay.targetDate, sameDay.kind], [
+  today,
+  today,
+  "spot",
+]);
+
 if (failed) {
   console.error(`${failed} failed`);
   process.exit(1);

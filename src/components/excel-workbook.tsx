@@ -65,7 +65,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
-import { ExcelImport } from "@/components/excel-import";
+import { ToolbarExtras } from "@/components/toolbar-extras";
 import {
   ArrowDown,
   ArrowUp,
@@ -76,10 +76,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import {
-  VoiceRowAddButton,
-  type VoiceRowCommit,
-} from "@/components/voice-row-add";
+import type { VoiceRowCommit } from "@/components/voice-row-add";
 
 export type WorkbookSheet = "todo" | "done";
 
@@ -666,9 +663,12 @@ export function ExcelWorkbook({
   /** Voice 「행 추가」: same validators + newest-first insert + similar-todo alert. */
   const commitVoiceRow = useCallback(
     (fields: VoiceRowCommit) => {
-      if (!isTaskCategory(frame)) return;
+      const cat = fields.category;
+      if (!isTaskCategory(cat)) return;
+      // Switch 틀 so the new row is visible (voice UI may pick a different frame).
+      if (frame !== cat) onFrameChange(cat);
       const created = onAdd({
-        category: frame,
+        category: cat,
         title: fields.title,
         memo: fields.memo,
         startDate: fields.startDate,
@@ -686,7 +686,7 @@ export function ExcelWorkbook({
         setPendingFocusId(created.id);
       }
     },
-    [frame, onAdd, maybeWarnSimilarWording],
+    [frame, onFrameChange, onAdd, maybeWarnSimilarWording],
   );
 
   const bulkDelete = useCallback(() => {
@@ -929,29 +929,22 @@ export function ExcelWorkbook({
             data-excel-toolbar-actions
             data-excel-bulk-row
           >
-            {/* 한 줄: 행 추가 | 엑셀 불러오기 | 완료 | 선택 삭제 */}
+            {/* 한 줄: 행 추가 | 추가 기능(음성·엑셀) | 완료 | 선택 삭제 */}
             {sheet === "todo" && !isAll ? (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[var(--toss-blue)] px-2 text-[12.5px] font-semibold text-white hover:bg-[#1b64da] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:px-3 sm:h-9 sm:min-h-9 sm:rounded-lg sm:px-3 sm:text-[14px]"
-                  onClick={() => onAdd()}
-                  data-excel-add-row
-                >
-                  <Plus className="size-3.5" />
-                  행 추가
-                </Button>
-                {isTaskCategory(frame) ? (
-                  <VoiceRowAddButton
-                    frame={frame}
-                    onCommit={commitVoiceRow}
-                  />
-                ) : null}
-              </>
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[var(--toss-blue)] px-2 text-[12.5px] font-semibold text-white hover:bg-[#1b64da] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:px-3 sm:h-9 sm:min-h-9 sm:rounded-lg sm:px-3 sm:text-[14px]"
+                onClick={() => onAdd()}
+                data-excel-add-row
+              >
+                <Plus className="size-3.5" />
+                행 추가
+              </Button>
             ) : null}
             {sheet === "todo" && (isTaskCategory(frame) || isAll) ? (
-              <ExcelImport
+              <ToolbarExtras
+                frame={frame}
                 category={isTaskCategory(frame) ? frame : "work"}
                 onImport={onImport}
                 onReplaceCategory={onReplaceCategory}
@@ -965,6 +958,7 @@ export function ExcelWorkbook({
                 existingTasks={importPeers}
                 existingGuidelines={guidelines}
                 existingHabits={habits}
+                onVoiceCommit={commitVoiceRow}
               />
             ) : null}
             {selectedCount > 0 && sheet === "todo" ? (

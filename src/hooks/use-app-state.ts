@@ -297,17 +297,25 @@ export function useAppState() {
   const addTask = useCallback(
     (partial?: Partial<Task>) => {
       const title = (partial?.title ?? "").trim();
+      const kind = partial?.kind ?? "spot";
+      const hasStart = partial != null && "startDate" in partial;
+      const hasTarget = partial != null && "targetDate" in partial;
       const task: Task = {
         id: createId(),
         title,
         category: partial?.category ?? "work",
-        kind: partial?.kind ?? "spot",
-        startDate:
-          partial?.startDate ??
-          (partial?.kind === "someday" ? null : todayIsoKst()),
-        targetDate:
-          partial?.targetDate ??
-          (partial?.kind === "someday" ? null : todayIsoKst()),
+        kind,
+        // Respect explicit null (언젠가). `??` alone would replace null with today.
+        startDate: hasStart
+          ? (partial.startDate ?? null)
+          : kind === "someday"
+            ? null
+            : todayIsoKst(),
+        targetDate: hasTarget
+          ? (partial.targetDate ?? null)
+          : kind === "someday"
+            ? null
+            : todayIsoKst(),
         urgency: clampPriority(partial?.urgency, 2),
         importance: clampPriority(partial?.importance, 2),
         groupKey: partial?.groupKey ?? inferGroupKey(title),

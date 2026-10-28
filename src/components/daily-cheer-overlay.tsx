@@ -9,13 +9,13 @@ const STORAGE_KEY = "ilbiseo-daily-cheer-kst";
 const IDX_KEY = "ilbiseo-daily-cheer-idx";
 
 /**
- * QA toggle for Ace daily cheer.
- * TEMP: every refresh for hooded upper-body photo QA (`018cde6` crop).
+ * QA toggle for Ace daily cheer (keep `false` in production).
+ * Photo confirmed — once-daily gate restored (07:00 Asia/Seoul).
  *
  * `true`  → show overlay on every page refresh/load (ignore 07:00 KST day gate).
  * `false` → once per cheer day via `cheerDayIsoKst()` + localStorage (07:00 Asia/Seoul).
  */
-const FORCE_CHEER_EVERY_LOAD = true;
+const FORCE_CHEER_EVERY_LOAD = false;
 
 /** Father-friendly rotating pool — Ace cheering grandpa. */
 export const CHEER_MESSAGES = [
@@ -95,7 +95,7 @@ function writeShownDay(day: string) {
  * Placement: viewport-centered stage (items-center + justify-center), including phone
  * (`max-width: 639px` / Tailwind default below `sm`).
  * Once per cheer day: Asia/Seoul day boundary at 07:00 (not midnight).
- * FORCE_CHEER_EVERY_LOAD = true (TEMP every-load photo QA for hooded upper-body).
+ * FORCE_CHEER_EVERY_LOAD = false (once per cheer day after 07:00 KST).
  */
 export function DailyCheerOverlay() {
   const [open, setOpen] = useState(false);

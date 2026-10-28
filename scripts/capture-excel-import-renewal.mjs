@@ -180,8 +180,7 @@ async function openImportPreview(page, fixturePath) {
   if (await frameSelect.count()) {
     await frameSelect.selectOption("all");
   }
-  await page.locator("[data-toolbar-extras]").click();
-  await page.locator("[data-toolbar-extras-excel]").click();
+  await page.locator("[data-excel-import]").click();
   await page.waitForSelector('[data-slot="dialog-content"], [role="dialog"]');
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles(fixturePath);

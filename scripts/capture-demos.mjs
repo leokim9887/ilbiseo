@@ -25,56 +25,19 @@ fs.mkdirSync(OUT, { recursive: true });
     fullPage: true,
   });
 
-  await page.getByRole("button", { name: "메모 붙여넣기" }).click();
-  await page.locator("#memo-text").waitFor();
-  await page.fill(
-    "#memo-text",
-    "오늘 후보자 전화 확인\nJD 수정 — 이번 주\n언젠가 사무실 정리",
-  );
-  await page.getByRole("button", { name: "할 일로 추가" }).click();
-  await page.waitForTimeout(500);
+  await page.locator("[data-excel-import]").first().click();
+  await page.waitForTimeout(300);
   await page.screenshot({
-    path: path.join(OUT, "ilbiseo-after-memo-import.png"),
+    path: path.join(OUT, "ilbiseo-excel-import-dialog.png"),
     fullPage: true,
   });
-
-  await page.locator('[data-slot="checkbox"]').first().click();
-  await page.waitForTimeout(400);
-  await page.getByRole("tab", { name: /완료 기록/ }).click();
-  await page.waitForTimeout(400);
-  await page.screenshot({
-    path: path.join(OUT, "ilbiseo-completion-log.png"),
-    fullPage: true,
-  });
-
-  await page.getByRole("tab", { name: /TO DO/ }).click();
+  await page.keyboard.press("Escape");
   await page.waitForTimeout(200);
-  await page.getByRole("button", { name: "캘린더 가져오기" }).click();
-  await page.getByRole("button", { name: "mock JSON 불러오기" }).click();
-  await page.waitForTimeout(200);
-  await page.screenshot({
-    path: path.join(OUT, "ilbiseo-calendar-dialog.png"),
-    fullPage: true,
-  });
-  await page.getByRole("button", { name: "일정 반영" }).click();
-  await page.waitForTimeout(400);
-  await page.screenshot({
-    path: path.join(OUT, "ilbiseo-after-calendar.png"),
-    fullPage: true,
-  });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(400);
   await page.screenshot({
     path: path.join(OUT, "ilbiseo-todo-mobile.png"),
-    fullPage: true,
-  });
-
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole("button", { name: "사진 OCR" }).click();
-  await page.waitForTimeout(300);
-  await page.screenshot({
-    path: path.join(OUT, "ilbiseo-ocr-dialog.png"),
     fullPage: true,
   });
 

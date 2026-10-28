@@ -65,7 +65,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
-import { ToolbarExtras } from "@/components/toolbar-extras";
+import { ExcelImport } from "@/components/excel-import";
 import {
   ArrowDown,
   ArrowUp,
@@ -876,7 +876,7 @@ export function ExcelWorkbook({
             data-excel-toolbar-actions
             data-excel-bulk-row
           >
-            {/* 한 줄: 행 추가 | 추가 기능 | 완료 | 선택 삭제 */}
+            {/* 한 줄: 행 추가 | 엑셀 불러오기 | 완료 | 선택 삭제 */}
             {sheet === "todo" && !isAll ? (
               <Button
                 type="button"
@@ -890,7 +890,7 @@ export function ExcelWorkbook({
               </Button>
             ) : null}
             {sheet === "todo" && (isTaskCategory(frame) || isAll) ? (
-              <ToolbarExtras
+              <ExcelImport
                 category={isTaskCategory(frame) ? frame : "work"}
                 onImport={onImport}
                 onReplaceCategory={onReplaceCategory}
@@ -902,7 +902,6 @@ export function ExcelWorkbook({
                 existingTasks={importPeers}
                 existingGuidelines={guidelines}
                 existingHabits={habits}
-                excelOnly={isAll}
               />
             ) : null}
             {selectedCount > 0 && sheet === "todo" ? (

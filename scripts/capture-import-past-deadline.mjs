@@ -128,8 +128,7 @@ async function main() {
   await dismissCheerIfAny(page);
 
   // Import
-  await page.locator("[data-toolbar-extras]").click();
-  await page.locator("[data-toolbar-extras-excel]").click();
+  await page.locator("[data-excel-import]").click();
   await page.waitForSelector('[role="dialog"]');
   await page.locator('input[type="file"]').setInputFiles(fixture);
   const nextBtn = page.locator('button:has-text("다음")');

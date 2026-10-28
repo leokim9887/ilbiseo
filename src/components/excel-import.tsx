@@ -372,7 +372,7 @@ export function ExcelImport({
               type="button"
               variant="outline"
               size="sm"
-              className="h-11 min-h-11 touch-manipulation rounded-sm border-[#8a939a] bg-white px-3 sm:h-9 sm:min-h-9 dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#e8eee9]"
+              className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#8a939a] bg-white px-2 text-[12.5px] text-[#454d48] dark:border-[#4a5c52] dark:bg-[#24302a] dark:text-[#c5cec9] max-sm:h-11 max-sm:min-h-11 max-sm:px-3 sm:h-9 sm:min-h-9 sm:px-2 sm:text-[13px]"
               data-excel-import
             >
               <FileSpreadsheet className="size-3.5" />

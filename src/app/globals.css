@@ -1452,8 +1452,7 @@
   color: #a8b3ad !important;
 }
 
-/* Toolbar extras / dropdowns */
-.dark [data-toolbar-extras],
+/* Dropdowns / popovers */
 .dark [data-slot="dropdown-menu-content"],
 .dark [data-slot="popover-content"] {
   background-color: #1e2823 !important;

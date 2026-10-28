@@ -66,39 +66,23 @@ if (await cheer.isVisible().catch(() => false)) {
 await page.locator('select[aria-label="틀"]').selectOption("work");
 await page.waitForTimeout(200);
 
-const standalone = await page.locator("[data-excel-import]").count();
-if (standalone !== 0) {
-  throw new Error("standalone 엑셀 불러오기 button should be gone");
+const extras = await page.locator("[data-toolbar-extras]").count();
+if (extras !== 0) {
+  throw new Error("추가 기능 menu should be removed");
 }
-const extras = page.locator("[data-toolbar-extras]");
-if ((await extras.count()) !== 1) {
-  throw new Error("추가 기능 trigger missing");
+const memoItem = await page.locator("[data-toolbar-extras-memo]").count();
+const ocrItem = await page.locator("[data-toolbar-extras-ocr]").count();
+if (memoItem !== 0 || ocrItem !== 0) {
+  throw new Error("메모/OCR entry points should be gone");
 }
-await extras.click();
-await page.waitForTimeout(250);
-const excelItem = page.locator("[data-toolbar-extras-excel]");
-await excelItem.waitFor({ state: "visible", timeout: 3000 });
-const memoItem = page.locator("[data-toolbar-extras-memo]");
-const ocrItem = page.locator("[data-toolbar-extras-ocr]");
-const excelBox = await excelItem.boundingBox();
-const memoBox = await memoItem.boundingBox();
-const ocrBox = await ocrItem.boundingBox();
-if (!excelBox || !memoBox || !ocrBox) throw new Error("menu items missing boxes");
-if (!(excelBox.y < memoBox.y && memoBox.y < ocrBox.y)) {
-  throw new Error(
-    `excel must be top of extras menu: excel=${excelBox.y} memo=${memoBox.y} ocr=${ocrBox.y}`,
-  );
+const excelBtn = page.locator("[data-excel-import]");
+if ((await excelBtn.count()) !== 1) {
+  throw new Error("standalone 엑셀 불러오기 button missing");
 }
+await excelBtn.waitFor({ state: "visible", timeout: 3000 });
 
 await page.screenshot({
-  path: path.join(OUT, "ilbiseo-extras-menu-excel-top.png"),
-});
-
-// Close menu by clicking elsewhere
-await page.keyboard.press("Escape");
-await page.waitForTimeout(200);
-await page.screenshot({
-  path: path.join(OUT, "ilbiseo-extras-toolbar-no-standalone-excel.png"),
+  path: path.join(OUT, "ilbiseo-excel-import-button-only.png"),
 });
 
 await page.evaluate(

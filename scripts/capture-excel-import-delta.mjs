@@ -182,8 +182,7 @@ async function main() {
     const page = await context.newPage();
     await page.goto(BASE, { waitUntil: "networkidle" });
     await dismissOverlays(page);
-    await page.locator("[data-toolbar-extras]").first().click();
-    await page.locator("[data-toolbar-extras-excel]").click();
+    await page.locator("[data-excel-import]").first().click();
     await page.locator('input[type="file"]').setInputFiles(fixture);
     await page.waitForTimeout(800);
     const sheetPick = page.locator("[data-excel-import-sheet-pick]");

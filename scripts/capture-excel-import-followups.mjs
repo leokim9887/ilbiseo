@@ -164,9 +164,8 @@ async function openImport(page) {
       await b.first().click({ force: true }).catch(() => {});
     }
   }
-  await page.locator("[data-toolbar-extras]").waitFor({ timeout: 15000 });
-  await page.locator("[data-toolbar-extras]").click();
-  await page.locator("[data-toolbar-extras-excel]").click();
+  await page.locator("[data-excel-import]").waitFor({ timeout: 15000 });
+  await page.locator("[data-excel-import]").click();
   await page.waitForSelector('[role="dialog"]');
 }
 

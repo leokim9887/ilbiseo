@@ -83,19 +83,41 @@ async function shot(page, name, clip) {
 
   await shot(ios, "ilbiseo-iphone-tab-glass-idle.png");
 
-  // Force :active styles via temporary class for a stable still
+  // Idle already shows active-tab frost on 할 일; force press glass on 일정
   await ios.addStyleTag({
     content: `
       nav[data-toss-tabbar][data-ios-glass="1"] button[data-demo-press="1"] {
         opacity: 1 !important;
-        transform: scale(0.9) !important;
-        background-color: rgba(255, 255, 255, 0.28) !important;
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.55) inset,
-          0 6px 16px rgba(49, 130, 246, 0.1) !important;
+        transform: scale(0.92) !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
       }
       nav[data-toss-tabbar][data-ios-glass="1"] button[data-demo-press="1"]::before {
         opacity: 1 !important;
+        background: linear-gradient(
+          165deg,
+          rgba(255, 255, 255, 0.98) 0%,
+          rgba(230, 237, 245, 0.88) 52%,
+          rgba(214, 224, 236, 0.7) 100%
+        ) !important;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 1),
+          inset 0 -1px 0 rgba(15, 23, 42, 0.06),
+          0 2px 6px rgba(15, 23, 42, 0.08),
+          0 0 0 0.5px rgba(15, 23, 42, 0.08) !important;
+      }
+      .dark nav[data-toss-tabbar][data-ios-glass="1"] button[data-demo-press="1"]::before {
+        background: linear-gradient(
+          165deg,
+          rgba(255, 255, 255, 0.28) 0%,
+          rgba(255, 255, 255, 0.12) 55%,
+          rgba(255, 255, 255, 0.06) 100%
+        ) !important;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.32),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+          0 2px 8px rgba(0, 0, 0, 0.45),
+          0 0 0 0.5px rgba(255, 255, 255, 0.12) !important;
       }
     `,
   });

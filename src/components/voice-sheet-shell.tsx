@@ -5,13 +5,17 @@ import { cn } from "@/lib/utils";
 
 /** Shared father-friendly sheet chrome for voice input dialogs. */
 export const VOICE_SHEET_CONTENT_CLASS =
-  "flex max-h-[min(88dvh,36rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md max-sm:max-h-[min(92dvh,100%)]";
+  "flex max-h-[min(88dvh,36rem)] w-full max-w-full flex-col gap-0 overflow-hidden overflow-x-hidden p-0 sm:max-w-md max-sm:max-h-[min(92dvh,100%)] max-sm:max-w-full";
 
 export const voiceFieldClass =
-  "h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-3 text-[16px] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-11 sm:min-h-11 sm:rounded-lg sm:text-[15px]";
+  "h-12 min-h-12 w-full max-w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-3 text-[16px] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-11 sm:min-h-11 sm:rounded-lg sm:text-[15px]";
+
+/** 할 일 title: padded multi-line, auto-grow (no fixed height / no resize handle). */
+export const voiceTitleFieldClass =
+  "box-border min-h-12 w-full max-w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-4 py-3.5 text-[16px] leading-[1.6] [field-sizing:fixed] outline-none focus:border-[var(--toss-blue)] dark:border-[#4a5c52] dark:bg-[#24302a] sm:min-h-11 sm:rounded-lg sm:px-3.5 sm:py-3 sm:text-[15px] sm:leading-[1.55]";
 
 export const voiceDateClass =
-  "h-12 min-h-12 w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-11 sm:min-h-11 sm:rounded-lg sm:text-[14px]";
+  "h-12 min-h-12 w-full max-w-full touch-manipulation rounded-xl border border-[#c5ccd3] bg-white px-2 text-[16px] dark:border-[#4a5c52] dark:bg-[#24302a] sm:h-11 sm:min-h-11 sm:rounded-lg sm:text-[14px]";
 
 export function VoiceSheetHeader({
   children,
@@ -23,7 +27,7 @@ export function VoiceSheetHeader({
   return (
     <div
       className={cn(
-        "shrink-0 space-y-1 border-b border-[#e8ecf0] px-4 pb-3 pt-4 pr-12 dark:border-[#2a3530]",
+        "min-w-0 shrink-0 space-y-1 overflow-x-hidden border-b border-[#e8ecf0] px-4 pb-3 pt-4 pr-12 dark:border-[#2a3530]",
         className,
       )}
     >
@@ -42,7 +46,7 @@ export function VoiceSheetBody({
   return (
     <div
       className={cn(
-        "min-h-0 flex-1 space-y-3.5 overflow-y-auto overscroll-contain px-4 py-3.5",
+        "min-h-0 min-w-0 flex-1 space-y-3.5 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none px-4 py-3.5 touch-pan-y",
         className,
       )}
     >
@@ -61,7 +65,7 @@ export function VoiceSheetFooter({
   return (
     <div
       className={cn(
-        "flex shrink-0 flex-row gap-2 border-t border-[#e8ecf0] bg-popover px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-[#2a3530]",
+        "flex min-w-0 shrink-0 flex-row gap-2 overflow-x-hidden border-t border-[#e8ecf0] bg-popover px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-[#2a3530]",
         className,
       )}
     >

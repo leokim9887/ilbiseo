@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  forwardRef,
+  useImperativeHandle,
   useLayoutEffect,
   useRef,
   type TextareaHTMLAttributes,
@@ -12,14 +14,16 @@ type AutoGrowTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 };
 
 /** Content-sized textarea — no manual resize handle. */
-export function AutoGrowTextarea({
-  className,
-  value,
-  onChange,
-  onInput,
-  ...props
-}: AutoGrowTextareaProps) {
+export const AutoGrowTextarea = forwardRef<
+  HTMLTextAreaElement,
+  AutoGrowTextareaProps
+>(function AutoGrowTextarea(
+  { className, value, onChange, onInput, ...props },
+  forwardedRef,
+) {
   const ref = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(forwardedRef, () => ref.current as HTMLTextAreaElement);
 
   const syncHeight = () => {
     const el = ref.current;
@@ -43,7 +47,10 @@ export function AutoGrowTextarea({
         syncHeight();
         onInput?.(e);
       }}
-      className={cn("resize-none overflow-hidden", className)}
+      className={cn(
+        "resize-none overflow-hidden [field-sizing:fixed]",
+        className,
+      )}
     />
   );
-}
+});

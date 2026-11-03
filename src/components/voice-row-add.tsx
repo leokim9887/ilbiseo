@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AutoGrowTextarea } from "@/components/auto-grow-textarea";
 import {
   VoiceDeadlineFields,
   VoiceSheetBody,
@@ -17,6 +18,7 @@ import {
   VoiceSheetHeader,
   VOICE_SHEET_CONTENT_CLASS,
   voiceFieldClass,
+  voiceTitleFieldClass,
 } from "@/components/voice-sheet-shell";
 import {
   createKoreanSpeechRecognition,
@@ -575,11 +577,11 @@ export function VoiceRowAddButton({
                   </p>
                 )}
 
-                <label className="block space-y-1.5">
+                <label className="block min-w-0 space-y-1.5">
                   <span className="text-[13px] font-medium text-[var(--ink-muted)]">
                     할 일
                   </span>
-                  <textarea
+                  <AutoGrowTextarea
                     ref={titleInputRef}
                     data-voice-field-title
                     value={draft.title}
@@ -588,11 +590,11 @@ export function VoiceRowAddButton({
                         d ? { ...d, title: e.target.value } : d,
                       )
                     }
-                    className={`${voiceFieldClass} min-h-[2.75rem] resize-y`}
+                    className={voiceTitleFieldClass}
                     placeholder="할 일 제목"
-                    rows={draft.title.includes("\n") ? 2 : 1}
                     enterKeyHint="done"
                     autoComplete="off"
+                    aria-label="할 일"
                   />
                 </label>
 

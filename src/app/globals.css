@@ -664,10 +664,9 @@
   }
 
   /*
-   * iPhone / iPad only — liquid-glass active + press on bottom category tabs.
+   * iPhone / iPad only — liquid-glass press on bottom category tabs.
    * Gated by data-ios-glass="1" (UA: iPhone/iPad/iPod + iPadOS desktop quirk).
    * Android / Samsung keep the subtle .toss-press scale+opacity above.
-   * Neutral frost (no purple / colored outer glow); Toss blue stays on icon/label only.
    */
   nav[data-toss-tabbar][data-ios-glass="1"] button {
     position: relative;
@@ -675,8 +674,8 @@
     isolation: isolate;
     -webkit-tap-highlight-color: transparent;
     transition:
-      transform 0.36s cubic-bezier(0.34, 1.45, 0.64, 1),
-      opacity 0.16s ease,
+      transform 0.4s cubic-bezier(0.34, 1.55, 0.64, 1),
+      opacity 0.18s ease,
       color 0.2s ease,
       background-color 0.22s ease,
       box-shadow 0.22s ease;
@@ -685,31 +684,25 @@
   nav[data-toss-tabbar][data-ios-glass="1"] button::before {
     content: "";
     position: absolute;
-    inset: 2px 4px;
+    inset: 3px 4px;
     z-index: 0;
-    border-radius: 0.95rem;
+    border-radius: 0.9rem;
     pointer-events: none;
     opacity: 0;
-    /* Frosted pill — readable on white bar via cool mist + rim (no color glow) */
     background: linear-gradient(
-      165deg,
-      rgba(255, 255, 255, 0.92) 0%,
-      rgba(236, 241, 247, 0.72) 48%,
-      rgba(226, 233, 242, 0.55) 100%
+      160deg,
+      rgba(255, 255, 255, 0.62) 0%,
+      rgba(255, 255, 255, 0.22) 44%,
+      rgba(49, 130, 246, 0.14) 100%
     );
-    border: 1px solid rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.5);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      inset 0 -1px 0 rgba(15, 23, 42, 0.04),
-      0 1px 2px rgba(15, 23, 42, 0.05),
-      0 0 0 0.5px rgba(15, 23, 42, 0.06);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    transition:
-      opacity 0.18s ease,
-      background 0.18s ease,
-      border-color 0.18s ease,
-      box-shadow 0.18s ease;
+      inset 0 1px 0 rgba(255, 255, 255, 0.72),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+      0 0 0 0.5px rgba(49, 130, 246, 0.08);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    transition: opacity 0.2s ease;
   }
 
   nav[data-toss-tabbar][data-ios-glass="1"] button > * {
@@ -717,36 +710,18 @@
     z-index: 1;
   }
 
-  /* Selected tab: quiet persistent frost (readable, not a glow) */
-  nav[data-toss-tabbar][data-ios-glass="1"] button[data-toss-tab-active="1"]::before {
-    opacity: 0.72;
-  }
-
-  nav[data-toss-tabbar][data-ios-glass="1"] button[data-toss-tab-active="1"] {
-    background-color: transparent;
-  }
-
   nav[data-toss-tabbar][data-ios-glass="1"] button:active {
     /* Override generic .toss-press wash-out — glass stays bright */
     opacity: 1;
-    transform: scale(0.92);
-    background-color: transparent;
-    box-shadow: none;
+    transform: scale(0.9);
+    background-color: rgba(255, 255, 255, 0.28);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.55) inset,
+      0 6px 16px rgba(49, 130, 246, 0.1);
   }
 
   nav[data-toss-tabbar][data-ios-glass="1"] button:active::before {
     opacity: 1;
-    background: linear-gradient(
-      165deg,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(230, 237, 245, 0.88) 52%,
-      rgba(214, 224, 236, 0.7) 100%
-    );
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 1),
-      inset 0 -1px 0 rgba(15, 23, 42, 0.06),
-      0 2px 6px rgba(15, 23, 42, 0.08),
-      0 0 0 0.5px rgba(15, 23, 42, 0.08);
   }
 
   nav[data-toss-tabbar][data-ios-glass="1"] button:focus-visible {
@@ -756,40 +731,23 @@
 
   .dark nav[data-toss-tabbar][data-ios-glass="1"] button::before {
     background: linear-gradient(
-      165deg,
-      rgba(255, 255, 255, 0.2) 0%,
-      rgba(255, 255, 255, 0.08) 50%,
-      rgba(255, 255, 255, 0.04) 100%
+      160deg,
+      rgba(255, 255, 255, 0.24) 0%,
+      rgba(255, 255, 255, 0.06) 46%,
+      rgba(49, 130, 246, 0.22) 100%
     );
     border-color: rgba(255, 255, 255, 0.22);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.28),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-      0 1px 3px rgba(0, 0, 0, 0.35),
-      0 0 0 0.5px rgba(255, 255, 255, 0.08);
-  }
-
-  .dark nav[data-toss-tabbar][data-ios-glass="1"] button[data-toss-tab-active="1"] {
-    background-color: transparent;
-  }
-
-  .dark nav[data-toss-tabbar][data-ios-glass="1"] button:active::before {
-    background: linear-gradient(
-      165deg,
-      rgba(255, 255, 255, 0.28) 0%,
-      rgba(255, 255, 255, 0.12) 55%,
-      rgba(255, 255, 255, 0.06) 100%
-    );
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.32),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-      0 2px 8px rgba(0, 0, 0, 0.45),
-      0 0 0 0.5px rgba(255, 255, 255, 0.12);
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+      0 0 0 0.5px rgba(49, 130, 246, 0.16);
   }
 
   .dark nav[data-toss-tabbar][data-ios-glass="1"] button:active {
-    background-color: transparent;
-    box-shadow: none;
+    background-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.18) inset,
+      0 8px 20px rgba(0, 0, 0, 0.35);
   }
 }
 

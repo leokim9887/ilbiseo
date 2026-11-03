@@ -120,7 +120,14 @@ await page.waitForTimeout(500);
 
 await page.locator("[data-voice-field-title]").waitFor({ state: "visible" });
 const title = await page.locator("[data-voice-field-title]").inputValue();
-if (title !== "보고서 쓰기") throw new Error(`title=${title}`);
+// Memo folds under 할 일 — no separate 메모 field
+const titleNorm = title.replace(/\n+$/, "");
+if (titleNorm !== "보고서 쓰기\n급함") {
+  throw new Error(`title=${JSON.stringify(title)}`);
+}
+if ((await page.locator("[data-voice-field-memo]").count()) > 0) {
+  throw new Error("expected no voice confirm memo field");
+}
 const cat = await page.locator("[data-voice-field-category]").inputValue();
 if (cat !== "work") throw new Error(`cat=${cat}`);
 

@@ -492,7 +492,8 @@ export function ExcelImport({
                           <select
                             value={
                               todoMapping[h] === "urgency" ||
-                              todoMapping[h] === "done"
+                              todoMapping[h] === "done" ||
+                              todoMapping[h] === "memo"
                                 ? "skip"
                                 : (todoMapping[h] ?? "skip")
                             }
@@ -509,7 +510,8 @@ export function ExcelImport({
                               {IMPORT_FIELD_LABEL.skip}
                             </option>
                             {IMPORT_TARGET_FIELDS.filter(
-                              (f) => f !== "done",
+                              // 할 일 path: no standalone 메모 (2nd line under title)
+                              (f) => f !== "done" && f !== "memo",
                             ).map((f) => (
                               <option key={f} value={f}>
                                 {IMPORT_FIELD_LABEL[f]}

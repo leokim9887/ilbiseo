@@ -47,6 +47,14 @@ ok(
 
 ok("suggest-urgency-skip", suggestFieldForHeader("시급성") === "skip");
 ok("suggest-urgency-en-skip", suggestFieldForHeader("urgency") === "skip");
+ok(
+  "todo-memo-header-skip",
+  suggestFieldForHeader("메모", "todo") === "skip",
+);
+ok(
+  "side-memo-header-kept",
+  suggestFieldForHeader("메모", "guideline") === "memo",
+);
 
 ok("template-new", isIlbiseoTemplate(newHeaders));
 ok("template-classic-with-urgency", isIlbiseoTemplate(classicHeaders));

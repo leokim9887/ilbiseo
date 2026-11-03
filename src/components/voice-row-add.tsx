@@ -78,16 +78,41 @@ function emptyDraft(category: TaskCategory, today: string): Draft {
   };
 }
 
+/**
+ * Confirm sheet has no separate 메모 box (same as the task table).
+ * Spoken memo folds under 할 일 as a second line — Excel round-trip pattern.
+ */
+function foldMemoIntoTitle(title: string, memo: string): string {
+  const t = title.trim();
+  const m = memo.trim();
+  if (!m) return t;
+  if (!t) return m;
+  return `${t}\n${m}`;
+}
+
+/** Inverse of fold — first line title, rest memo (matches Excel splitListUp). */
+function splitTitleMemo(raw: string): { title: string; memo: string } {
+  const lines = raw
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return { title: "", memo: "" };
+  if (lines.length === 1) return { title: lines[0], memo: "" };
+  return { title: lines[0], memo: lines.slice(1).join("\n") };
+}
+
 function fieldsToDraft(
   p: VoiceParsedFields,
   today: string,
   fallbackCategory: TaskCategory,
 ): Draft {
   const category = p.spokenCategory ?? fallbackCategory;
+  const title = foldMemoIntoTitle(p.title, p.memo);
   if (p.kind === "someday" || p.deadlineKind === "someday") {
     return {
-      title: p.title,
-      memo: p.memo,
+      title,
+      memo: "",
       startDate: today,
       targetDate: today,
       someday: true,
@@ -96,8 +121,8 @@ function fieldsToDraft(
     };
   }
   return {
-    title: p.title,
-    memo: p.memo,
+    title,
+    memo: "",
     startDate: p.startDate ?? today,
     targetDate: p.targetDate ?? p.startDate ?? today,
     someday: false,
@@ -107,12 +132,13 @@ function fieldsToDraft(
 }
 
 function draftToCommit(d: Draft): VoiceRowCommit | null {
-  const title = d.title.trim();
+  const { title, memo: fromTitle } = splitTitleMemo(d.title);
+  const memo = fromTitle || d.memo.trim();
   if (!title) return null;
   if (d.someday) {
     return {
       title,
-      memo: d.memo.trim(),
+      memo,
       startDate: null,
       targetDate: null,
       kind: "someday",
@@ -127,7 +153,7 @@ function draftToCommit(d: Draft): VoiceRowCommit | null {
   const kind: TaskKind = a === b ? "spot" : "ongoing";
   return {
     title,
-    memo: d.memo.trim(),
+    memo,
     startDate: a,
     targetDate: b,
     kind,
@@ -179,7 +205,7 @@ export function VoiceRowAddButton({
   const [speechOk, setSpeechOk] = useState(true);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const today = todayIsoKst();
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const stopRec = useCallback(() => {
     try {
@@ -504,8 +530,8 @@ export function VoiceRowAddButton({
                 <p className="mt-1.5 min-h-[2.75rem] whitespace-pre-wrap break-words text-[16px] leading-relaxed text-[var(--ink)] sm:text-[15px]">
                   {transcript || interim || (
                     <span className="text-[var(--ink-muted)]">
-                      예: 보고서 쓰기 메모 급함 마감 10월 30일부터 11월 2일
-                      중요도 높음
+                      예: 보고서 쓰기 마감 10월 30일부터 11월 2일 중요도
+                      높음
                     </span>
                   )}
                 </p>
@@ -553,7 +579,7 @@ export function VoiceRowAddButton({
                   <span className="text-[13px] font-medium text-[var(--ink-muted)]">
                     할 일
                   </span>
-                  <input
+                  <textarea
                     ref={titleInputRef}
                     data-voice-field-title
                     value={draft.title}
@@ -562,27 +588,9 @@ export function VoiceRowAddButton({
                         d ? { ...d, title: e.target.value } : d,
                       )
                     }
-                    className={voiceFieldClass}
+                    className={`${voiceFieldClass} min-h-[2.75rem] resize-y`}
                     placeholder="할 일 제목"
-                    enterKeyHint="done"
-                    autoComplete="off"
-                  />
-                </label>
-
-                <label className="block space-y-1.5">
-                  <span className="text-[13px] font-medium text-[var(--ink-muted)]">
-                    메모 (선택)
-                  </span>
-                  <input
-                    data-voice-field-memo
-                    value={draft.memo}
-                    onChange={(e) =>
-                      setDraft((d) =>
-                        d ? { ...d, memo: e.target.value } : d,
-                      )
-                    }
-                    className={voiceFieldClass}
-                    placeholder="메모"
+                    rows={draft.title.includes("\n") ? 2 : 1}
                     enterKeyHint="done"
                     autoComplete="off"
                   />

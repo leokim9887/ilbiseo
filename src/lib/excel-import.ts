@@ -385,6 +385,16 @@ export function suggestFieldForHeader(
   if (n === "완료여부" || n === "완료" || n === "done" || n === "status") {
     return "skip";
   }
+  // 할 일 path: no standalone 메모 column — memo lives as 2nd line under「할 일」.
+  // 지침/습관 still map「메모」. Legacy todo「메모」header is skipped (not dropped from file).
+  if (
+    sheetKind === "todo" &&
+    HEADER_ALIASES.memo.some(
+      (a) => n === normalizeHeader(a) || n === a || n.includes(a),
+    )
+  ) {
+    return "skip";
+  }
   // Prefer exact template match for title
   if (TEMPLATE_TITLE_HEADERS.has(n) || n === "할 일" || n === "할일") {
     return "title";
@@ -402,6 +412,10 @@ export function suggestFieldForHeader(
         field === "importance" ||
         field === "category")
     ) {
+      continue;
+    }
+    // Todo sheets: never target「메모」— second line under title only
+    if (sheetKind === "todo" && field === "memo") {
       continue;
     }
     const aliases = HEADER_ALIASES[field];
@@ -498,6 +512,11 @@ export function applySavedOrAuto(
   const out: ColumnMapping = {};
   for (const h of headers) {
     const fromSaved = byNorm.get(normalizeHeader(h));
+    // Todo: coerce legacy「메모」column mappings → skip (2nd line under title)
+    if (sheetKind === "todo" && fromSaved === "memo") {
+      out[h] = "skip";
+      continue;
+    }
     if (
       fromSaved &&
       fromSaved !== "skip" &&

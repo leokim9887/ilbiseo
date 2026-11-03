@@ -144,9 +144,17 @@ await page.waitForTimeout(500);
 const title = page.locator("[data-voice-field-title]");
 await title.waitFor({ state: "visible", timeout: 5000 });
 const titleVal = await title.inputValue();
-if (titleVal !== "장보기") throw new Error(`title=${titleVal}`);
-const memo = await page.locator("[data-voice-field-memo]").inputValue();
-if (memo !== "우유") throw new Error(`memo=${memo}`);
+// Spoken memo folds under 할 일 (no separate 메모 box)
+if (titleVal !== "장보기\n우유" && titleVal !== "장보기\n우유\n") {
+  // normalize trailing newline
+  const norm = titleVal.replace(/\n+$/, "");
+  if (norm !== "장보기\n우유") {
+    throw new Error(`title=${JSON.stringify(titleVal)}`);
+  }
+}
+if ((await page.locator("[data-voice-field-memo]").count()) > 0) {
+  throw new Error("expected no voice confirm memo field");
+}
 const imp = await page.locator("[data-voice-field-importance]").inputValue();
 if (imp !== "1") throw new Error(`importance=${imp}`);
 const cat = await page.locator("[data-voice-field-category]").inputValue();
@@ -173,10 +181,20 @@ await firstTitle.waitFor({ state: "visible", timeout: 5000 });
 const added = await firstTitle.inputValue();
 if (added !== "장보기") throw new Error(`row title=${added}`);
 
-// 표 메모 UI는 제거됨 — 음성/엑셀 메모는 데이터에만 유지
+// 표·음성 모두 별도 메모 UI 없음 — 메모는 데이터(엑셀 할 일 둘째 줄)만
 const memoCell = page.locator("[data-excel-memo]").first();
 if ((await memoCell.count()) > 0) {
   throw new Error("expected no visible excel memo field");
+}
+const memoAdded = await page.evaluate(() => {
+  const raw = localStorage.getItem("ilbiseo-state-v2");
+  if (!raw) return null;
+  const state = JSON.parse(raw);
+  const t = (state.tasks ?? []).find((x) => x.title === "장보기");
+  return t?.memo ?? null;
+});
+if (memoAdded !== "우유") {
+  throw new Error(`expected task.memo=우유 got ${JSON.stringify(memoAdded)}`);
 }
 
 const impSelect = page.locator('select[aria-label="중요도"]').first();

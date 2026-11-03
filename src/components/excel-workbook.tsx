@@ -1905,7 +1905,7 @@ export function ExcelWorkbook({
         >
           <DialogHeader>
             <DialogTitle className="text-[16px] text-[var(--ink)]">
-              유사한 할 일
+              비슷한 할 일이 있습니다
             </DialogTitle>
             <DialogDescription className="whitespace-pre-line text-[14px] leading-relaxed text-[var(--ink-muted)]">
               {similarityAlert}
@@ -1919,11 +1919,12 @@ export function ExcelWorkbook({
               className="min-h-9"
               data-similarity-alert-ignore
               onClick={() => {
+                // 무시하고 진행 — keep current edits, do not jump
                 setSimilarityAlert(null);
                 setSimilarityFocusId(null);
               }}
             >
-              무시
+              무시하고 진행
             </Button>
             <Button
               type="button"
@@ -1937,7 +1938,7 @@ export function ExcelWorkbook({
                 if (peerId) focusSimilarPeerRow(peerId);
               }}
             >
-              해당 행으로
+              해당 행으로 가서 확인
             </Button>
           </DialogFooter>
         </DialogContent>

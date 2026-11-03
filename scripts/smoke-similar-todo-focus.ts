@@ -71,7 +71,11 @@ const order = orderInFrame(hits[0].task, peers);
 ok("order-in-frame-positive", order >= 1, order);
 
 const msg = buildSimilarityAlertMessage(hits, peers);
-ok("msg-has-similar-label", Boolean(msg && msg.includes("유사한 할 일")), msg);
+ok(
+  "msg-has-similar-label",
+  Boolean(msg && msg.includes("비슷한 할 일이 있습니다")),
+  msg,
+);
 ok("msg-has-frame", Boolean(msg && msg.includes("팀원용")), msg);
 ok("msg-has-row", Boolean(msg && /\d+번 행/.test(msg)), msg);
 ok("msg-has-overlap", Boolean(msg && msg.includes("겹친 말")), msg);

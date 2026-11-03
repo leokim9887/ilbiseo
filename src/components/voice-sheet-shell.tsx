@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Shared father-friendly sheet chrome for voice / voice-file dialogs. */
+/** Shared father-friendly sheet chrome for voice input dialogs. */
 export const VOICE_SHEET_CONTENT_CLASS =
   "flex max-h-[min(88dvh,36rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md max-sm:max-h-[min(92dvh,100%)]";
 

@@ -48,12 +48,15 @@ import {
   taskWordingBlob,
 } from "@/lib/text-similarity";
 import {
-  applyColumnSort,
-  columnSortLabel,
-  cycleColumnSort,
+  applyColumnSortStack,
+  columnSortStackLabel,
+  cycleColumnSortStack,
+  deadlineBasisShort,
   isSortableCol,
+  sortLevelForKey,
   type ColumnSort,
   type ColumnSortKey,
+  type ColumnSortStack,
 } from "@/lib/column-sort";
 import { Button } from "@/components/ui/button";
 import {
@@ -312,8 +315,8 @@ export function ExcelWorkbook({
   const [activeRow, setActiveRow] = useState<string | null>(null);
   const [filterStart, setFilterStart] = useState<string>("");
   const [filterEnd, setFilterEnd] = useState<string>("");
-  /** Excel header column sort (click 마감목표·중요도) */
-  const [columnSort, setColumnSort] = useState<ColumnSort | null>(null);
+  /** Excel header multi-level sort (first click = primary, second key = secondary) */
+  const [columnSort, setColumnSort] = useState<ColumnSortStack | null>(null);
   const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
   const [gcalRangeStart, setGcalRangeStart] = useState("");
   const [gcalRangeEnd, setGcalRangeEnd] = useState("");
@@ -372,12 +375,19 @@ export function ExcelWorkbook({
       });
     }
     // 「전체」 기본: 시작일 내림차순 (언젠가 맨 아래). 헤더 클릭 정렬이 있으면 그게 우선.
-    const effectiveSort =
+    const effectiveSort: ColumnSortStack | null =
       columnSort ??
       (isAll && !isGcal
-        ? ({ key: "deadline", dir: "desc" } as ColumnSort)
+        ? {
+            primary: {
+              key: "deadline",
+              dir: "desc",
+              basis: "start",
+            } as ColumnSort,
+            secondary: null,
+          }
         : null);
-    const sorted = applyColumnSort(built, effectiveSort);
+    const sorted = applyColumnSortStack(built, effectiveSort);
     // 할 일: 지난 일정은 같은 틀에 두고 맨 아래로 + 구분선 (자동→한 일 없음)
     if (sheet === "todo" && !isGcal) {
       return sinkPastSheetRowsLast(sorted, todayKst);
@@ -400,7 +410,9 @@ export function ExcelWorkbook({
 
   const onHeaderSort = (key: ColKey) => {
     if (!isSortableCol(key)) return;
-    setColumnSort((prev) => cycleColumnSort(prev, key as ColumnSortKey));
+    setColumnSort((prev) =>
+      cycleColumnSortStack(prev, key as ColumnSortKey),
+    );
   };
 
   const searchActive = normalizeSearchQuery(searchQuery).length > 0;
@@ -895,14 +907,6 @@ export function ExcelWorkbook({
 
   useEffect(() => {
     if (!focus) return;
-    // Don't steal focus from the memo sub-input inside LIST UP
-    const active = document.activeElement;
-    if (
-      active instanceof HTMLElement &&
-      active.dataset.excelMemo === focus.rowId
-    ) {
-      return;
-    }
     const el = document.querySelector<HTMLElement>(
       `[data-excel-cell="${focus.rowId}:${focus.col}"]`,
     );
@@ -1069,7 +1073,7 @@ export function ExcelWorkbook({
           {FRAME_LABEL[frame]} · {taskCount + (isGcal ? calCount : 0)}줄
           {!isGcal && filterActive ? " · 기간" : ""}
           {isGcal && sheet === "todo" && gcalFilterActive ? " · 기간" : ""}
-          {columnSort ? ` · ${columnSortLabel(columnSort)}` : ""}
+          {columnSort ? ` · ${columnSortStackLabel(columnSort)}` : ""}
           {searchActive ? " · 검색" : ""}
         </span>
       </div>
@@ -1297,8 +1301,12 @@ export function ExcelWorkbook({
               ) : null}
               {COLS.map((c) => {
                 const sortable = isSortableCol(c.key);
-                const active =
-                  sortable && columnSort?.key === c.key ? columnSort : null;
+                const levelInfo =
+                  sortable && isSortableCol(c.key)
+                    ? sortLevelForKey(columnSort, c.key)
+                    : null;
+                const active = levelInfo?.sort ?? null;
+                const basisHint = active ? deadlineBasisShort(active) : null;
                 const labelNode = (
                   <>
                     <span className="sm:hidden">{c.shortLabel}</span>
@@ -1320,9 +1328,21 @@ export function ExcelWorkbook({
                           active ? "bg-[#e4efe6] dark:bg-[#2a3a32]" : ""
                         }`}
                         aria-label={`${c.label} 정렬`}
-                        title="누르면 정렬이 바뀝니다"
+                        title="누르면 정렬이 바뀝니다. 다른 열을 이어서 누르면 2차 정렬됩니다."
+                        data-sort-level={levelInfo?.level}
+                        data-sort-basis={basisHint ?? undefined}
                       >
                         <span>{labelNode}</span>
+                        {basisHint ? (
+                          <span className="text-[10px] font-semibold text-[#217346] sm:text-[11px]">
+                            {basisHint}
+                          </span>
+                        ) : null}
+                        {levelInfo ? (
+                          <span className="text-[10px] font-bold text-[#217346] sm:text-[11px]">
+                            {levelInfo.level === 1 ? "①" : "②"}
+                          </span>
+                        ) : null}
                         <span
                           className="inline-flex flex-col leading-none text-[#217346]"
                           aria-hidden
@@ -1609,40 +1629,6 @@ export function ExcelWorkbook({
                           aria-label="할 일"
                           placeholder="할 일 제목"
                         />
-                        <label className="flex flex-col gap-0">
-                          <span className="rounded-sm bg-[#e8ecef]/80 px-1 py-0 text-[11px] font-medium leading-tight text-[#454d48] dark:bg-[#24302a] dark:text-[#a8b3ad] sm:text-[12px]">
-                            메모
-                          </span>
-                          <AutoGrowTextarea
-                            data-excel-memo={task.id}
-                            value={task.memo}
-                            placeholder="일정·메모 입력"
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onFocus={() => {
-                              if (locked) return;
-                              setActiveRow(task.id);
-                              setFocus({ rowId: task.id, col: "listup" });
-                            }}
-                            onChange={(e) =>
-                              updateListUp(task, { memo: e.target.value })
-                            }
-                            onBlur={(e) => {
-                              maybeWarnSimilarWording(task, {
-                                memo: e.currentTarget.value,
-                              });
-                              relockIfLeavingRow(e);
-                            }}
-                            readOnly={locked}
-                            disabled={locked}
-                            className={`excel-textarea excel-textarea-memo ${
-                              locked
-                                ? "cursor-default opacity-90 text-[#6a7670]"
-                                : ""
-                            }`}
-                            aria-label="메모"
-                          />
-                        </label>
                       </div>
                     </EditCell>
 
@@ -1905,10 +1891,9 @@ export function ExcelWorkbook({
         open={Boolean(similarityAlert)}
         onOpenChange={(open) => {
           if (!open) {
-            const peerId = similarityFocusId;
+            // Backdrop / Esc = 무시 (행으로 이동하지 않음)
             setSimilarityAlert(null);
             setSimilarityFocusId(null);
-            if (peerId) focusSimilarPeerRow(peerId);
           }
         }}
       >
@@ -1920,13 +1905,26 @@ export function ExcelWorkbook({
         >
           <DialogHeader>
             <DialogTitle className="text-[16px] text-[var(--ink)]">
-              비슷한 할 일
+              유사한 할 일
             </DialogTitle>
             <DialogDescription className="whitespace-pre-line text-[14px] leading-relaxed text-[var(--ink-muted)]">
               {similarityAlert}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-end">
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="min-h-9"
+              data-similarity-alert-ignore
+              onClick={() => {
+                setSimilarityAlert(null);
+                setSimilarityFocusId(null);
+              }}
+            >
+              무시
+            </Button>
             <Button
               type="button"
               size="sm"

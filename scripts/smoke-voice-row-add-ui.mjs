@@ -173,9 +173,11 @@ await firstTitle.waitFor({ state: "visible", timeout: 5000 });
 const added = await firstTitle.inputValue();
 if (added !== "장보기") throw new Error(`row title=${added}`);
 
+// 표 메모 UI는 제거됨 — 음성/엑셀 메모는 데이터에만 유지
 const memoCell = page.locator("[data-excel-memo]").first();
-const memoAdded = await memoCell.inputValue();
-if (memoAdded !== "우유") throw new Error(`row memo=${memoAdded}`);
+if ((await memoCell.count()) > 0) {
+  throw new Error("expected no visible excel memo field");
+}
 
 const impSelect = page.locator('select[aria-label="중요도"]').first();
 const impAdded = await impSelect.inputValue();

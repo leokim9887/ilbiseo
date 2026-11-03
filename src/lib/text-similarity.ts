@@ -356,12 +356,12 @@ export function buildSimilarityAlertMessage(
   const peers = allActive ?? hits.map((h) => h.task);
   const primary = describeSimilarityHit(hits[0], peers);
   if (hits.length === 1) {
-    return `비슷한 할 일이 있습니다: ${primary}`;
+    return `유사한 할 일 (해당 행으로 확인): ${primary}`;
   }
   if (hits.length === 2) {
     const second = describeSimilarityHit(hits[1], peers);
-    return `비슷한 할 일이 있습니다:\n· ${primary}\n· ${second}`;
+    return `유사한 할 일 (해당 행으로 확인):\n· ${primary}\n· ${second}`;
   }
   const extra = hits.length - 1;
-  return `비슷한 할 일이 있습니다: ${primary}\n(같은 내용 ${extra}건 더)`;
+  return `유사한 할 일 (해당 행으로 확인): ${primary}\n(같은 내용 ${extra}건 더)`;
 }

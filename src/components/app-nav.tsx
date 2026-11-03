@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   CheckSquare,
@@ -7,6 +8,7 @@ import {
   Newspaper,
   Settings2,
 } from "lucide-react";
+import { isAppleMobileDevice } from "@/lib/platform";
 
 export type MainView =
   | "todo"
@@ -35,6 +37,11 @@ interface AppNavProps {
 }
 
 export function AppNav({ value, onChange, counts }: AppNavProps) {
+  const [iosGlass, setIosGlass] = useState(false);
+  useEffect(() => {
+    setIosGlass(isAppleMobileDevice());
+  }, []);
+
   const activeIndex = Math.max(
     0,
     NAV.findIndex((item) => item.id === value),
@@ -101,10 +108,11 @@ export function AppNav({ value, onChange, counts }: AppNavProps) {
         })}
       </nav>
 
-      {/* Phone: Toss-like bottom tab bar — springy indicator + press scale */}
+      {/* Phone: Toss-like bottom tab bar — iOS liquid-glass press when gated */}
       <nav
         aria-label="주요 메뉴"
         data-toss-tabbar
+        data-ios-glass={iosGlass ? "1" : "0"}
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--grid-line)] bg-[var(--sheet)]/98 backdrop-blur-xl sm:hidden"
         style={{
           paddingBottom: "max(0.35rem, env(safe-area-inset-bottom))",

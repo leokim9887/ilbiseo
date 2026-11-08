@@ -12,6 +12,7 @@ import {
   planToWorkbookDelta,
 } from "../src/lib/excel-import";
 import { CATEGORY_LABEL, CATEGORY_ORDER, type Task } from "../src/lib/types";
+import { addDaysIso, todayIsoKst } from "../src/lib/date-range";
 
 const OUT =
   process.env.OUT_DIR ||
@@ -26,19 +27,24 @@ function ok(name: string, cond: boolean, detail?: unknown) {
   console.log("ok", name, detail ?? "");
 }
 
+const TODAY = todayIsoKst();
+const D_NEAR = addDaysIso(TODAY, 7);
+const D_MID = addDaysIso(TODAY, 14);
+const D_FAR = addDaysIso(TODAY, 21);
+
 function baseTask(partial: Partial<Task> & Pick<Task, "id" | "title">): Task {
   return {
     category: "work",
     kind: "spot",
-    startDate: "2026-10-20",
-    targetDate: "2026-10-20",
+    startDate: D_MID,
+    targetDate: D_MID,
     urgency: 2,
     importance: 2,
     groupKey: "g",
     memo: "",
     source: "manual",
     status: "active",
-    createdAt: "2026-10-17T00:00:00.000Z",
+    createdAt: `${addDaysIso(TODAY, -10)}T00:00:00.000Z`,
     completedAt: null,
     ...partial,
   };
@@ -50,23 +56,23 @@ async function main() {
       id: "new",
       title: "최신 업무",
       category: "work",
-      createdAt: "2026-10-28T12:00:00.000Z",
-      startDate: "2026-10-28",
-      targetDate: "2026-10-28",
+      createdAt: `${D_FAR}T12:00:00.000Z`,
+      startDate: D_FAR,
+      targetDate: D_FAR,
     }),
     baseTask({
       id: "old",
       title: "오래된 업무",
       category: "work",
-      createdAt: "2026-10-01T00:00:00.000Z",
-      startDate: "2026-10-25",
-      targetDate: "2026-10-25",
+      createdAt: `${addDaysIso(TODAY, -30)}T00:00:00.000Z`,
+      startDate: D_NEAR,
+      targetDate: D_NEAR,
     }),
     baseTask({
       id: "per",
       title: "개인 세금",
       category: "personal",
-      createdAt: "2026-10-20T00:00:00.000Z",
+      createdAt: `${D_MID}T00:00:00.000Z`,
     }),
     baseTask({
       id: "proj",
@@ -86,9 +92,9 @@ async function main() {
       title: "끝난 일",
       category: "work",
       status: "completed",
-      completedAt: "2026-10-16T12:00:00.000Z",
-      startDate: "2026-10-15",
-      targetDate: "2026-10-15",
+      completedAt: `${addDaysIso(TODAY, -5)}T12:00:00.000Z`,
+      startDate: addDaysIso(TODAY, -6),
+      targetDate: addDaysIso(TODAY, -6),
     }),
   ];
 
@@ -113,7 +119,11 @@ async function main() {
   all.getRow(1).eachCell((c) => allHeaders.push(String(c.value)));
   ok(
     "전체-has-틀",
-    allHeaders.includes("틀") && allHeaders.includes("할 일"),
+    allHeaders.includes("틀") &&
+      allHeaders.includes("할 일") &&
+      allHeaders.includes("등록일") &&
+      allHeaders.indexOf("할 일") < allHeaders.indexOf("등록일") &&
+      allHeaders.indexOf("등록일") < allHeaders.indexOf("마감목표"),
     allHeaders,
   );
   const allTitles: string[] = [];
@@ -136,7 +146,10 @@ async function main() {
     "업무용-no-틀",
     !workHeaders.includes("틀") &&
       workHeaders.includes("할 일") &&
-      workHeaders.includes("마감목표"),
+      workHeaders.includes("등록일") &&
+      workHeaders.includes("마감목표") &&
+      workHeaders.indexOf("할 일") < workHeaders.indexOf("등록일") &&
+      workHeaders.indexOf("등록일") < workHeaders.indexOf("마감목표"),
     workHeaders,
   );
   const workTitles: string[] = [];
@@ -156,7 +169,14 @@ async function main() {
   const done = wb.getWorksheet("한 일")!;
   const doneHeaders: string[] = [];
   done.getRow(1).eachCell((c) => doneHeaders.push(String(c.value)));
-  ok("한일-has-틀", doneHeaders.includes("틀"), doneHeaders);
+  ok(
+    "한일-has-틀-and-등록일",
+    doneHeaders.includes("틀") &&
+      doneHeaders.includes("등록일") &&
+      doneHeaders.indexOf("할 일") < doneHeaders.indexOf("등록일") &&
+      doneHeaders.indexOf("등록일") < doneHeaders.indexOf("마감목표"),
+    doneHeaders,
+  );
 
   // No cell notes / comments on sheets (OOXML safety)
   for (const sh of wb.worksheets) {

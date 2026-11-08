@@ -19,6 +19,31 @@ export function todayIsoKst(d = new Date()): string {
 }
 
 /**
+ * 「등록일」storage day from task `createdAt` (KST calendar day).
+ * Invalid / missing → today (KST) — only for brand-new rows lacking createdAt.
+ */
+export function registeredDateFromCreatedAt(
+  createdAt: string | null | undefined,
+  fallbackToday: string = todayIsoKst(),
+): string {
+  if (!createdAt) return fallbackToday;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return fallbackToday;
+  return todayIsoKst(d);
+}
+
+/**
+ * Seed `createdAt` from an imported/exported 「등록일」YYYY-MM-DD (noon KST).
+ */
+export function createdAtFromRegisteredDate(isoDay: string): string {
+  const day = isoDay.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return new Date().toISOString();
+  }
+  return new Date(`${day}T12:00:00+09:00`).toISOString();
+}
+
+/**
  * Cheer “day” key in Asia/Seoul — boundary at 07:00 KST, not midnight.
  * Before 07:00 still counts as the previous cheer day; from 07:00 a new
  * window opens until the next 07:00.

@@ -1,5 +1,8 @@
 import * as XLSX from "xlsx";
-import { todayIsoKst } from "./date-range";
+import {
+  createdAtFromRegisteredDate,
+  todayIsoKst,
+} from "./date-range";
 import { createId } from "./id";
 import { clampPriority } from "./priority";
 import { inferGroupKey } from "./sort";
@@ -24,6 +27,7 @@ import {
 export type ImportField =
   | "title"
   | "memo"
+  | "registered"
   | "deadline"
   | "importance"
   /** @deprecated 시급성 UI 제거 — 예전 저장 매핑·타입 호환만 */
@@ -35,6 +39,7 @@ export type ImportField =
 export const IMPORT_FIELD_LABEL: Record<ImportField, string> = {
   title: "할 일",
   memo: "메모",
+  registered: "등록일",
   deadline: "마감목표",
   importance: "중요도",
   urgency: "시급성",
@@ -49,6 +54,7 @@ export type ImportTargetField = Exclude<ImportField, "skip" | "urgency">;
 export const IMPORT_TARGET_FIELDS: ImportTargetField[] = [
   "title",
   "memo",
+  "registered",
   "deadline",
   "importance",
   "done",
@@ -86,6 +92,17 @@ const HEADER_ALIASES: Record<ImportTargetField, string[]> = {
     "task",
   ],
   memo: ["메모", "memo", "notes", "비고", "설명", "상세"],
+  registered: [
+    "등록일",
+    "등록",
+    "등록날짜",
+    "작성일",
+    "생성일",
+    "registered",
+    "created",
+    "createdat",
+    "created at",
+  ],
   deadline: [
     "마감목표",
     "마감",
@@ -232,6 +249,11 @@ export type MappedPreviewRow = {
   startDate: string | null;
   targetDate: string | null;
   kind: TaskKind;
+  /**
+   * Parsed 「등록일」YYYY-MM-DD when the column is present.
+   * null = column absent or unparsable → new rows use import time.
+   */
+  registeredDate: string | null;
   /** empty / unchanged / exact_block → not applied as add */
   skip: boolean;
   exactDuplicate: boolean;
@@ -409,6 +431,7 @@ export function suggestFieldForHeader(
     if (
       sheetKind !== "todo" &&
       (field === "deadline" ||
+        field === "registered" ||
         field === "importance" ||
         field === "category")
     ) {
@@ -849,6 +872,7 @@ export function buildPreviewRows(
   };
   const titleCol = fieldOf("title");
   const memoCol = fieldOf("memo");
+  const registeredCol = fieldOf("registered");
   const deadlineCol = fieldOf("deadline");
   const importanceCol = fieldOf("importance");
   const categoryCol = fieldOf("category");
@@ -865,6 +889,12 @@ export function buildPreviewRows(
     const memoFromCol = memoCol ? cellToString(row[memoCol]) : "";
     const memo = [splitMemo, memoFromCol].filter(Boolean).join("\n");
     const title = splitTitle || titleRaw.trim();
+    const registeredRaw = registeredCol
+      ? cellToString(row[registeredCol])
+      : "";
+    const registeredDate = registeredRaw
+      ? parseOneDate(registeredRaw)
+      : null;
     const deadlineRaw = deadlineCol ? cellToString(row[deadlineCol]) : "";
     const dl = parseDeadline(deadlineRaw);
     const importance = clampPriority(
@@ -940,6 +970,7 @@ export function buildPreviewRows(
       startDate: dl.startDate,
       targetDate: dl.targetDate,
       kind: dl.kind,
+      registeredDate,
       skip:
         delta === "empty" ||
         delta === "unchanged" ||
@@ -956,6 +987,15 @@ export type TodoDeltaCommit = {
   add: Task[];
   update: { id: string; patch: Partial<Task> }[];
 };
+
+/** createdAt for a new imported row: preserve 「등록일」if present, else import time. */
+function createdAtForImportedRow(
+  registeredDate: string | null,
+  now: string,
+): string {
+  if (registeredDate) return createdAtFromRegisteredDate(registeredDate);
+  return now;
+}
 
 /** Build add/update payloads from delta preview (only new + changed). */
 export function previewToTodoDelta(
@@ -979,10 +1019,11 @@ export function previewToTodoDelta(
         memo: r.memo,
         source: "import",
         status: "active",
-        createdAt: now,
+        createdAt: createdAtForImportedRow(r.registeredDate, now),
         completedAt: null,
       });
     } else if (r.delta === "changed" && r.matchId) {
+      // 「등록일」/createdAt is read-only after first set — never patch on update
       update.push({
         id: r.matchId,
         patch: {
@@ -1021,7 +1062,7 @@ export function previewToReplaceTasks(
       memo: r.memo,
       source: "import" as const,
       status: "active" as const,
-      createdAt: now,
+      createdAt: createdAtForImportedRow(r.registeredDate, now),
       completedAt: null,
     }));
 }
@@ -1128,6 +1169,7 @@ export function buildSidePreviewRows(
       startDate: null,
       targetDate: null,
       kind: "someday" as TaskKind,
+      registeredDate: null,
       skip:
         delta === "empty" ||
         delta === "unchanged" ||

@@ -11,7 +11,11 @@ import {
   DEADLINE_ENTRY_HELP,
   deadlineValidationListFormula,
 } from "../src/lib/excel";
-import { deadlineExcelParts, todayIsoKst } from "../src/lib/date-range";
+import {
+  addDaysIso,
+  deadlineExcelParts,
+  todayIsoKst,
+} from "../src/lib/date-range";
 import { parseDeadline } from "../src/lib/excel-import";
 import type { Task } from "../src/lib/types";
 
@@ -20,19 +24,27 @@ const OUT =
   "/cursor/stores/bc-c183c9b6-6e26-42be-ac03-4fae1f3882f3/media";
 fs.mkdirSync(OUT, { recursive: true });
 
+const TODAY = todayIsoKst();
+const D0 = TODAY;
+const D7 = addDaysIso(TODAY, 7);
+const D14 = addDaysIso(TODAY, 14);
+const D21 = addDaysIso(TODAY, 21);
+const RANGE_START = addDaysIso(TODAY, 3);
+const RANGE_END = addDaysIso(TODAY, 20);
+
 function baseTask(partial: Partial<Task> & Pick<Task, "id" | "title">): Task {
   return {
     category: "work",
     kind: "spot",
-    startDate: "2026-10-20",
-    targetDate: "2026-10-20",
+    startDate: D7,
+    targetDate: D7,
     urgency: 2,
     importance: 2,
     groupKey: "g",
     memo: "",
     source: "manual",
     status: "active",
-    createdAt: "2026-10-17T00:00:00.000Z",
+    createdAt: `${addDaysIso(TODAY, -10)}T00:00:00.000Z`,
     completedAt: null,
     ...partial,
   };
@@ -88,8 +100,8 @@ async function main() {
       title: "팀 회의",
       category: "team",
       importance: 1,
-      startDate: "2026-10-25",
-      targetDate: "2026-10-25",
+      startDate: D14,
+      targetDate: D14,
     }),
     baseTask({
       id: "2",
@@ -97,16 +109,16 @@ async function main() {
       category: "personal",
       importance: 3,
       kind: "ongoing",
-      startDate: "2026-10-10",
-      targetDate: "2026-10-30",
+      startDate: RANGE_START,
+      targetDate: RANGE_END,
     }),
     baseTask({
       id: "3",
       title: "업무 보고",
       category: "work",
       importance: 2,
-      startDate: "2026-10-18",
-      targetDate: "2026-10-18",
+      startDate: D0,
+      targetDate: D0,
     }),
     baseTask({
       id: "4",
@@ -123,9 +135,9 @@ async function main() {
       category: "work",
       importance: 1,
       status: "completed",
-      completedAt: "2026-10-16T12:00:00.000Z",
-      startDate: "2026-10-15",
-      targetDate: "2026-10-15",
+      completedAt: `${addDaysIso(TODAY, -5)}T12:00:00.000Z`,
+      startDate: addDaysIso(TODAY, -6),
+      targetDate: addDaysIso(TODAY, -6),
     }),
   ];
 
@@ -140,6 +152,7 @@ async function main() {
     순서: false,
     틀: true,
     "할 일": false,
+    등록일: false,
     마감목표: true,
     중요도: true,
   };
@@ -191,13 +204,14 @@ async function main() {
     const table = work.getTable("IlbiseoTodoWork");
     ok("table-업무용", Boolean(table), null);
     const buttons: Record<string, boolean> = {};
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const col = table.getColumn(i);
       buttons[col.name] = Boolean(col.filterButton);
     }
     ok(
       "업무용-no-틀-col",
       !Object.prototype.hasOwnProperty.call(buttons, "틀") &&
+        buttons["등록일"] === false &&
         buttons["마감목표"] === true &&
         buttons["중요도"] === true,
       buttons,
@@ -210,13 +224,13 @@ async function main() {
   const deadlines: { type: string; numFmt?: string; iso?: string; text?: string }[] =
     [];
 
-  // After load, column keys are gone — use positions: 틀=2 마감=4 중요도=5
+  // After load, column keys are gone — use positions: 틀=2 등록일=4 마감=5 중요도=6
   todo.eachRow((row, n) => {
     if (n === 1) return;
     frames.push(String(row.getCell(2).value ?? ""));
-    const imp = row.getCell(5).value;
+    const imp = row.getCell(6).value;
     importances.push(imp);
-    const dCell = row.getCell(4);
+    const dCell = row.getCell(5);
     const v = dCell.value;
     if (v instanceof Date) {
       const iso = v.toISOString().slice(0, 10);
@@ -249,8 +263,8 @@ async function main() {
       (d) =>
         d.type === "string" &&
         typeof d.text === "string" &&
-        d.text.includes("2026-10-10") &&
-        d.text.includes("2026-10-30") &&
+        d.text.includes(RANGE_START) &&
+        d.text.includes(RANGE_END) &&
         d.text.includes("~"),
     ),
     deadlines,
@@ -278,7 +292,7 @@ async function main() {
   const deadlineTexts = aoa.slice(1).map((r) => String(r[deadlineIdx] ?? ""));
   ok(
     "xlsx-formatted-range-visible",
-    deadlineTexts.some((t) => t.includes("~") && t.includes("2026-10-30")),
+    deadlineTexts.some((t) => t.includes("~") && t.includes(RANGE_END)),
     deadlineTexts,
   );
   ok(

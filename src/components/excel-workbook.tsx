@@ -34,9 +34,11 @@ import {
 import {
   formatDeadlineRange,
   formatDeadlineRangeCompact,
+  formatDisplayDate,
   isPastUnfinishedTask,
   isSomedayDeadline,
   monthRangeContaining,
+  registeredDateFromCreatedAt,
   todayIso,
   todayIsoKst,
   weekRangeContaining,
@@ -110,6 +112,7 @@ function openDatePickerFromEvent(
 type ColKey =
   | "order"
   | "listup"
+  | "registered"
   | "deadline"
   | "importance"
   | "done"
@@ -127,13 +130,19 @@ const COLS_TODO: {
     key: "listup",
     label: "할 일",
     shortLabel: "할일",
-    width: "48%",
+    width: "42%",
+  },
+  {
+    key: "registered",
+    label: "등록일",
+    shortLabel: "등록",
+    width: "88px",
   },
   {
     key: "deadline",
     label: "마감목표",
     shortLabel: "마감",
-    width: "220px",
+    width: "200px",
   },
   {
     key: "importance",
@@ -155,13 +164,19 @@ const COLS_DONE: {
     key: "listup",
     label: "할 일",
     shortLabel: "할일",
-    width: "46%",
+    width: "40%",
+  },
+  {
+    key: "registered",
+    label: "등록일",
+    shortLabel: "등록",
+    width: "88px",
   },
   {
     key: "deadline",
     label: "마감목표",
     shortLabel: "마감",
-    width: "220px",
+    width: "200px",
   },
   {
     key: "importance",
@@ -172,7 +187,7 @@ const COLS_DONE: {
   { key: "edit", label: "수정", shortLabel: "수정", width: "84px" },
 ];
 
-/** Google Calendar list: no 중요도 / 완료여부 */
+/** Google Calendar list: no 중요도 / 완료여부 / 등록일 (캘린더 일정) */
 const COLS_GCAL: {
   key: ColKey;
   label: string;
@@ -1261,18 +1276,20 @@ export function ExcelWorkbook({
               <>
                 <col style={{ width: "5%" }} />
                 <col style={{ width: "5%" }} />
-                <col style={{ width: "46%" }} />
-                <col style={{ width: "26%" }} />
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "10%" }} />
+                <col style={{ width: "40%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "9%" }} />
               </>
             ) : (
               <>
-                <col style={{ width: "6%" }} />
                 <col style={{ width: "5%" }} />
-                <col style={{ width: "50%" }} />
-                <col style={{ width: "28%" }} />
-                <col style={{ width: "11%" }} />
+                <col style={{ width: "5%" }} />
+                <col style={{ width: "44%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "24%" }} />
+                <col style={{ width: "10%" }} />
               </>
             )}
           </colgroup>
@@ -1631,6 +1648,18 @@ export function ExcelWorkbook({
                         />
                       </div>
                     </EditCell>
+
+                    {/* 등록일: createdAt KST day — read-only */}
+                    <td
+                      className="border border-black px-0.5 py-1 text-center align-middle tabular-nums text-[12.5px] text-[#3d4641] dark:text-[#c5cec8] sm:px-1 sm:text-[14.5px]"
+                      aria-label="등록일"
+                      data-excel-registered={task.id}
+                      title="앱에 등록한 날 (수정 불가)"
+                    >
+                      {formatDisplayDate(
+                        registeredDateFromCreatedAt(task.createdAt),
+                      )}
+                    </td>
 
                     {/* 마감목표: 언젠가 | 시작일 ~ 종료일 */}
                     <EditCell

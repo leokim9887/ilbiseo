@@ -1498,6 +1498,14 @@
 .dark textarea {
   color-scheme: dark;
 }
+/* Schedule search: hide native WebKit clear so only our custom ✕ shows */
+[data-schedule-search-input]::-webkit-search-cancel-button,
+[data-schedule-search-input]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 /* Schedule search: jump to 지침/습관 row */
 [data-side-item][data-search-focus="1"] {
   outline: 2px solid var(--brand);

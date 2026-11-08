@@ -527,7 +527,7 @@ export async function buildWorkbook(
   wb.created = new Date();
 
   // Active tasks: 「전체」(with 틀) + 4 frame sheets (no 틀).
-  // Newest-first stored order + 「지난 일정」sink — same as UI.
+  // 「등록일」newest-first + 「지난 일정」sink — same as UI 할 일 default.
   const activeTasks = listActiveForExport(tasks);
 
   const allSheet = wb.addWorksheet(EXCEL_ALL_SHEET, {

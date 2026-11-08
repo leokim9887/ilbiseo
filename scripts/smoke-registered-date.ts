@@ -4,7 +4,7 @@
 import fs from "fs";
 import path from "path";
 import ExcelJS from "exceljs";
-import { buildWorkbook, EXCEL_ALL_SHEET } from "../src/lib/excel";
+import { buildWorkbook, EXCEL_ALL_SHEET, excelFrameSheetName } from "../src/lib/excel";
 import {
   buildPreviewRows,
   parseExcelFile,
@@ -13,11 +13,13 @@ import {
   type ParsedSheet,
 } from "../src/lib/excel-import";
 import {
+  addDaysIso,
   createdAtFromRegisteredDate,
   formatDisplayDate,
   registeredDateFromCreatedAt,
   todayIsoKst,
 } from "../src/lib/date-range";
+import { listActiveForExport } from "../src/lib/sort";
 import type { Task } from "../src/lib/types";
 
 const OUT =
@@ -192,6 +194,108 @@ async function main() {
     ca >= before - 2000 && ca <= after + 2000,
     legacyDelta.add[0]?.createdAt,
   );
+
+  // Excel export: 「등록일」newest-first even if stored array is oldest-first;
+  // past unfinished still sinks; 「한 일」keeps 완료일순 (앱과 동일).
+  {
+    const today = todayIsoKst();
+    const pastDay = addDaysIso(today, -3);
+    const futureDay = addDaysIso(today, 10);
+    const reversed: Task[] = [
+      baseTask({
+        id: "old-active",
+        title: "오래된활성",
+        category: "work",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        startDate: futureDay,
+        targetDate: futureDay,
+      }),
+      baseTask({
+        id: "new-past",
+        title: "최신지난",
+        category: "work",
+        createdAt: "2026-11-01T00:00:00.000Z",
+        startDate: pastDay,
+        targetDate: pastDay,
+      }),
+      baseTask({
+        id: "mid-active",
+        title: "중간활성",
+        category: "personal",
+        createdAt: "2026-10-15T00:00:00.000Z",
+        startDate: futureDay,
+        targetDate: futureDay,
+      }),
+      baseTask({
+        id: "done-new-reg",
+        title: "완료최신등록",
+        category: "work",
+        status: "completed",
+        createdAt: "2026-11-02T00:00:00.000Z",
+        completedAt: "2026-10-01T00:00:00.000Z",
+        startDate: pastDay,
+        targetDate: pastDay,
+      }),
+      baseTask({
+        id: "done-old-reg",
+        title: "완료오래등록",
+        category: "work",
+        status: "completed",
+        createdAt: "2026-08-01T00:00:00.000Z",
+        completedAt: "2026-10-20T00:00:00.000Z",
+        startDate: pastDay,
+        targetDate: pastDay,
+      }),
+    ];
+
+    const exported = listActiveForExport(reversed, today);
+    ok(
+      "export-active-등록일-then-past-sink",
+      exported.map((t) => t.title).join("|") ===
+        "중간활성|오래된활성|최신지난",
+      exported.map((t) => t.title),
+    );
+
+    const sortBuf = await buildWorkbook({
+      tasks: reversed,
+      calendarEvents: [],
+    });
+    const sortWb = new ExcelJS.Workbook();
+    await sortWb.xlsx.load(sortBuf as unknown as ExcelJS.Buffer);
+
+    const allTitles: string[] = [];
+    sortWb.getWorksheet(EXCEL_ALL_SHEET)!.eachRow((row, n) => {
+      if (n === 1) return;
+      allTitles.push(String(row.getCell(3).value ?? ""));
+    });
+    ok(
+      "전체-등록일-newest-then-past",
+      allTitles.join("|") === "중간활성|오래된활성|최신지난",
+      allTitles,
+    );
+
+    const workTitles: string[] = [];
+    sortWb.getWorksheet(excelFrameSheetName("work"))!.eachRow((row, n) => {
+      if (n === 1) return;
+      workTitles.push(String(row.getCell(2).value ?? ""));
+    });
+    ok(
+      "업무용-등록일-newest-then-past",
+      workTitles.join("|") === "오래된활성|최신지난",
+      workTitles,
+    );
+
+    const doneTitles: string[] = [];
+    sortWb.getWorksheet("한 일")!.eachRow((row, n) => {
+      if (n === 1) return;
+      doneTitles.push(String(row.getCell(3).value ?? ""));
+    });
+    ok(
+      "한일-완료일-newest-first",
+      doneTitles.join("|") === "완료오래등록|완료최신등록",
+      doneTitles,
+    );
+  }
 
   console.log("sample", outPath);
 }

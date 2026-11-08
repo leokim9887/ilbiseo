@@ -29,12 +29,19 @@ export function listActiveInStoredOrder(
   );
 }
 
-/** Active list for Excel/sync: stored order, then 「지난 일정」 sink to end. */
+/**
+ * Active list for Excel/sync: 「등록일」newest-first (`createdAt` desc),
+ * then 「지난 일정」 sink to end — same default as app 「할 일」
+ * (`applyDefaultRegisteredSort` + past-sink).
+ */
 export function listActiveForExport(
   tasks: Task[],
   today: string = todayIsoKst(),
 ): Task[] {
-  return sinkPastUnfinishedTasksLast(listActiveInStoredOrder(tasks), today);
+  return sinkPastUnfinishedTasksLast(
+    orderByCreatedAtNewestFirst(listActiveInStoredOrder(tasks)),
+    today,
+  );
 }
 
 function score(task: Task): number {

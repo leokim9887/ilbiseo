@@ -1498,7 +1498,7 @@
 .dark textarea {
   color-scheme: dark;
 }
-/* Schedule search: hide native WebKit clear so only our custom ✕ shows */
+/* Schedule search: belt-and-suspenders if type=search returns — hide native WebKit ✕ */
 [data-schedule-search-input]::-webkit-search-cancel-button,
 [data-schedule-search-input]::-webkit-search-decoration {
   -webkit-appearance: none;

@@ -41,8 +41,11 @@ export function ScheduleSearch({
           aria-hidden
         />
         <input
-          type="search"
+          /* type=text: avoid native WebKit search-cancel X next to our clear */
+          type="text"
+          inputMode="search"
           enterKeyHint="search"
+          role="searchbox"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}

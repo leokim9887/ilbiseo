@@ -1,5 +1,6 @@
 import type { SheetRow } from "./sheet-rows";
 import { isSomedayDeadline, taskDateRange } from "./date-range";
+import type { Task } from "./types";
 
 /** Sortable Excel columns (마감목표 · 중요도). */
 export type ColumnSortKey = "deadline" | "importance";
@@ -228,6 +229,100 @@ export function applyDefaultRegisteredSort(rows: SheetRow[]): SheetRow[] {
 
 /** Status hint when default 등록일 sort is in effect. */
 export const DEFAULT_REGISTERED_SORT_LABEL = "등록일 최신순";
+
+/**
+ * Father rule — a 「할 일」row is ready for live 등록일/header sort only when
+ * 할 일 + 마감목표 + 중요도 are all meaningfully filled.
+ * Incomplete rows stay put (no mid-type jump).
+ */
+export function isTodoSortReady(task: Task): boolean {
+  const titleOk = task.title.trim().length > 0;
+  const deadlineOk =
+    task.kind === "someday" ||
+    Boolean(task.startDate?.trim()) ||
+    Boolean(task.targetDate?.trim());
+  const importanceOk =
+    task.importance != null &&
+    Number.isFinite(task.importance) &&
+    task.importance >= 1 &&
+    task.importance <= 3;
+  return titleOk && deadlineOk && importanceOk;
+}
+
+/**
+ * Keep deferred rows at their baseline indices; fill remaining slots with
+ * the fully-sorted order of non-deferred rows.
+ * Used so mid-edit / incomplete rows do not jump while siblings re-sort.
+ */
+export function applySortPreservingDeferred(
+  baseline: SheetRow[],
+  sortedFully: SheetRow[],
+  isDeferred: (row: SheetRow) => boolean,
+): SheetRow[] {
+  if (baseline.length === 0) return [];
+  if (baseline.length !== sortedFully.length) {
+    // Fall back to sorted when sets diverge (filter/frame change).
+    return sortedFully;
+  }
+  const n = baseline.length;
+  const result: (SheetRow | null)[] = Array(n).fill(null);
+  const deferredIds = new Set<string>();
+  for (let i = 0; i < n; i++) {
+    const row = baseline[i];
+    if (!isDeferred(row)) continue;
+    result[i] = row;
+    deferredIds.add(row.id);
+  }
+  if (deferredIds.size === 0) return sortedFully;
+  let slot = 0;
+  for (const row of sortedFully) {
+    if (deferredIds.has(row.id)) continue;
+    while (slot < n && result[slot] !== null) slot++;
+    if (slot >= n) break;
+    result[slot] = row;
+    slot++;
+  }
+  return result.map((r, i) => r ?? sortedFully[i] ?? baseline[i]);
+}
+
+/**
+ * Rebuild task-row order using a previous visual id list.
+ * New ids (e.g. 「행 추가」) keep their position from `rows` (usually index 0).
+ * Non-task rows are dropped — callers re-apply sink after preserving.
+ */
+export function orderTaskRowsByIds(
+  rows: SheetRow[],
+  prevIds: readonly string[],
+): SheetRow[] {
+  const tasks = rows.filter((r) => r.kind === "task");
+  if (tasks.length === 0) return [];
+  if (prevIds.length === 0) return tasks;
+
+  const byId = new Map(tasks.map((r) => [r.id, r]));
+  const prevSet = new Set(prevIds);
+  const knownOrdered: SheetRow[] = [];
+  for (const id of prevIds) {
+    const row = byId.get(id);
+    if (row) knownOrdered.push(row);
+  }
+  if (knownOrdered.length === tasks.length) return knownOrdered;
+
+  // Merge: new rows stay at their built index; known rows keep prior relative order.
+  const out: SheetRow[] = [];
+  let knownIdx = 0;
+  for (const row of tasks) {
+    if (!prevSet.has(row.id)) {
+      out.push(row);
+    } else {
+      const next = knownOrdered[knownIdx++];
+      if (next) out.push(next);
+    }
+  }
+  while (knownIdx < knownOrdered.length) {
+    out.push(knownOrdered[knownIdx++]);
+  }
+  return out;
+}
 
 function oneSortLabel(sort: ColumnSort): string {
   if (sort.key === "importance") {

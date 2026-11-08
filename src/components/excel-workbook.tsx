@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -52,11 +53,14 @@ import {
 import {
   applyColumnSortStack,
   applyDefaultRegisteredSort,
+  applySortPreservingDeferred,
   columnSortStackLabel,
   cycleColumnSortStack,
   DEFAULT_REGISTERED_SORT_LABEL,
   deadlineBasisShort,
   isSortableCol,
+  isTodoSortReady,
+  orderTaskRowsByIds,
   sortLevelForKey,
   type ColumnSortKey,
   type ColumnSortStack,
@@ -333,6 +337,15 @@ export function ExcelWorkbook({
   const [filterEnd, setFilterEnd] = useState<string>("");
   /** Excel header multi-level sort (first click = primary, second key = secondary) */
   const [columnSort, setColumnSort] = useState<ColumnSortStack | null>(null);
+  /**
+   * Father rule: rows edited mid-input stay pinned until Enter (or leave-row)
+   * commits sort. Incomplete rows also stay put via isTodoSortReady.
+   */
+  const [sortPinnedIds, setSortPinnedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  /** Last visual task-id order — pins incomplete/mid-edit rows in place. */
+  const displayOrderRef = useRef<string[]>([]);
   const [chip, setChip] = useState<"all" | "today" | "week" | "month">("all");
   const [gcalRangeStart, setGcalRangeStart] = useState("");
   const [gcalRangeEnd, setGcalRangeEnd] = useState("");
@@ -372,6 +385,24 @@ export function ExcelWorkbook({
 
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
 
+  const pinRowForSort = useCallback((id: string) => {
+    setSortPinnedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const commitRowSort = useCallback((id: string) => {
+    setSortPinnedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
   const rows = useMemo(() => {
     let built: SheetRow[];
     if (isGcal && sheet === "todo") {
@@ -392,17 +423,33 @@ export function ExcelWorkbook({
     }
     // 「할 일」기본: 등록일 최신순 (행 추가 newest-on-top과 동일).
     // 헤더(마감목표·중요도) 클릭 정렬이 있으면 그게 우선. 한 일/캘린더는 그대로.
+    // Father: do NOT live-re-sort mid-input / incomplete rows — Enter commits.
+    const deferLiveSort = sheet === "todo" && !isGcal;
     let sorted: SheetRow[];
     if (columnSort) {
       sorted = applyColumnSortStack(built, columnSort);
-    } else if (sheet === "todo" && !isGcal) {
+    } else if (deferLiveSort) {
       sorted = applyDefaultRegisteredSort(built);
     } else {
       sorted = built;
     }
     // 할 일: 지난 일정은 같은 틀에 두고 맨 아래로 + 구분선 (자동→한 일 없음)
-    if (sheet === "todo" && !isGcal) {
-      return sinkPastSheetRowsLast(sorted, todayKst);
+    if (deferLiveSort) {
+      const fullySorted = sinkPastSheetRowsLast(sorted, todayKst);
+      const baselineTasks = orderTaskRowsByIds(
+        built,
+        displayOrderRef.current,
+      );
+      // Re-apply sink on baseline so pin indices match past-separator layout.
+      const baseline = sinkPastSheetRowsLast(baselineTasks, todayKst);
+      const isDeferred = (row: SheetRow) => {
+        if (row.kind !== "task") return false;
+        // Pinned mid-edit until Enter/leave-row commit; incomplete always stays.
+        if (sortPinnedIds.has(row.task.id)) return true;
+        if (!isTodoSortReady(row.task)) return true;
+        return false;
+      };
+      return applySortPreservingDeferred(baseline, fullySorted, isDeferred);
     }
     return sorted;
   }, [
@@ -417,7 +464,29 @@ export function ExcelWorkbook({
     filterEnd,
     columnSort,
     todayKst,
+    sortPinnedIds,
   ]);
+
+  useLayoutEffect(() => {
+    displayOrderRef.current = rows
+      .filter((r) => r.kind === "task")
+      .map((r) => r.id);
+  }, [rows]);
+
+  // Drop sort pins for deleted tasks
+  useEffect(() => {
+    setSortPinnedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const alive = new Set(baseTasks.map((t) => t.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (alive.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [baseTasks]);
 
   const onHeaderSort = (key: ColKey) => {
     if (!isSortableCol(key)) return;
@@ -623,9 +692,10 @@ export function ExcelWorkbook({
   /** Deadline edits — no date-range overlap warn (replaced by wording alert). */
   const applyDeadlinePatch = useCallback(
     (task: Task, patch: Partial<Task>) => {
+      pinRowForSort(task.id);
       onUpdate(task.id, patch);
     },
-    [onUpdate],
+    [onUpdate, pinRowForSort],
   );
 
   const maybeWarnSimilarWording = useCallback(
@@ -740,10 +810,24 @@ export function ExcelWorkbook({
 
   const updateListUp = useCallback(
     (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
+      pinRowForSort(task.id);
       onUpdate(task.id, patch);
       scheduleSimilarityCheck(task, patch);
     },
-    [onUpdate, scheduleSimilarityCheck],
+    [onUpdate, scheduleSimilarityCheck, pinRowForSort],
+  );
+
+  /** Blur leaving the row (not just another cell) → commit sort pin. */
+  const commitSortIfLeavingRow = useCallback(
+    (taskId: string, e: FocusEvent<HTMLElement>) => {
+      const next = e.relatedTarget as Node | null;
+      const rowEl = (e.currentTarget as HTMLElement).closest(
+        "[data-excel-row]",
+      );
+      if (next && rowEl && rowEl.contains(next)) return;
+      commitRowSort(taskId);
+    },
+    [commitRowSort],
   );
 
   /** Voice 「행 추가」: same validators + newest-first insert + similar-todo alert. */
@@ -844,6 +928,8 @@ export function ExcelWorkbook({
         }
         const nr = dir === "next" ? rowIdx + 1 : rowIdx - 1;
         if (nr >= 0 && nr < taskIds.length) {
+          // Tab leaving the row → Enter-to-commit sort
+          commitRowSort(rowId);
           setFocus({
             rowId: taskIds[nr],
             col:
@@ -851,15 +937,20 @@ export function ExcelWorkbook({
                 ? EDITABLE[0]
                 : EDITABLE[EDITABLE.length - 1],
           });
+        } else {
+          // Left the sheet edge — still commit
+          commitRowSort(rowId);
         }
         return;
       }
       const nr = dir === "down" ? rowIdx + 1 : rowIdx - 1;
+      // Enter up/down → commit sort for this row (father rule)
+      commitRowSort(rowId);
       if (nr >= 0 && nr < taskIds.length) {
         setFocus({ rowId: taskIds[nr], col });
       }
     },
-    [taskIds],
+    [taskIds, commitRowSort],
   );
 
   useEffect(() => {
@@ -867,6 +958,8 @@ export function ExcelWorkbook({
     setActiveRow(null);
     setSelectedIds(new Set());
     setEditingDoneIds(new Set());
+    setSortPinnedIds(new Set());
+    displayOrderRef.current = [];
   }, [sheet, frame]);
 
   // Drop selection ids that are no longer in the workbook tasks
@@ -1013,7 +1106,15 @@ export function ExcelWorkbook({
                 type="button"
                 size="sm"
                 className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm bg-[var(--toss-blue)] px-2 text-[12.5px] font-semibold text-white hover:bg-[#1b64da] max-sm:h-11 max-sm:min-h-11 max-sm:rounded-xl max-sm:px-3 sm:h-9 sm:min-h-9 sm:rounded-lg sm:px-3 sm:text-[14px]"
-                onClick={() => onAdd()}
+                onClick={() => {
+                  const created = onAdd();
+                  if (created && typeof created === "object" && "id" in created) {
+                    pinRowForSort(created.id);
+                    setActiveRow(created.id);
+                    setFocus({ rowId: created.id, col: "listup" });
+                    setPendingFocusId(created.id);
+                  }
+                }}
                 data-excel-add-row
               >
                 <Plus className="size-3.5" />
@@ -1499,6 +1600,7 @@ export function ExcelWorkbook({
                     : todayKst;
                 const setSomeday = (on: boolean) => {
                   if (locked) return;
+                  pinRowForSort(task.id);
                   if (on) {
                     onUpdate(task.id, {
                       kind: "someday",
@@ -1516,6 +1618,7 @@ export function ExcelWorkbook({
                 const relockIfLeavingRow = (
                   e: FocusEvent<HTMLElement>,
                 ) => {
+                  if (!locked) commitSortIfLeavingRow(task.id, e);
                   if (!isDoneSheet || locked) return;
                   const next = e.relatedTarget as Node | null;
                   const rowEl = e.currentTarget.closest("[data-excel-row]");
@@ -1603,6 +1706,7 @@ export function ExcelWorkbook({
                       locked={locked}
                       onFocusCell={() => {
                         if (locked) return;
+                        pinRowForSort(task.id);
                         setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "listup" });
                       }}
@@ -1633,8 +1737,19 @@ export function ExcelWorkbook({
                           }}
                           onFocus={() => {
                             if (locked) return;
+                            pinRowForSort(task.id);
                             setActiveRow(task.id);
                             setFocus({ rowId: task.id, col: "listup" });
+                          }}
+                          onKeyDown={(e) => {
+                            // Enter (not Shift) commits sort without blocking newline
+                            if (
+                              e.key === "Enter" &&
+                              !e.shiftKey &&
+                              !e.nativeEvent.isComposing
+                            ) {
+                              commitRowSort(task.id);
+                            }
                           }}
                           readOnly={locked}
                           disabled={locked}
@@ -1668,6 +1783,7 @@ export function ExcelWorkbook({
                       locked={locked}
                       onFocusCell={() => {
                         if (locked) return;
+                        pinRowForSort(task.id);
                         setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "deadline" });
                       }}
@@ -1848,6 +1964,7 @@ export function ExcelWorkbook({
                       locked={locked}
                       onFocusCell={() => {
                         if (locked) return;
+                        pinRowForSort(task.id);
                         setActiveRow(task.id);
                         setFocus({ rowId: task.id, col: "importance" });
                       }}
@@ -1858,9 +1975,10 @@ export function ExcelWorkbook({
                       <ScoreSelect
                         cellId={`${task.id}:importance`}
                         value={task.importance}
-                        onChange={(n) =>
-                          onUpdate(task.id, { importance: n })
-                        }
+                        onChange={(n) => {
+                          pinRowForSort(task.id);
+                          onUpdate(task.id, { importance: n });
+                        }}
                         onBlur={relockIfLeavingRow}
                         label="중요도"
                         disabled={locked}

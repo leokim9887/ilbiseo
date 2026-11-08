@@ -51,12 +51,13 @@ import {
 } from "@/lib/text-similarity";
 import {
   applyColumnSortStack,
+  applyDefaultRegisteredSort,
   columnSortStackLabel,
   cycleColumnSortStack,
+  DEFAULT_REGISTERED_SORT_LABEL,
   deadlineBasisShort,
   isSortableCol,
   sortLevelForKey,
-  type ColumnSort,
   type ColumnSortKey,
   type ColumnSortStack,
 } from "@/lib/column-sort";
@@ -389,20 +390,16 @@ export function ExcelWorkbook({
         periodSort: "default",
       });
     }
-    // 「전체」 기본: 시작일 내림차순 (언젠가 맨 아래). 헤더 클릭 정렬이 있으면 그게 우선.
-    const effectiveSort: ColumnSortStack | null =
-      columnSort ??
-      (isAll && !isGcal
-        ? {
-            primary: {
-              key: "deadline",
-              dir: "desc",
-              basis: "start",
-            } as ColumnSort,
-            secondary: null,
-          }
-        : null);
-    const sorted = applyColumnSortStack(built, effectiveSort);
+    // 「할 일」기본: 등록일 최신순 (행 추가 newest-on-top과 동일).
+    // 헤더(마감목표·중요도) 클릭 정렬이 있으면 그게 우선. 한 일/캘린더는 그대로.
+    let sorted: SheetRow[];
+    if (columnSort) {
+      sorted = applyColumnSortStack(built, columnSort);
+    } else if (sheet === "todo" && !isGcal) {
+      sorted = applyDefaultRegisteredSort(built);
+    } else {
+      sorted = built;
+    }
     // 할 일: 지난 일정은 같은 틀에 두고 맨 아래로 + 구분선 (자동→한 일 없음)
     if (sheet === "todo" && !isGcal) {
       return sinkPastSheetRowsLast(sorted, todayKst);
@@ -410,7 +407,6 @@ export function ExcelWorkbook({
     return sorted;
   }, [
     isGcal,
-    isAll,
     sheet,
     calendarEvents,
     gcalRangeStart,
@@ -1088,7 +1084,11 @@ export function ExcelWorkbook({
           {FRAME_LABEL[frame]} · {taskCount + (isGcal ? calCount : 0)}줄
           {!isGcal && filterActive ? " · 기간" : ""}
           {isGcal && sheet === "todo" && gcalFilterActive ? " · 기간" : ""}
-          {columnSort ? ` · ${columnSortStackLabel(columnSort)}` : ""}
+          {columnSort
+            ? ` · ${columnSortStackLabel(columnSort)}`
+            : sheet === "todo" && !isGcal
+              ? ` · ${DEFAULT_REGISTERED_SORT_LABEL}`
+              : ""}
           {searchActive ? " · 검색" : ""}
         </span>
       </div>

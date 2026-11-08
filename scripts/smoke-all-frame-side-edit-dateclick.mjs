@@ -162,11 +162,12 @@ const titles = await page.locator("[data-excel-row]").evaluateAll((rows) =>
   }),
 );
 
+// Default 「할 일」sort = 등록일 newest-first (createdAt desc)
 const expectedOrder = [
-  "업무-늦은시작",
+  "팀원-언젠가",
   "과제-중간시작",
   "개인-이른시작",
-  "팀원-언젠가",
+  "업무-늦은시작",
 ];
 const orderOk =
   titles.length === 4 &&
@@ -180,7 +181,7 @@ const noCalInAll = !(await page
   .catch(() => false));
 
 const sortHint = await page
-  .locator("text=시작일 내림차순")
+  .locator("text=등록일 최신순")
   .first()
   .isVisible()
   .catch(() => false);

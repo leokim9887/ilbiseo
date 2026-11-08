@@ -4,8 +4,10 @@
  */
 import {
   applyColumnSortStack,
+  applyDefaultRegisteredSort,
   cycleColumnSortStack,
   columnSortStackLabel,
+  DEFAULT_REGISTERED_SORT_LABEL,
   type ColumnSortStack,
 } from "../src/lib/column-sort";
 import type { SheetRow } from "../src/lib/sheet-rows";
@@ -124,5 +126,23 @@ stack = cycleColumnSortStack(stack, "deadline"); // end desc
 ok("cycle-end-desc", stack?.primary.basis === "end" && stack.primary.dir === "desc", stack);
 stack = cycleColumnSortStack(stack, "deadline"); // clear
 ok("cycle-clear", stack === null, stack);
+
+// Default 「할 일」: 등록일 newest-first
+const byReg = applyDefaultRegisteredSort([
+  row(task({ id: "old", title: "old", createdAt: "2026-10-01T00:00:00.000Z" })),
+  row(task({ id: "new", title: "new", createdAt: "2026-10-04T00:00:00.000Z" })),
+  row(task({ id: "mid", title: "mid", createdAt: "2026-10-02T00:00:00.000Z" })),
+]);
+ok(
+  "default-registered-newest-first",
+  byReg.map((r) => (r.kind === "task" ? r.task.id : "")).join(",") ===
+    "new,mid,old",
+  byReg.map((r) => (r.kind === "task" ? r.task.id : "")),
+);
+ok(
+  "default-label",
+  DEFAULT_REGISTERED_SORT_LABEL === "등록일 최신순",
+  DEFAULT_REGISTERED_SORT_LABEL,
+);
 
 console.log("smoke-column-sort-stack OK");

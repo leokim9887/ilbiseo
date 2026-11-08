@@ -208,6 +208,27 @@ export function applyColumnSortStack(
   return applyColumnSort(rows, stack.primary, stack.secondary);
 }
 
+/**
+ * Default 「할 일」order when no header sort is active:
+ * 「등록일」newest-first (`createdAt` desc) — matches 「행 추가」newest-on-top.
+ * Non-task rows keep relative position via stable index tie-break.
+ */
+export function applyDefaultRegisteredSort(rows: SheetRow[]): SheetRow[] {
+  return [...rows]
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => {
+      const ca = a.row.kind === "task" ? a.row.task.createdAt : "";
+      const cb = b.row.kind === "task" ? b.row.task.createdAt : "";
+      const byRegistered = cb.localeCompare(ca);
+      if (byRegistered !== 0) return byRegistered;
+      return a.i - b.i;
+    })
+    .map((x) => x.row);
+}
+
+/** Status hint when default 등록일 sort is in effect. */
+export const DEFAULT_REGISTERED_SORT_LABEL = "등록일 최신순";
+
 function oneSortLabel(sort: ColumnSort): string {
   if (sort.key === "importance") {
     return `중요도 ${sort.dir === "asc" ? "오름차순▲" : "내림차순▼"}`;

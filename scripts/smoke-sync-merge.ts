@@ -33,6 +33,8 @@ function task(partial: Partial<Task> & { id: string; title: string }): Task {
     urgency: 3,
     importance: 3,
     groupKey: "",
+    groupId: null,
+    groupLabel: null,
     memo: "",
     source: "manual",
     status: "active",
@@ -221,6 +223,50 @@ ok(
     mixed.tasks.some((t) => t.id === "a") &&
     mixed.tasks.some((t) => t.id === "b") &&
     !mixed.tasks.some((t) => t.id === "z"),
+);
+
+// --- 묶기 해제: preferred null must NOT resurrect from other via ?? ---
+const localUngrouped: AppState = {
+  ...createEmptyState(),
+  tasks: [
+    task({
+      id: "g1",
+      title: "병원 예약",
+      groupId: null,
+      groupLabel: null,
+    }),
+  ],
+};
+const remoteStillGrouped: AppState = {
+  ...createEmptyState(),
+  tasks: [
+    task({
+      id: "g1",
+      title: "병원 예약",
+      groupId: "grp:병원",
+      groupLabel: "병원",
+    }),
+  ],
+};
+const ungroupLocalWins = mergeAppStates(
+  localUngrouped,
+  remoteStillGrouped,
+  "local",
+);
+ok(
+  "ungroup null wins over remote group (no ?? resurrection)",
+  ungroupLocalWins.tasks[0]?.groupId === null &&
+    ungroupLocalWins.tasks[0]?.groupLabel === null,
+);
+const ungroupRemoteWins = mergeAppStates(
+  localUngrouped,
+  remoteStillGrouped,
+  "remote",
+);
+ok(
+  "newer remote still grouped keeps group (LWW)",
+  ungroupRemoteWins.tasks[0]?.groupId === "grp:병원" &&
+    ungroupRemoteWins.tasks[0]?.groupLabel === "병원",
 );
 
 console.log("smoke-sync-merge: all passed");

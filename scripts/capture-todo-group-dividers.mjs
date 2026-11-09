@@ -1,5 +1,5 @@
 /**
- * Capture 「구분하기」 toolbar + group separator UI.
+ * Capture 「구분하기」 (under search) + group separator UI.
  */
 import { chromium } from "playwright";
 import { mkdirSync } from "fs";
@@ -135,9 +135,9 @@ await page.waitForTimeout(200);
 const groupBtn = page.locator("[data-excel-group-divider]");
 await groupBtn.waitFor({ state: "visible", timeout: 5000 });
 
-const toolbarPath = join(OUT, "ilbiseo-todo-group-dividers-toolbar.png");
-await page.locator("[data-excel-toolbar-actions]").screenshot({
-  path: toolbarPath,
+const barPath = join(OUT, "ilbiseo-todo-group-dividers-toolbar.png");
+await page.locator("[data-excel-group-divider-bar]").screenshot({
+  path: barPath,
 });
 
 await groupBtn.click();
@@ -153,17 +153,36 @@ const sectionPath = join(OUT, "ilbiseo-todo-group-dividers-section.png");
 // Capture table area including separator + clustered rows
 await page.locator("table").first().screenshot({ path: sectionPath });
 
+// Click a grouped row a few times — order must stay put (stability check)
+const before = await page.locator("[data-excel-row]").evaluateAll((els) =>
+  els.map((el) => el.getAttribute("data-excel-row")),
+);
+for (let i = 0; i < 3; i++) {
+  await page.locator("[data-excel-grouped='1'] textarea").nth(i % 2).click();
+  await page.waitForTimeout(120);
+}
+const after = await page.locator("[data-excel-row]").evaluateAll((els) =>
+  els.map((el) => el.getAttribute("data-excel-row")),
+);
+
 const meta = {
   ok: true,
   label: (label || "").trim(),
-  toolbarPath,
+  toolbarPath: barPath,
   sectionPath,
   sepCount: await sep.count(),
   ungroupVisible: (await page.locator("[data-excel-group-ungroup]").count()) > 0,
+  rowOrderStable: JSON.stringify(before) === JSON.stringify(after),
+  before,
+  after,
 };
 console.log(JSON.stringify(meta, null, 2));
 if (meta.label !== "병원") {
   console.error("unexpected label", meta.label);
+  process.exit(1);
+}
+if (!meta.rowOrderStable) {
+  console.error("row order jumped on click", meta.before, meta.after);
   process.exit(1);
 }
 

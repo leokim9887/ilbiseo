@@ -16,11 +16,14 @@ import {
 import { sinkPastSheetRowsLast, type SheetRow } from "../src/lib/sheet-rows";
 import { filterSheetRowsBySearch } from "../src/lib/schedule-search";
 import {
+  clusterTasksByGroup,
   extractGroupKeyword,
   groupIdFromLabel,
   insertGroupSeparators,
   makeTodoGroup,
+  normalizeGroupLabel,
 } from "../src/lib/todo-group";
+import { listActiveForExport } from "../src/lib/sort";
 import type { Task } from "../src/lib/types";
 import { addDaysIso, todayIsoKst } from "../src/lib/date-range";
 
@@ -70,8 +73,20 @@ assert.equal(
   "세금",
   "search query wins",
 );
+assert.equal(
+  extractGroupKeyword(
+    [
+      task({ id: "1", title: "Tax filing A" }),
+      task({ id: "2", title: "Tax filing B" }),
+    ],
+  ),
+  "FILING",
+  "latin keywords always uppercase",
+);
+assert.equal(normalizeGroupLabel("  hospital  "), "HOSPITAL");
 assert.equal(groupIdFromLabel("병원"), "grp:병원");
 assert.equal(groupIdFromLabel("  병원  "), "grp:병원");
+assert.equal(groupIdFromLabel("HOSPITAL"), "grp:hospital");
 
 const made = makeTodoGroup([
   task({ id: "a", title: "팀 회의 준비" }),
@@ -133,6 +148,42 @@ assert.deepEqual(
   kinds,
   ["x", "y", "sep:병원", "1", "2"],
   `ungrouped first, then group block ${JSON.stringify(kinds)}`,
+);
+
+// Excel export: same-group rows contiguous (ungrouped first)
+const exportOrder = listActiveForExport([
+  task({
+    id: "e1",
+    title: "병원 A",
+    groupId: "grp:병원",
+    groupLabel: "병원",
+    createdAt: `${addDaysIso(TODAY, -1)}T12:00:00.000Z`,
+  }),
+  task({
+    id: "e2",
+    title: "장보기",
+    createdAt: `${TODAY}T12:00:00.000Z`,
+  }),
+  task({
+    id: "e3",
+    title: "병원 B",
+    groupId: "grp:병원",
+    groupLabel: "병원",
+    createdAt: `${addDaysIso(TODAY, -2)}T12:00:00.000Z`,
+  }),
+]);
+assert.deepEqual(
+  exportOrder.map((t) => t.id),
+  ["e2", "e1", "e3"],
+  `excel clusters groups: ${exportOrder.map((t) => t.id).join(",")}`,
+);
+assert.deepEqual(
+  clusterTasksByGroup([
+    task({ id: "a", title: "g", groupId: "grp:x", groupLabel: "X" }),
+    task({ id: "b", title: "u" }),
+    task({ id: "c", title: "g2", groupId: "grp:x", groupLabel: "X" }),
+  ]).map((t) => t.id),
+  ["b", "a", "c"],
 );
 
 // past + group

@@ -24,6 +24,7 @@ import {
   repairExcelJsTableXml,
   sanitizeExcelText,
 } from "./excel-xlsx-repair";
+import { normalizeGroupLabel } from "./todo-group";
 
 /** Active-task Excel sheets: 「전체」+ 4 program frames (exact CATEGORY_LABEL). */
 export const EXCEL_ALL_SHEET = "전체";
@@ -352,7 +353,8 @@ const TODO_COL_WIDTHS = {
 } as const;
 
 function groupCellValue(task: Pick<Task, "groupLabel">): string {
-  return sanitizeExcelText(String(task.groupLabel ?? "").trim());
+  // Persist uppercase labels so Excel round-trip keeps 「구분」display rule.
+  return sanitizeExcelText(normalizeGroupLabel(task.groupLabel) ?? "");
 }
 
 function applyTodoColumnLayout(

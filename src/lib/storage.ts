@@ -18,6 +18,7 @@ import {
   normalizeTaskDeadlineDates,
   todayIsoKst,
 } from "./date-range";
+import { normalizeGroupLabel } from "./todo-group";
 
 export function createEmptyState(): AppState {
   return {
@@ -131,8 +132,8 @@ function migrateTask(
         ? raw.groupId.trim()
         : null,
     groupLabel:
-      typeof raw.groupLabel === "string" && raw.groupLabel.trim()
-        ? raw.groupLabel.trim()
+      typeof raw.groupLabel === "string"
+        ? normalizeGroupLabel(raw.groupLabel)
         : null,
     memo: notes,
     source:

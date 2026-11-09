@@ -96,8 +96,16 @@ function pickTask(a: Task, b: Task, prefer: MergePrefer): Task {
     title: preferred.title.trim() || other.title,
     memo: preferred.memo || other.memo,
     groupKey: preferred.groupKey || other.groupKey,
-    groupId: preferred.groupId ?? other.groupId ?? null,
-    groupLabel: preferred.groupLabel ?? other.groupLabel ?? null,
+    // Explicit null (묶기 해제) must win — never resurrect via `?? other`.
+    // Only fall back when the preferred side omits the field (undefined).
+    groupId:
+      preferred.groupId !== undefined
+        ? preferred.groupId
+        : (other.groupId ?? null),
+    groupLabel:
+      preferred.groupLabel !== undefined
+        ? preferred.groupLabel
+        : (other.groupLabel ?? null),
     startDate: preferred.startDate ?? other.startDate,
     targetDate: preferred.targetDate ?? other.targetDate,
   });

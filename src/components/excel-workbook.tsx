@@ -87,6 +87,7 @@ import {
   groupIdFromLabel,
   insertGroupSeparators,
   makeTodoGroup,
+  normalizeGroupLabel,
 } from "@/lib/todo-group";
 import {
   ArrowDown,
@@ -875,9 +876,9 @@ export function ExcelWorkbook({
           title: created.title,
           memo: created.memo,
         });
+        // No pendingFocusId — avoid green similarity outline on new rows.
         setActiveRow(created.id);
         setFocus({ rowId: created.id, col: "listup" });
-        setPendingFocusId(created.id);
       }
     },
     [frame, onFrameChange, onAdd, maybeWarnSimilarWording],
@@ -918,38 +919,22 @@ export function ExcelWorkbook({
     [onUpdate, onUpdateMany],
   );
 
-  const canGroupBySelection = selectedCount > 0 && sheet === "todo" && !isGcal;
-  const canGroupBySearch =
-    searchActive && taskCount > 0 && sheet === "todo" && !isGcal;
-  const canGroup = canGroupBySelection || (selectedCount === 0 && canGroupBySearch);
+  /** 「구분하기」는 선택 ≥1일 때만 (검색만으로는 버튼 안 뜸). */
+  const canGroup = selectedCount > 0 && sheet === "todo" && !isGcal;
 
-  /** 「구분하기」: selection wins; else search-filtered rows. */
+  /** 「구분하기」: 선택한 행만 묶음. */
   const applyGroupDivider = useCallback(() => {
     if (sheet !== "todo" || isGcal) return;
-    const useSearch = selectedCount === 0 && searchActive;
-    const ids = useSearch ? taskIds : Array.from(selectedIds);
+    const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     const targets = ids
       .map((id) => baseTasks.find((t) => t.id === id))
       .filter((t): t is Task => Boolean(t));
     if (targets.length === 0) return;
-    const { groupId, groupLabel } = makeTodoGroup(
-      targets,
-      useSearch ? searchQuery : undefined,
-    );
+    const { groupId, groupLabel } = makeTodoGroup(targets);
     patchMany(ids, { groupId, groupLabel });
     setSelectedIds(new Set());
-  }, [
-    sheet,
-    isGcal,
-    selectedCount,
-    searchActive,
-    taskIds,
-    selectedIds,
-    baseTasks,
-    searchQuery,
-    patchMany,
-  ]);
+  }, [sheet, isGcal, selectedIds, baseTasks, patchMany]);
 
   const ungroupById = useCallback(
     (groupId: string) => {
@@ -967,7 +952,7 @@ export function ExcelWorkbook({
 
   const commitGroupRename = useCallback(
     (groupId: string) => {
-      const nextLabel = editingGroupLabel.trim().replace(/\s+/g, " ");
+      const nextLabel = normalizeGroupLabel(editingGroupLabel) ?? "";
       if (!nextLabel) {
         setEditingGroupId(null);
         setEditingGroupLabel("");
@@ -1209,9 +1194,10 @@ export function ExcelWorkbook({
                   const created = onAdd();
                   if (created && typeof created === "object" && "id" in created) {
                     pinRowForSort(created.id);
+                    // Focus title for typing — do NOT use pendingFocusId
+                    // (that paints the green similarity-row outline).
                     setActiveRow(created.id);
                     setFocus({ rowId: created.id, col: "listup" });
-                    setPendingFocusId(created.id);
                   }
                 }}
                 data-excel-add-row
@@ -1319,18 +1305,12 @@ export function ExcelWorkbook({
             className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#8a5a2b]/55 bg-white px-3 text-[12.5px] text-[#6b4423] hover:bg-[#f7f0e6] dark:bg-[#24302a] dark:text-[#e8d4b8] sm:h-9 sm:min-h-9 sm:text-[14px]"
             onClick={applyGroupDivider}
             data-excel-group-divider
-            title={
-              canGroupBySelection
-                ? "선택한 할 일을 키워드로 묶기"
-                : "검색된 할 일을 키워드로 묶기"
-            }
+            title="선택한 할 일을 키워드로 묶기"
           >
             구분하기
           </Button>
           <span className="min-w-0 text-[12.5px] leading-snug text-[#5a635e] dark:text-[#a8b3ad] sm:text-[13px]">
-            {canGroupBySelection
-              ? `선택한 ${selectedCount}줄을 키워드로 묶습니다`
-              : "검색된 할 일을 키워드로 묶습니다"}
+            {`선택한 ${selectedCount}줄을 키워드로 묶습니다`}
           </span>
         </div>
       ) : null}

@@ -6,7 +6,7 @@ import {
 import { createId } from "./id";
 import { clampPriority } from "./priority";
 import { inferGroupKey } from "./sort";
-import { groupIdFromLabel } from "./todo-group";
+import { groupIdFromLabel, normalizeGroupLabel } from "./todo-group";
 import {
   findExactDuplicateTasks,
   findSimilarActiveTasks,
@@ -312,8 +312,7 @@ export function taskContentKey(partial: {
 }
 
 function normalizeImportedGroupLabel(raw: string): string | null {
-  const label = raw.normalize("NFKC").trim().replace(/\s+/g, " ");
-  return label || null;
+  return normalizeGroupLabel(raw);
 }
 
 export function sideMatchKey(title: string): string {

@@ -1,4 +1,5 @@
 import { isPastUnfinishedTask, todayIsoKst } from "./date-range";
+import { clusterTasksByGroup } from "./todo-group";
 import type { Task, TaskCategory, TaskKind } from "./types";
 
 const KIND_ORDER: Record<TaskKind, number> = {
@@ -33,15 +34,24 @@ export function listActiveInStoredOrder(
  * Active list for Excel/sync: 「등록일」newest-first (`createdAt` desc),
  * then 「지난 일정」 sink to end — same default as app 「할 일」
  * (`applyDefaultRegisteredSort` + past-sink).
+ * Within each partition, 「구분하기」 groups are clustered contiguous
+ * (ungrouped first, then each group block) so Excel matches on-screen.
  */
 export function listActiveForExport(
   tasks: Task[],
   today: string = todayIsoKst(),
 ): Task[] {
-  return sinkPastUnfinishedTasksLast(
+  const sunk = sinkPastUnfinishedTasksLast(
     orderByCreatedAtNewestFirst(listActiveInStoredOrder(tasks)),
     today,
   );
+  // Cluster within current / past partitions separately (same as UI).
+  const pastStart = sunk.findIndex((t) => isPastUnfinishedTask(t, today));
+  if (pastStart < 0) return clusterTasksByGroup(sunk);
+  return [
+    ...clusterTasksByGroup(sunk.slice(0, pastStart)),
+    ...clusterTasksByGroup(sunk.slice(pastStart)),
+  ];
 }
 
 function score(task: Task): number {

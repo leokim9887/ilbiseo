@@ -87,6 +87,7 @@ import {
   groupIdFromLabel,
   insertGroupSeparators,
   makeTodoGroup,
+  MIN_TODO_GROUP_SELECTION,
   normalizeGroupLabel,
 } from "@/lib/todo-group";
 import {
@@ -919,14 +920,17 @@ export function ExcelWorkbook({
     [onUpdate, onUpdateMany],
   );
 
-  /** 「구분하기」는 선택 ≥1일 때만 (검색만으로는 버튼 안 뜸). */
-  const canGroup = selectedCount > 0 && sheet === "todo" && !isGcal;
+  /** 「구분하기」는 선택 ≥2일 때만 (검색만으로는 버튼 안 뜸). */
+  const canGroup =
+    selectedCount >= MIN_TODO_GROUP_SELECTION &&
+    sheet === "todo" &&
+    !isGcal;
 
   /** 「구분하기」: 선택한 행만 묶음. */
   const applyGroupDivider = useCallback(() => {
     if (sheet !== "todo" || isGcal) return;
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
+    if (ids.length < MIN_TODO_GROUP_SELECTION) return;
     const targets = ids
       .map((id) => baseTasks.find((t) => t.id === id))
       .filter((t): t is Task => Boolean(t));
@@ -1305,7 +1309,7 @@ export function ExcelWorkbook({
             className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#8a5a2b]/55 bg-white px-3 text-[12.5px] text-[#6b4423] hover:bg-[#f7f0e6] dark:bg-[#24302a] dark:text-[#e8d4b8] sm:h-9 sm:min-h-9 sm:text-[14px]"
             onClick={applyGroupDivider}
             data-excel-group-divider
-            title="선택한 할 일을 키워드로 묶기"
+            title="선택한 할 일 2줄 이상을 키워드로 묶기"
           >
             구분하기
           </Button>

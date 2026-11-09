@@ -8,6 +8,12 @@ import {
 import type { Task } from "./types";
 
 /**
+ * 「구분하기」버튼 표시·적용 최소 선택 수.
+ * 검색만으로는 버튼이 뜨지 않음 — 체크 선택이 이 수 이상이어야 함.
+ */
+export const MIN_TODO_GROUP_SELECTION = 2;
+
+/**
  * Display keyword for 「구분하기」— always uppercase (father-facing).
  * Empty → null. Id derivation still lowercases separately.
  */

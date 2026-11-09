@@ -21,6 +21,7 @@ import {
   groupIdFromLabel,
   insertGroupSeparators,
   makeTodoGroup,
+  MIN_TODO_GROUP_SELECTION,
   normalizeGroupLabel,
 } from "../src/lib/todo-group";
 import { listActiveForExport } from "../src/lib/sort";
@@ -87,6 +88,13 @@ assert.equal(normalizeGroupLabel("  hospital  "), "HOSPITAL");
 assert.equal(groupIdFromLabel("병원"), "grp:병원");
 assert.equal(groupIdFromLabel("  병원  "), "grp:병원");
 assert.equal(groupIdFromLabel("HOSPITAL"), "grp:hospital");
+
+// 「구분하기」표시·적용: 선택 ≥2 (검색만·1줄 선택으로는 버튼 없음)
+assert.equal(MIN_TODO_GROUP_SELECTION, 2, "group button threshold ≥2");
+assert.ok(
+  1 < MIN_TODO_GROUP_SELECTION,
+  "single selection must not unlock 구분하기",
+);
 
 const made = makeTodoGroup([
   task({ id: "a", title: "팀 회의 준비" }),

@@ -319,6 +319,8 @@ export function useAppState() {
         urgency: clampPriority(partial?.urgency, 2),
         importance: clampPriority(partial?.importance, 2),
         groupKey: partial?.groupKey ?? inferGroupKey(title),
+        groupId: partial?.groupId ?? null,
+        groupLabel: partial?.groupLabel ?? null,
         memo: partial?.memo ?? "",
         source: partial?.source ?? "manual",
         status: "active",
@@ -491,6 +493,29 @@ export function useAppState() {
           }
           // Do not re-infer groupKey on every title keystroke — that regrouped
           // rows under sortTasks. groupKey is set once at create/import.
+          return next;
+        }),
+      });
+    },
+    [persist, state],
+  );
+
+  /** Batch patch many tasks in one persist (「구분하기」등). */
+  const updateTasks = useCallback(
+    (ids: string[], patch: Partial<Task>) => {
+      if (ids.length === 0) return;
+      const set = new Set(ids);
+      persist({
+        ...state,
+        tasks: state.tasks.map((t) => {
+          if (!set.has(t.id)) return t;
+          const next = { ...t, ...patch };
+          if (patch.urgency !== undefined) {
+            next.urgency = clampPriority(patch.urgency);
+          }
+          if (patch.importance !== undefined) {
+            next.importance = clampPriority(patch.importance);
+          }
           return next;
         }),
       });
@@ -765,6 +790,7 @@ export function useAppState() {
     applyWorkbookDelta,
     applyWorkbookReplace,
     updateTask,
+    updateTasks,
     completeTask,
     completeTasks,
     restoreTask,

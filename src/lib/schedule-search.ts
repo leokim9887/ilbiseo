@@ -45,7 +45,8 @@ export function filterSideBySearch(
 
 /**
  * Filter sheet rows by title/memo. Keeps past-separator only when both
- * current and past task groups still have matches.
+ * current and past task groups still have matches. Keeps group-separators
+ * only when at least one member task remains.
  */
 export function filterSheetRowsBySearch(
   rows: SheetRow[],
@@ -56,7 +57,7 @@ export function filterSheetRowsBySearch(
 
   const kept: SheetRow[] = [];
   for (const row of rows) {
-    if (row.kind === "past-separator") {
+    if (row.kind === "past-separator" || row.kind === "group-separator") {
       kept.push(row);
       continue;
     }
@@ -68,10 +69,25 @@ export function filterSheetRowsBySearch(
     if (taskMatchesSearch(row.task, q)) kept.push(row);
   }
 
-  const sepIdx = kept.findIndex((r) => r.kind === "past-separator");
-  if (sepIdx < 0) return kept;
-  const before = kept.slice(0, sepIdx).filter((r) => r.kind !== "past-separator");
-  const after = kept.slice(sepIdx + 1).filter((r) => r.kind !== "past-separator");
+  // Drop group dividers with no remaining members
+  const presentGroups = new Set<string>();
+  for (const row of kept) {
+    if (row.kind === "task" && row.task.groupId) {
+      presentGroups.add(row.task.groupId);
+    }
+  }
+  const pruned = kept.filter(
+    (r) => r.kind !== "group-separator" || presentGroups.has(r.groupId),
+  );
+
+  const sepIdx = pruned.findIndex((r) => r.kind === "past-separator");
+  if (sepIdx < 0) return pruned;
+  const before = pruned
+    .slice(0, sepIdx)
+    .filter((r) => r.kind !== "past-separator");
+  const after = pruned
+    .slice(sepIdx + 1)
+    .filter((r) => r.kind !== "past-separator");
   if (before.length === 0 || after.length === 0) {
     return [...before, ...after];
   }

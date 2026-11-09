@@ -15,7 +15,13 @@ import { filterEventsByPeriod } from "./unified";
 export type SheetRow =
   | { kind: "task"; id: string; task: Task; sortKey: string }
   | { kind: "calendar"; id: string; event: CalendarEvent; sortKey: string }
-  | { kind: "past-separator"; id: "past-separator" };
+  | { kind: "past-separator"; id: "past-separator" }
+  | {
+      kind: "group-separator";
+      id: string;
+      groupId: string;
+      label: string;
+    };
 
 function taskSortKey(task: Task): string {
   const r = taskDateRange(task);
@@ -112,7 +118,9 @@ export function sinkPastSheetRowsLast(
   const current: SheetRow[] = [];
   const past: SheetRow[] = [];
   for (const row of rows) {
-    if (row.kind === "past-separator") continue;
+    if (row.kind === "past-separator" || row.kind === "group-separator") {
+      continue;
+    }
     if (row.kind === "task" && isPastUnfinishedTask(row.task, today)) {
       past.push(row);
     } else {
@@ -192,8 +200,14 @@ export function buildTodoSheetRows(
     });
   }
   rows.sort((a, b) => {
-    const ka = a.kind === "past-separator" ? "zzzz" : a.sortKey;
-    const kb = b.kind === "past-separator" ? "zzzz" : b.sortKey;
+    const ka =
+      a.kind === "past-separator" || a.kind === "group-separator"
+        ? "zzzz"
+        : a.sortKey;
+    const kb =
+      b.kind === "past-separator" || b.kind === "group-separator"
+        ? "zzzz"
+        : b.sortKey;
     return ka.localeCompare(kb);
   });
   return rows;

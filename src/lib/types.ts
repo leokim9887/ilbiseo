@@ -28,6 +28,13 @@ export interface Task {
   urgency: number;
   importance: number;
   groupKey: string;
+  /**
+   * User 「구분하기」 group id within a 틀.
+   * null = ungrouped. Same id → same divider section.
+   */
+  groupId: string | null;
+  /** Display keyword on the divider (e.g. 「병원」). */
+  groupLabel: string | null;
   /** 일정·항목 옆 짧은 메모 */
   memo: string;
   source: TaskSource;

@@ -241,6 +241,7 @@ export function AssistantApp() {
                 allTasksForImport={[...app.allActive, ...app.allCompleted]}
                 calendarEvents={app.calendarEvents}
                 onUpdate={app.updateTask}
+                onUpdateMany={app.updateTasks}
                 onComplete={app.completeTask}
                 onCompleteMany={app.completeTasks}
                 onRestore={app.restoreTask}

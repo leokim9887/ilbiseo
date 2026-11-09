@@ -126,6 +126,14 @@ function migrateTask(
     urgency: clampPriority(raw.urgency, 2),
     importance: clampPriority(raw.importance, 2),
     groupKey: String(raw.groupKey ?? title),
+    groupId:
+      typeof raw.groupId === "string" && raw.groupId.trim()
+        ? raw.groupId.trim()
+        : null,
+    groupLabel:
+      typeof raw.groupLabel === "string" && raw.groupLabel.trim()
+        ? raw.groupLabel.trim()
+        : null,
     memo: notes,
     source:
       raw.source === "calendar"
@@ -166,6 +174,8 @@ function foldChecklistsIntoTasks(
       urgency: 2,
       importance: 2,
       groupKey: inferGroupKey(title),
+      groupId: null,
+      groupLabel: null,
       memo: "예전 체크리스트에서 옮김",
       source: "import",
       status: "active",

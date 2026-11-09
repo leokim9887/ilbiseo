@@ -84,6 +84,11 @@ import {
   type SideSearchHit,
 } from "@/lib/schedule-search";
 import {
+  groupIdFromLabel,
+  insertGroupSeparators,
+  makeTodoGroup,
+} from "@/lib/todo-group";
+import {
   ArrowDown,
   ArrowUp,
   Check,
@@ -230,6 +235,8 @@ interface ExcelWorkbookProps {
   /** Active + completed — for Excel delta match (program truth). */
   allTasksForImport?: Task[];
   onUpdate: (id: string, patch: Partial<Task>) => void;
+  /** Batch patch (「구분하기」·그룹 이름/해제). Falls back to onUpdate loop. */
+  onUpdateMany?: (ids: string[], patch: Partial<Task>) => void;
   onComplete: (id: string) => void;
   onCompleteMany?: (ids: string[]) => void;
   onRestore: (id: string) => void;
@@ -297,6 +304,7 @@ export function ExcelWorkbook({
   allActiveTasks,
   allTasksForImport,
   onUpdate,
+  onUpdateMany,
   onComplete,
   onCompleteMany,
   onRestore,
@@ -380,6 +388,9 @@ export function ExcelWorkbook({
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   /** Father-friendly schedule/task search (filter-as-you-type) */
   const [searchQuery, setSearchQuery] = useState("");
+  /** Inline rename for a group divider label */
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupLabel, setEditingGroupLabel] = useState("");
   const similarityAckRef = useRef<Set<string>>(new Set());
   const similarityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -434,6 +445,7 @@ export function ExcelWorkbook({
       sorted = built;
     }
     // 할 일: 지난 일정은 같은 틀에 두고 맨 아래로 + 구분선 (자동→한 일 없음)
+    // then user 「구분하기」group dividers (same visual pattern).
     if (deferLiveSort) {
       const fullySorted = sinkPastSheetRowsLast(sorted, todayKst);
       const baselineTasks = orderTaskRowsByIds(
@@ -449,9 +461,14 @@ export function ExcelWorkbook({
         if (!isTodoSortReady(row.task)) return true;
         return false;
       };
-      return applySortPreservingDeferred(baseline, fullySorted, isDeferred);
+      const preserved = applySortPreservingDeferred(
+        baseline,
+        fullySorted,
+        isDeferred,
+      );
+      return insertGroupSeparators(preserved);
     }
-    return sorted;
+    return insertGroupSeparators(sorted);
   }, [
     isGcal,
     sheet,
@@ -885,6 +902,81 @@ export function ExcelWorkbook({
     setActiveRow(null);
   }, [onRestore, onRestoreMany, selectedIds]);
 
+  const patchMany = useCallback(
+    (ids: string[], patch: Partial<Task>) => {
+      if (ids.length === 0) return;
+      if (onUpdateMany) onUpdateMany(ids, patch);
+      else ids.forEach((id) => onUpdate(id, patch));
+    },
+    [onUpdate, onUpdateMany],
+  );
+
+  const canGroupBySelection = selectedCount > 0 && sheet === "todo" && !isGcal;
+  const canGroupBySearch =
+    searchActive && taskCount > 0 && sheet === "todo" && !isGcal;
+  const canGroup = canGroupBySelection || (selectedCount === 0 && canGroupBySearch);
+
+  /** 「구분하기」: selection wins; else search-filtered rows. */
+  const applyGroupDivider = useCallback(() => {
+    if (sheet !== "todo" || isGcal) return;
+    const useSearch = selectedCount === 0 && searchActive;
+    const ids = useSearch ? taskIds : Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const targets = ids
+      .map((id) => baseTasks.find((t) => t.id === id))
+      .filter((t): t is Task => Boolean(t));
+    if (targets.length === 0) return;
+    const { groupId, groupLabel } = makeTodoGroup(
+      targets,
+      useSearch ? searchQuery : undefined,
+    );
+    patchMany(ids, { groupId, groupLabel });
+    setSelectedIds(new Set());
+  }, [
+    sheet,
+    isGcal,
+    selectedCount,
+    searchActive,
+    taskIds,
+    selectedIds,
+    baseTasks,
+    searchQuery,
+    patchMany,
+  ]);
+
+  const ungroupById = useCallback(
+    (groupId: string) => {
+      const ids = baseTasks
+        .filter((t) => t.groupId === groupId)
+        .map((t) => t.id);
+      patchMany(ids, { groupId: null, groupLabel: null });
+      if (editingGroupId === groupId) {
+        setEditingGroupId(null);
+        setEditingGroupLabel("");
+      }
+    },
+    [baseTasks, patchMany, editingGroupId],
+  );
+
+  const commitGroupRename = useCallback(
+    (groupId: string) => {
+      const nextLabel = editingGroupLabel.trim().replace(/\s+/g, " ");
+      if (!nextLabel) {
+        setEditingGroupId(null);
+        setEditingGroupLabel("");
+        return;
+      }
+      const nextId = groupIdFromLabel(nextLabel) || groupId;
+      const ids = baseTasks
+        .filter((t) => t.groupId === groupId)
+        .map((t) => t.id);
+      patchMany(ids, { groupId: nextId, groupLabel: nextLabel });
+      setEditingGroupId(null);
+      setEditingGroupLabel("");
+    },
+    [editingGroupLabel, baseTasks, patchMany],
+  );
+
   const applyChip = (c: "all" | "today" | "week" | "month") => {
     setChip(c);
     if (c === "all") {
@@ -1139,6 +1231,23 @@ export function ExcelWorkbook({
                 existingHabits={habits}
                 onVoiceCommit={commitVoiceRow}
               />
+            ) : null}
+            {canGroup ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#8a5a2b]/55 px-2 text-[12.5px] text-[#6b4423] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
+                onClick={applyGroupDivider}
+                data-excel-group-divider
+                title={
+                  canGroupBySelection
+                    ? "선택한 할 일을 키워드로 묶기"
+                    : "검색된 할 일을 키워드로 묶기"
+                }
+              >
+                구분하기
+              </Button>
             ) : null}
             {selectedCount > 0 && sheet === "todo" ? (
               <Button
@@ -1548,12 +1657,94 @@ export function ExcelWorkbook({
                     </tr>
                   );
                 }
+                if (row.kind === "group-separator") {
+                  const editing = editingGroupId === row.groupId;
+                  return (
+                    <tr
+                      key={row.id}
+                      data-excel-group-separator="1"
+                      data-excel-group-id={row.groupId}
+                      aria-label={`구분 ${row.label}`}
+                    >
+                      <td
+                        colSpan={emptyColSpan}
+                        className="border border-black border-t-[3px] border-t-[#5a7a62] bg-[#eef5f0] px-2 py-1.5 dark:border-t-[#8fb89a] dark:bg-[#1e2a22] sm:px-3 sm:py-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          {editing ? (
+                            <input
+                              type="text"
+                              value={editingGroupLabel}
+                              onChange={(e) =>
+                                setEditingGroupLabel(e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  commitGroupRename(row.groupId);
+                                }
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  setEditingGroupId(null);
+                                  setEditingGroupLabel("");
+                                }
+                              }}
+                              onBlur={() => commitGroupRename(row.groupId)}
+                              className="h-8 min-w-[6rem] max-w-[12rem] rounded-sm border border-[#5a7a62] bg-white px-2 text-center text-[13px] font-bold text-[#2f4a38] outline-none focus:border-[#217346] dark:bg-[#24302a] dark:text-[#d8e8dc] sm:text-[15px]"
+                              aria-label="구분 이름"
+                              data-excel-group-rename-input
+                              autoFocus
+                            />
+                          ) : (
+                            <span
+                              className="text-[13px] font-bold tracking-wide text-[#2f4a38] dark:text-[#d8e8dc] sm:text-[15px]"
+                              data-excel-group-separator-label
+                            >
+                              {row.label}
+                            </span>
+                          )}
+                          {sheet === "todo" && !isGcal ? (
+                            <div className="flex items-center gap-1">
+                              {!editing ? (
+                                <button
+                                  type="button"
+                                  className="h-7 rounded-sm px-1.5 text-[12px] font-medium text-[#3d5a48] underline-offset-2 hover:underline dark:text-[#b7d0c0]"
+                                  onClick={() => {
+                                    setEditingGroupId(row.groupId);
+                                    setEditingGroupLabel(row.label);
+                                  }}
+                                  data-excel-group-rename
+                                  aria-label="구분 이름 바꾸기"
+                                >
+                                  이름
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="h-7 rounded-sm px-1.5 text-[12px] font-medium text-[#6b4423] underline-offset-2 hover:underline dark:text-[#e8d4b8]"
+                                onClick={() => ungroupById(row.groupId)}
+                                data-excel-group-ungroup
+                                aria-label="묶기 해제"
+                              >
+                                묶기 해제
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
                 if (row.kind === "calendar") {
                   const ev = row.event;
                   const order =
                     displayRows
                       .slice(0, idx + 1)
-                      .filter((r) => r.kind !== "past-separator").length;
+                      .filter(
+                        (r) =>
+                          r.kind !== "past-separator" &&
+                          r.kind !== "group-separator",
+                      ).length;
                   return (
                     <tr
                       key={row.id}
@@ -1579,8 +1770,9 @@ export function ExcelWorkbook({
                 const order =
                   displayRows
                     .slice(0, idx + 1)
-                    .filter((r) => r.kind === "task" || r.kind === "calendar")
-                    .length;
+                    .filter(
+                      (r) => r.kind === "task" || r.kind === "calendar",
+                    ).length;
                 const checked = selectedIds.has(task.id);
                 const editingDone = editingDoneIds.has(task.id);
                 const locked = isDoneSheet && !editingDone;
@@ -1589,6 +1781,7 @@ export function ExcelWorkbook({
                 const someday = isSomedayDeadline(task);
                 const past =
                   sheet === "todo" && isPastUnfinishedTask(task, todayKst);
+                const inGroup = Boolean(task.groupId?.trim());
                 const deadlineFocused =
                   !locked &&
                   focus?.rowId === task.id &&
@@ -1633,6 +1826,7 @@ export function ExcelWorkbook({
                     data-excel-row-selected={checked ? "1" : "0"}
                     data-excel-row-locked={locked ? "1" : "0"}
                     data-excel-overdue={past ? "1" : "0"}
+                    data-excel-grouped={inGroup ? "1" : "0"}
                     data-excel-row-editing={
                       isDoneSheet && editingDone ? "1" : "0"
                     }

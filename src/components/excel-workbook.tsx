@@ -446,14 +446,22 @@ export function ExcelWorkbook({
     }
     // 할 일: 지난 일정은 같은 틀에 두고 맨 아래로 + 구분선 (자동→한 일 없음)
     // then user 「구분하기」group dividers (same visual pattern).
+    //
+    // Group clustering MUST run before defer-pin preservation. Otherwise a
+    // focus/pin reshuffles the intermediate task order, insertGroupSeparators
+    // re-clusters from that noise, and already-grouped rows jump on every click.
     if (deferLiveSort) {
-      const fullySorted = sinkPastSheetRowsLast(sorted, todayKst);
+      const fullySorted = insertGroupSeparators(
+        sinkPastSheetRowsLast(sorted, todayKst),
+      );
       const baselineTasks = orderTaskRowsByIds(
         built,
         displayOrderRef.current,
       );
-      // Re-apply sink on baseline so pin indices match past-separator layout.
-      const baseline = sinkPastSheetRowsLast(baselineTasks, todayKst);
+      // Re-apply sink + group seps on baseline so pin indices match layout.
+      const baseline = insertGroupSeparators(
+        sinkPastSheetRowsLast(baselineTasks, todayKst),
+      );
       const isDeferred = (row: SheetRow) => {
         if (row.kind !== "task") return false;
         // Pinned mid-edit until Enter/leave-row commit; incomplete always stays.
@@ -461,12 +469,11 @@ export function ExcelWorkbook({
         if (!isTodoSortReady(row.task)) return true;
         return false;
       };
-      const preserved = applySortPreservingDeferred(
+      return applySortPreservingDeferred(
         baseline,
         fullySorted,
         isDeferred,
       );
-      return insertGroupSeparators(preserved);
     }
     return insertGroupSeparators(sorted);
   }, [
@@ -1232,23 +1239,6 @@ export function ExcelWorkbook({
                 onVoiceCommit={commitVoiceRow}
               />
             ) : null}
-            {canGroup ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#8a5a2b]/55 px-2 text-[12.5px] text-[#6b4423] sm:h-9 sm:min-h-9 sm:px-3 sm:text-[14px]"
-                onClick={applyGroupDivider}
-                data-excel-group-divider
-                title={
-                  canGroupBySelection
-                    ? "선택한 할 일을 키워드로 묶기"
-                    : "검색된 할 일을 키워드로 묶기"
-                }
-              >
-                구분하기
-              </Button>
-            ) : null}
             {selectedCount > 0 && sheet === "todo" ? (
               <Button
                 type="button"
@@ -1314,6 +1304,35 @@ export function ExcelWorkbook({
           onClear={() => setSearchQuery("")}
           onSubmit={focusFirstSearchMatch}
         />
+      ) : null}
+
+      {/* 「구분하기」— under search (not toolbar) so father layout stays calm */}
+      {canGroup ? (
+        <div
+          className="flex items-center gap-2 border-b border-[#9aa5ad] bg-[#f3f6f4] px-2.5 py-2 dark:border-[#3a4a42] dark:bg-[#1e2823] sm:px-3"
+          data-excel-group-divider-bar
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 min-h-9 shrink-0 touch-manipulation rounded-sm border-[#8a5a2b]/55 bg-white px-3 text-[12.5px] text-[#6b4423] hover:bg-[#f7f0e6] dark:bg-[#24302a] dark:text-[#e8d4b8] sm:h-9 sm:min-h-9 sm:text-[14px]"
+            onClick={applyGroupDivider}
+            data-excel-group-divider
+            title={
+              canGroupBySelection
+                ? "선택한 할 일을 키워드로 묶기"
+                : "검색된 할 일을 키워드로 묶기"
+            }
+          >
+            구분하기
+          </Button>
+          <span className="min-w-0 text-[12.5px] leading-snug text-[#5a635e] dark:text-[#a8b3ad] sm:text-[13px]">
+            {canGroupBySelection
+              ? `선택한 ${selectedCount}줄을 키워드로 묶습니다`
+              : "검색된 할 일을 키워드로 묶습니다"}
+          </span>
+        </div>
       ) : null}
 
       {/* Period filter OR Google calendar picker */}

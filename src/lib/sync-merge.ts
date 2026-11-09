@@ -96,6 +96,8 @@ function pickTask(a: Task, b: Task, prefer: MergePrefer): Task {
     title: preferred.title.trim() || other.title,
     memo: preferred.memo || other.memo,
     groupKey: preferred.groupKey || other.groupKey,
+    groupId: preferred.groupId ?? other.groupId ?? null,
+    groupLabel: preferred.groupLabel ?? other.groupLabel ?? null,
     startDate: preferred.startDate ?? other.startDate,
     targetDate: preferred.targetDate ?? other.targetDate,
   });

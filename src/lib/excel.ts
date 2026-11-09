@@ -177,13 +177,14 @@ function styleBodyCells(
 }
 
 /**
- * 「전체」·「한 일」— include「틀」. ▾ only on 틀 · 마감목표 · 중요도.
- * 「등록일」is read-only (no ▾) — between「할 일」and「마감목표」.
+ * 「전체」·「한 일」— include「틀」. ▾ only on 틀 · 구분 · 마감목표 · 중요도.
+ * 「등록일」is read-only (no ▾) — between「구분」and「마감목표」.
  */
 const TODO_TABLE_COLUMNS_WITH_FRAME: ExcelJS.TableColumnProperties[] = [
   { name: "순서", filterButton: false },
   { name: "틀", filterButton: true },
   { name: "할 일", filterButton: false },
+  { name: "구분", filterButton: true },
   { name: "등록일", filterButton: false },
   { name: "마감목표", filterButton: true },
   { name: "중요도", filterButton: true },
@@ -191,11 +192,12 @@ const TODO_TABLE_COLUMNS_WITH_FRAME: ExcelJS.TableColumnProperties[] = [
 
 /**
  * Per-frame sheets (업무용/개인용/과제용/팀원용) — no「틀」column.
- * ▾ only on 마감목표 · 중요도.
+ * ▾ only on 구분 · 마감목표 · 중요도.
  */
 const TODO_TABLE_COLUMNS_FRAME: ExcelJS.TableColumnProperties[] = [
   { name: "순서", filterButton: false },
   { name: "할 일", filterButton: false },
+  { name: "구분", filterButton: true },
   { name: "등록일", filterButton: false },
   { name: "마감목표", filterButton: true },
   { name: "중요도", filterButton: true },
@@ -205,6 +207,7 @@ type TodoSheetLayout = {
   includeFrame: boolean;
   columns: ExcelJS.TableColumnProperties[];
   titleCol: number;
+  groupCol: number;
   registeredCol: number;
   deadlineCol: number;
   importanceCol: number;
@@ -214,18 +217,20 @@ const LAYOUT_WITH_FRAME: TodoSheetLayout = {
   includeFrame: true,
   columns: TODO_TABLE_COLUMNS_WITH_FRAME,
   titleCol: 3,
-  registeredCol: 4,
-  deadlineCol: 5,
-  importanceCol: 6,
+  groupCol: 4,
+  registeredCol: 5,
+  deadlineCol: 6,
+  importanceCol: 7,
 };
 
 const LAYOUT_FRAME_ONLY: TodoSheetLayout = {
   includeFrame: false,
   columns: TODO_TABLE_COLUMNS_FRAME,
   titleCol: 2,
-  registeredCol: 3,
-  deadlineCol: 4,
-  importanceCol: 5,
+  groupCol: 3,
+  registeredCol: 4,
+  deadlineCol: 5,
+  importanceCol: 6,
 };
 
 const MEMO_FONT: Partial<ExcelJS.Font> = {
@@ -339,11 +344,16 @@ function colLetter(n: number): string {
 const TODO_COL_WIDTHS = {
   order: 6,
   frame: 10,
-  title: 88,
+  title: 80,
+  group: 12,
   registered: 12,
   deadline: 28,
   importance: 8,
 } as const;
+
+function groupCellValue(task: Pick<Task, "groupLabel">): string {
+  return sanitizeExcelText(String(task.groupLabel ?? "").trim());
+}
 
 function applyTodoColumnLayout(
   sheet: ExcelJS.Worksheet,
@@ -366,6 +376,11 @@ function applyTodoColumnLayout(
     wrapText: true,
     vertical: "top",
     horizontal: "left",
+  };
+  sheet.getColumn(layout.groupCol).width = TODO_COL_WIDTHS.group;
+  sheet.getColumn(layout.groupCol).alignment = {
+    vertical: "middle",
+    horizontal: "center",
   };
   sheet.getColumn(layout.registeredCol).width = TODO_COL_WIDTHS.registered;
   sheet.getColumn(layout.registeredCol).alignment = {
@@ -537,6 +552,7 @@ export async function buildWorkbook(
     i + 1,
     CATEGORY_LABEL[t.category],
     listUpCell(t),
+    groupCellValue(t),
     registeredCellValue(t),
     deadlineCellValue(t),
     Number(t.importance) || 0,
@@ -563,6 +579,7 @@ export async function buildWorkbook(
     const rows: ExcelJS.CellValue[][] = frameTasks.map((t, i) => [
       i + 1,
       listUpCell(t),
+      groupCellValue(t),
       registeredCellValue(t),
       deadlineCellValue(t),
       Number(t.importance) || 0,
@@ -585,6 +602,7 @@ export async function buildWorkbook(
     i + 1,
     CATEGORY_LABEL[t.category],
     listUpCell(t),
+    groupCellValue(t),
     registeredCellValue(t),
     deadlineCellValue(t),
     Number(t.importance) || 0,

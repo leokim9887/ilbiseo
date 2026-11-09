@@ -104,12 +104,13 @@ async function main() {
   ok(
     "전체-등록일-between",
     headers.indexOf("할 일") === 2 &&
-      headers.indexOf("등록일") === 3 &&
-      headers.indexOf("마감목표") === 4,
+      headers.indexOf("구분") === 3 &&
+      headers.indexOf("등록일") === 4 &&
+      headers.indexOf("마감목표") === 5,
     headers,
   );
 
-  const regCell = all.getRow(2).getCell(4);
+  const regCell = all.getRow(2).getCell(5);
   const regVal = regCell.value;
   ok(
     "등록일-excel-date",

@@ -6,6 +6,7 @@ import {
 import { createId } from "./id";
 import { clampPriority } from "./priority";
 import { inferGroupKey } from "./sort";
+import { groupIdFromLabel } from "./todo-group";
 import {
   findExactDuplicateTasks,
   findSimilarActiveTasks,
@@ -34,6 +35,7 @@ export type ImportField =
   | "urgency"
   | "done"
   | "category"
+  | "group"
   | "skip";
 
 export const IMPORT_FIELD_LABEL: Record<ImportField, string> = {
@@ -45,6 +47,7 @@ export const IMPORT_FIELD_LABEL: Record<ImportField, string> = {
   urgency: "시급성",
   done: "완료여부",
   category: "틀",
+  group: "구분",
   skip: "안 씀",
 };
 
@@ -59,6 +62,7 @@ export const IMPORT_TARGET_FIELDS: ImportTargetField[] = [
   "importance",
   "done",
   "category",
+  "group",
 ];
 
 export function isImportTargetField(
@@ -119,6 +123,7 @@ const HEADER_ALIASES: Record<ImportTargetField, string[]> = {
   // 「할 일」시트에서는 완료여부 열 제거 — 예전 파일만 skip
   done: ["완료여부", "완료", "done", "status", "상태", "끝", "끝?"],
   category: ["틀", "분류", "category", "frame", "카테고리"],
+  group: ["구분", "그룹", "묶음", "group", "grouplabel", "구분선"],
 };
 
 /** 지침/습관 시트 「내용」열 */
@@ -254,6 +259,13 @@ export type MappedPreviewRow = {
    * null = column absent or unparsable → new rows use import time.
    */
   registeredDate: string | null;
+  /**
+   * 「구분」keyword.
+   * - `undefined` = column absent (legacy) — leave existing group alone on update
+   * - `null` / empty cell = ungrouped
+   * - string = group label
+   */
+  groupLabel: string | null | undefined;
   /** empty / unchanged / exact_block → not applied as add */
   skip: boolean;
   exactDuplicate: boolean;
@@ -286,6 +298,7 @@ export function taskContentKey(partial: {
   startDate: string | null;
   targetDate: string | null;
   importance: number;
+  groupLabel?: string | null;
 }): string {
   return [
     compactKey(partial.title),
@@ -294,7 +307,13 @@ export function taskContentKey(partial: {
     partial.targetDate ?? "",
     String(partial.importance),
     compactKey(partial.memo ?? ""),
+    compactKey(partial.groupLabel ?? ""),
   ].join("|");
+}
+
+function normalizeImportedGroupLabel(raw: string): string | null {
+  const label = raw.normalize("NFKC").trim().replace(/\s+/g, " ");
+  return label || null;
 }
 
 export function sideMatchKey(title: string): string {
@@ -427,13 +446,14 @@ export function suggestFieldForHeader(
     }
   }
   for (const field of IMPORT_TARGET_FIELDS) {
-    // Side sheets: ignore deadline/importance/category
+    // Side sheets: ignore deadline/importance/category/group
     if (
       sheetKind !== "todo" &&
       (field === "deadline" ||
         field === "registered" ||
         field === "importance" ||
-        field === "category")
+        field === "category" ||
+        field === "group")
     ) {
       continue;
     }
@@ -876,6 +896,7 @@ export function buildPreviewRows(
   const deadlineCol = fieldOf("deadline");
   const importanceCol = fieldOf("importance");
   const categoryCol = fieldOf("category");
+  const groupCol = fieldOf("group");
   const peers = existingTasks.filter((t) => t.status === "active");
   const byMatch = new Map<string, Task>();
   for (const t of peers) {
@@ -901,6 +922,11 @@ export function buildPreviewRows(
       importanceCol ? cellToString(row[importanceCol]) : 2,
       2,
     );
+    // null = 「구분」column absent (legacy) — do not clear existing groups on update.
+    // "" normalized to null when column present but cell empty = ungrouped.
+    const groupLabel = groupCol
+      ? normalizeImportedGroupLabel(cellToString(row[groupCol]))
+      : undefined;
     // Frame sheets: category = sheet name. 「전체」/legacy: 틀 column or default.
     const category = opts?.forceCategory
       ? opts.forceCategory
@@ -924,6 +950,8 @@ export function buildPreviewRows(
         startDate: dl.startDate,
         targetDate: dl.targetDate,
         importance,
+        // Legacy files without「구분」: omit so content key ignores groups
+        ...(groupLabel !== undefined ? { groupLabel } : {}),
       });
       if (matched) {
         matchId = matched.id;
@@ -934,6 +962,9 @@ export function buildPreviewRows(
           startDate: matched.startDate,
           targetDate: matched.targetDate,
           importance: matched.importance,
+          ...(groupLabel !== undefined
+            ? { groupLabel: matched.groupLabel }
+            : {}),
         });
         if (ck === existingCk) {
           delta = "unchanged";
@@ -971,6 +1002,7 @@ export function buildPreviewRows(
       targetDate: dl.targetDate,
       kind: dl.kind,
       registeredDate,
+      groupLabel,
       skip:
         delta === "empty" ||
         delta === "unchanged" ||
@@ -1006,6 +1038,8 @@ export function previewToTodoDelta(
   const update: { id: string; patch: Partial<Task> }[] = [];
   for (const r of preview) {
     if (r.delta === "new") {
+      const groupLabel = r.groupLabel ?? null;
+      const groupId = groupLabel ? groupIdFromLabel(groupLabel) || null : null;
       add.push({
         id: createId(),
         title: r.title,
@@ -1016,6 +1050,8 @@ export function previewToTodoDelta(
         urgency: 1,
         importance: r.importance,
         groupKey: inferGroupKey(r.title),
+        groupId,
+        groupLabel,
         memo: r.memo,
         source: "import",
         status: "active",
@@ -1024,18 +1060,27 @@ export function previewToTodoDelta(
       });
     } else if (r.delta === "changed" && r.matchId) {
       // 「등록일」/createdAt is read-only after first set — never patch on update
+      const patch: Partial<Task> = {
+        title: r.title,
+        category: r.category,
+        kind: r.kind,
+        startDate: r.startDate,
+        targetDate: r.targetDate,
+        importance: r.importance,
+        memo: r.memo,
+        source: "import",
+      };
+      // Only touch groups when「구분」column was present in the sheet
+      if (r.groupLabel !== undefined) {
+        const groupLabel = r.groupLabel;
+        patch.groupLabel = groupLabel;
+        patch.groupId = groupLabel
+          ? groupIdFromLabel(groupLabel) || null
+          : null;
+      }
       update.push({
         id: r.matchId,
-        patch: {
-          title: r.title,
-          category: r.category,
-          kind: r.kind,
-          startDate: r.startDate,
-          targetDate: r.targetDate,
-          importance: r.importance,
-          memo: r.memo,
-          source: "import",
-        },
+        patch,
       });
     }
   }
@@ -1049,22 +1094,28 @@ export function previewToReplaceTasks(
   const now = new Date().toISOString();
   return preview
     .filter((r) => r.delta !== "empty")
-    .map((r) => ({
-      id: createId(),
-      title: r.title,
-      category: r.category,
-      kind: r.kind,
-      startDate: r.startDate,
-      targetDate: r.targetDate,
-      urgency: 1,
-      importance: r.importance,
-      groupKey: inferGroupKey(r.title),
-      memo: r.memo,
-      source: "import" as const,
-      status: "active" as const,
-      createdAt: createdAtForImportedRow(r.registeredDate, now),
-      completedAt: null,
-    }));
+    .map((r) => {
+      const groupLabel = r.groupLabel ?? null;
+      const groupId = groupLabel ? groupIdFromLabel(groupLabel) || null : null;
+      return {
+        id: createId(),
+        title: r.title,
+        category: r.category,
+        kind: r.kind,
+        startDate: r.startDate,
+        targetDate: r.targetDate,
+        urgency: 1,
+        importance: r.importance,
+        groupKey: inferGroupKey(r.title),
+        groupId,
+        groupLabel,
+        memo: r.memo,
+        source: "import" as const,
+        status: "active" as const,
+        createdAt: createdAtForImportedRow(r.registeredDate, now),
+        completedAt: null,
+      };
+    });
 }
 
 /** @deprecated prefer previewToTodoDelta — returns only *new* rows (not changed). */
@@ -1116,6 +1167,8 @@ export function buildSidePreviewRows(
     urgency: 1,
     importance: 1,
     groupKey: "",
+    groupId: null,
+    groupLabel: null,
     source: "manual",
     status: "active",
     createdAt: i.createdAt,
@@ -1170,6 +1223,7 @@ export function buildSidePreviewRows(
       targetDate: null,
       kind: "someday" as TaskKind,
       registeredDate: null,
+      groupLabel: undefined,
       skip:
         delta === "empty" ||
         delta === "unchanged" ||

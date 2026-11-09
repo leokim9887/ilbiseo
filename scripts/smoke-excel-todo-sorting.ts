@@ -152,6 +152,7 @@ async function main() {
     순서: false,
     틀: true,
     "할 일": false,
+    구분: true,
     등록일: false,
     마감목표: true,
     중요도: true,
@@ -186,6 +187,7 @@ async function main() {
     ok(
       `sortable-cols-shown-${name}`,
       buttons["틀"] === true &&
+        buttons["구분"] === true &&
         buttons["마감목표"] === true &&
         buttons["중요도"] === true,
       buttons,
@@ -204,13 +206,14 @@ async function main() {
     const table = work.getTable("IlbiseoTodoWork");
     ok("table-업무용", Boolean(table), null);
     const buttons: Record<string, boolean> = {};
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const col = table.getColumn(i);
       buttons[col.name] = Boolean(col.filterButton);
     }
     ok(
       "업무용-no-틀-col",
       !Object.prototype.hasOwnProperty.call(buttons, "틀") &&
+        buttons["구분"] === true &&
         buttons["등록일"] === false &&
         buttons["마감목표"] === true &&
         buttons["중요도"] === true,
@@ -224,13 +227,13 @@ async function main() {
   const deadlines: { type: string; numFmt?: string; iso?: string; text?: string }[] =
     [];
 
-  // After load, column keys are gone — use positions: 틀=2 등록일=4 마감=5 중요도=6
+  // After load, column keys are gone — use positions: 틀=2 구분=4 등록일=5 마감=6 중요도=7
   todo.eachRow((row, n) => {
     if (n === 1) return;
     frames.push(String(row.getCell(2).value ?? ""));
-    const imp = row.getCell(6).value;
+    const imp = row.getCell(7).value;
     importances.push(imp);
-    const dCell = row.getCell(5);
+    const dCell = row.getCell(6);
     const v = dCell.value;
     if (v instanceof Date) {
       const iso = v.toISOString().slice(0, 10);

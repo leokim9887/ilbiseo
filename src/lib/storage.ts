@@ -18,7 +18,7 @@ import {
   normalizeTaskDeadlineDates,
   todayIsoKst,
 } from "./date-range";
-import { normalizeGroupLabel } from "./todo-group";
+import { groupIdFromLabel, normalizeGroupLabel } from "./todo-group";
 
 export function createEmptyState(): AppState {
   return {
@@ -127,10 +127,21 @@ function migrateTask(
     urgency: clampPriority(raw.urgency, 2),
     importance: clampPriority(raw.importance, 2),
     groupKey: String(raw.groupKey ?? title),
-    groupId:
-      typeof raw.groupId === "string" && raw.groupId.trim()
+    // Label wins: derive groupId so mismatched/stale ids cannot spawn
+    // duplicate「구분하기」dividers after sync/reload.
+    groupId: (() => {
+      const label =
+        typeof raw.groupLabel === "string"
+          ? normalizeGroupLabel(raw.groupLabel)
+          : null;
+      if (label) {
+        const fromLabel = groupIdFromLabel(label);
+        if (fromLabel) return fromLabel;
+      }
+      return typeof raw.groupId === "string" && raw.groupId.trim()
         ? raw.groupId.trim()
-        : null,
+        : null;
+    })(),
     groupLabel:
       typeof raw.groupLabel === "string"
         ? normalizeGroupLabel(raw.groupLabel)

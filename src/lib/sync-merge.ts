@@ -6,6 +6,7 @@ import type {
 } from "./types";
 import { APP_VERSION } from "./types";
 import { normalizeTaskDeadlineDates } from "./date-range";
+import { canonicalizeTaskGroup } from "./todo-group";
 
 function normalizeDeletions(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -91,21 +92,27 @@ function pickTask(a: Task, b: Task, prefer: MergePrefer): Task {
     const bC = parseTime(b.completedAt);
     if (aC !== bC) return aC >= bC ? a : b;
   }
+  // Explicit null (묶기 해제) must win — never resurrect via `?? other`.
+  // Only fall back when the preferred side omits the field (undefined).
+  const mergedGroupId =
+    preferred.groupId !== undefined
+      ? preferred.groupId
+      : (other.groupId ?? null);
+  const mergedGroupLabel =
+    preferred.groupLabel !== undefined
+      ? preferred.groupLabel
+      : (other.groupLabel ?? null);
+  const grouped = canonicalizeTaskGroup({
+    groupId: mergedGroupId,
+    groupLabel: mergedGroupLabel,
+  });
   return normalizeTaskDeadlineDates({
     ...preferred,
     title: preferred.title.trim() || other.title,
     memo: preferred.memo || other.memo,
     groupKey: preferred.groupKey || other.groupKey,
-    // Explicit null (묶기 해제) must win — never resurrect via `?? other`.
-    // Only fall back when the preferred side omits the field (undefined).
-    groupId:
-      preferred.groupId !== undefined
-        ? preferred.groupId
-        : (other.groupId ?? null),
-    groupLabel:
-      preferred.groupLabel !== undefined
-        ? preferred.groupLabel
-        : (other.groupLabel ?? null),
+    groupId: grouped.groupId,
+    groupLabel: grouped.groupLabel,
     startDate: preferred.startDate ?? other.startDate,
     targetDate: preferred.targetDate ?? other.targetDate,
   });

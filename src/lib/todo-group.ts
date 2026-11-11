@@ -41,6 +41,34 @@ export function groupIdFromLabel(label: string): string {
 }
 
 /**
+ * Canonical group id for a task: prefer label→id so the same keyword
+ * never splits into multiple divider rows (stale/mismatched groupId).
+ */
+export function canonicalGroupIdForTask(
+  task: Pick<Task, "groupId" | "groupLabel">,
+): string {
+  const label = normalizeGroupLabel(task.groupLabel);
+  if (label) {
+    const fromLabel = groupIdFromLabel(label);
+    if (fromLabel) return fromLabel;
+  }
+  return task.groupId?.trim() || "";
+}
+
+/** Persist-time repair: label wins; id derived from label when present. */
+export function canonicalizeTaskGroup<
+  T extends Pick<Task, "groupId" | "groupLabel">,
+>(task: T): T {
+  const label = normalizeGroupLabel(task.groupLabel);
+  if (label) {
+    const gid = groupIdFromLabel(label) || task.groupId?.trim() || null;
+    return { ...task, groupId: gid, groupLabel: label };
+  }
+  const gid = task.groupId?.trim() || null;
+  return { ...task, groupId: gid, groupLabel: null };
+}
+
+/**
  * Pick one keyword for a 「구분하기」 divider.
  * Search mode → search query wins; else common / frequent tokens
  * from title+memo (reuses `tokenizeMeaningful`). Always uppercase.
@@ -155,19 +183,25 @@ export function clusterTasksByGroup<T extends Pick<Task, "groupId">>(
  * 1) ungrouped (+ non-task) rows keep relative order on top
  * 2) then each user group: divider + members (first-seen order)
  * So nothing ungrouped sits visually “under” a group divider.
+ *
+ * Same display label → same canonical groupId (prevents duplicate dividers).
  */
-function clusterPartition(rows: SheetRow[]): SheetRow[] {
+function clusterPartition(
+  rows: SheetRow[],
+  scope: "current" | "past" | "all" = "all",
+): SheetRow[] {
   const cleaned = rows.filter((r) => r.kind !== "group-separator");
   const ungrouped: SheetRow[] = [];
   const groupOrder: string[] = [];
   const clusters = new Map<string, Extract<SheetRow, { kind: "task" }>[]>();
+  const labelByGid = new Map<string, string>();
 
   for (const row of cleaned) {
     if (row.kind !== "task") {
       ungrouped.push(row);
       continue;
     }
-    const gid = row.task.groupId?.trim() || "";
+    const gid = canonicalGroupIdForTask(row.task);
     if (!gid) {
       ungrouped.push(row);
       continue;
@@ -175,6 +209,10 @@ function clusterPartition(rows: SheetRow[]): SheetRow[] {
     if (!clusters.has(gid)) {
       clusters.set(gid, []);
       groupOrder.push(gid);
+      const label =
+        normalizeGroupLabel(row.task.groupLabel) ||
+        extractGroupKeyword([row.task]);
+      labelByGid.set(gid, label);
     }
     clusters.get(gid)!.push(row);
   }
@@ -184,11 +222,14 @@ function clusterPartition(rows: SheetRow[]): SheetRow[] {
     const cluster = clusters.get(gid) ?? [];
     if (cluster.length === 0) continue;
     const label =
+      labelByGid.get(gid) ||
       normalizeGroupLabel(cluster[0].task.groupLabel) ||
       extractGroupKeyword(cluster.map((r) => r.task));
+    // Scope suffix keeps React keys unique if a group ever appears twice;
+    // insertGroupSeparators still emits at most one sep per 틀.
     out.push({
       kind: "group-separator",
-      id: `group-sep:${gid}`,
+      id: `group-sep:${scope}:${gid}`,
       groupId: gid,
       label,
     });
@@ -198,31 +239,86 @@ function clusterPartition(rows: SheetRow[]): SheetRow[] {
 }
 
 /**
+ * Drop orphan dividers and collapse duplicate groupId/label separators
+ * so each 틀 shows at most one divider per group.
+ */
+export function sanitizeGroupSeparators(rows: SheetRow[]): SheetRow[] {
+  if (rows.length === 0) return rows;
+
+  const presentIds = new Set<string>();
+  const presentLabels = new Set<string>();
+  for (const row of rows) {
+    if (row.kind !== "task") continue;
+    const gid = canonicalGroupIdForTask(row.task);
+    if (!gid) continue;
+    presentIds.add(gid);
+    const lab = normalizeGroupLabel(row.task.groupLabel);
+    if (lab) presentLabels.add(lab);
+  }
+
+  const seenIds = new Set<string>();
+  const seenLabels = new Set<string>();
+  const out: SheetRow[] = [];
+  for (const row of rows) {
+    if (row.kind !== "group-separator") {
+      out.push(row);
+      continue;
+    }
+    const lab = normalizeGroupLabel(row.label) || row.label;
+    const alive =
+      presentIds.has(row.groupId) ||
+      (lab ? presentLabels.has(lab) : false);
+    if (!alive) continue;
+    if (seenIds.has(row.groupId)) continue;
+    if (lab && seenLabels.has(lab)) continue;
+    seenIds.add(row.groupId);
+    if (lab) seenLabels.add(lab);
+    out.push(row);
+  }
+  return out;
+}
+
+/**
  * After sort + 「지난 일정」sink: cluster user groups and insert
  * divider rows (same visual role as past-separator).
+ * Same groupId/label → at most one divider per 틀 (not per past/current).
  */
 export function insertGroupSeparators(rows: SheetRow[]): SheetRow[] {
   if (rows.length === 0) return rows;
   const sepIdx = rows.findIndex((r) => r.kind === "past-separator");
-  if (sepIdx < 0) return clusterPartition(rows);
-  const before = clusterPartition(rows.slice(0, sepIdx));
-  const after = clusterPartition(rows.slice(sepIdx + 1));
-  return [
+  if (sepIdx < 0) {
+    return sanitizeGroupSeparators(clusterPartition(rows, "all"));
+  }
+  const before = clusterPartition(rows.slice(0, sepIdx), "current");
+  const after = clusterPartition(rows.slice(sepIdx + 1), "past");
+
+  const seenIds = new Set<string>();
+  const seenLabels = new Set<string>();
+  for (const r of before) {
+    if (r.kind !== "group-separator") continue;
+    seenIds.add(r.groupId);
+    const lab = normalizeGroupLabel(r.label) || r.label;
+    if (lab) seenLabels.add(lab);
+  }
+  // 틀당 1개: past 쪽에서는 이미 current에 있는 그룹 구분선을 넣지 않음.
+  const afterDeduped = after.filter((r) => {
+    if (r.kind !== "group-separator") return true;
+    const lab = normalizeGroupLabel(r.label) || r.label;
+    if (seenIds.has(r.groupId)) return false;
+    if (lab && seenLabels.has(lab)) return false;
+    seenIds.add(r.groupId);
+    if (lab) seenLabels.add(lab);
+    return true;
+  });
+
+  return sanitizeGroupSeparators([
     ...before,
     { kind: "past-separator", id: "past-separator" },
-    ...after,
-  ];
+    ...afterDeduped,
+  ]);
 }
 
 /** Drop group separators that no longer have task members (e.g. after search). */
 export function pruneEmptyGroupSeparators(rows: SheetRow[]): SheetRow[] {
-  const present = new Set<string>();
-  for (const row of rows) {
-    if (row.kind === "task" && row.task.groupId) {
-      present.add(row.task.groupId);
-    }
-  }
-  return rows.filter(
-    (r) => r.kind !== "group-separator" || present.has(r.groupId),
-  );
+  return sanitizeGroupSeparators(rows);
 }

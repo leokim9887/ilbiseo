@@ -235,8 +235,12 @@ assert.ok(
 );
 assert.equal(
   withGroups.filter((r) => r.kind === "group-separator").length,
-  2,
-  "group sep in current + past partitions",
+  1,
+  "same groupId → one divider per 틀 (not per past/current)",
+);
+assert.equal(
+  withGroups.filter((r) => r.kind === "group-separator")[0]?.groupId,
+  g.groupId,
 );
 
 const searched = filterSheetRowsBySearch(withGroups, "병원");

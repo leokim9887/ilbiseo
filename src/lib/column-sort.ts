@@ -257,6 +257,9 @@ export function isTodoSortReady(task: Task): boolean {
  * Keep deferred rows at their baseline indices; fill remaining slots with
  * the fully-sorted order of non-deferred rows.
  * Used so mid-edit / incomplete rows do not jump while siblings re-sort.
+ *
+ * Never emits the same row `id` twice — duplicate group-separator ids used to
+ * stack visually and break 묶기 해제/삭제 clicks (React key collisions).
  */
 export function applySortPreservingDeferred(
   baseline: SheetRow[],
@@ -266,27 +269,56 @@ export function applySortPreservingDeferred(
   if (baseline.length === 0) return [];
   if (baseline.length !== sortedFully.length) {
     // Fall back to sorted when sets diverge (filter/frame change).
-    return sortedFully;
+    return dedupeSheetRowsById(sortedFully);
   }
   const n = baseline.length;
   const result: (SheetRow | null)[] = Array(n).fill(null);
   const deferredIds = new Set<string>();
+  const placedIds = new Set<string>();
   for (let i = 0; i < n; i++) {
     const row = baseline[i];
     if (!isDeferred(row)) continue;
+    // Skip if this id was already pinned (defensive).
+    if (placedIds.has(row.id)) continue;
     result[i] = row;
     deferredIds.add(row.id);
+    placedIds.add(row.id);
   }
-  if (deferredIds.size === 0) return sortedFully;
+  if (deferredIds.size === 0) return dedupeSheetRowsById(sortedFully);
   let slot = 0;
   for (const row of sortedFully) {
     if (deferredIds.has(row.id)) continue;
+    if (placedIds.has(row.id)) continue;
     while (slot < n && result[slot] !== null) slot++;
     if (slot >= n) break;
     result[slot] = row;
+    placedIds.add(row.id);
     slot++;
   }
-  return result.map((r, i) => r ?? sortedFully[i] ?? baseline[i]);
+  // Fill any leftover holes with still-unplaced rows (never duplicate ids).
+  const unplaced = sortedFully.filter((r) => !placedIds.has(r.id));
+  let u = 0;
+  for (let i = 0; i < n; i++) {
+    if (result[i] !== null) continue;
+    const next = unplaced[u++];
+    if (next) {
+      result[i] = next;
+      placedIds.add(next.id);
+    }
+  }
+  return result.filter((r): r is SheetRow => r !== null);
+}
+
+/** Stable unique-by-id pass (first occurrence wins). */
+export function dedupeSheetRowsById(rows: SheetRow[]): SheetRow[] {
+  const seen = new Set<string>();
+  const out: SheetRow[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
 }
 
 /**

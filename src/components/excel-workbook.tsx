@@ -85,11 +85,13 @@ import {
   type SideSearchHit,
 } from "@/lib/schedule-search";
 import {
+  canonicalGroupIdForTask,
   groupIdFromLabel,
   insertGroupSeparators,
   makeTodoGroup,
   MIN_TODO_GROUP_SELECTION,
   normalizeGroupLabel,
+  sanitizeGroupSeparators,
 } from "@/lib/todo-group";
 import {
   ArrowDown,
@@ -504,10 +506,10 @@ export function ExcelWorkbook({
         if (!isTodoSortReady(row.task)) return true;
         return false;
       };
-      return applySortPreservingDeferred(
-        baseline,
-        fullySorted,
-        isDeferred,
+      // Final sanitize: collapse duplicate/orphan dividers after defer merge
+      // (stale pins + same-label different groupIds used to stack on mobile).
+      return sanitizeGroupSeparators(
+        applySortPreservingDeferred(baseline, fullySorted, isDeferred),
       );
     }
     return insertGroupSeparators(sorted);
@@ -980,9 +982,16 @@ export function ExcelWorkbook({
 
   const ungroupById = useCallback(
     (groupId: string) => {
+      // Match canonical id too — stale mismatched groupIds with the same
+      // label must all clear, or 「묶기 해제」looks broken next to dup seps.
       const ids = baseTasks
-        .filter((t) => t.groupId === groupId)
+        .filter(
+          (t) =>
+            t.groupId === groupId ||
+            canonicalGroupIdForTask(t) === groupId,
+        )
         .map((t) => t.id);
+      if (ids.length === 0) return;
       patchMany(ids, { groupId: null, groupLabel: null });
       if (editingGroupId === groupId) {
         setEditingGroupId(null);
@@ -1002,7 +1011,11 @@ export function ExcelWorkbook({
       }
       const nextId = groupIdFromLabel(nextLabel) || groupId;
       const ids = baseTasks
-        .filter((t) => t.groupId === groupId)
+        .filter(
+          (t) =>
+            t.groupId === groupId ||
+            canonicalGroupIdForTask(t) === groupId,
+        )
         .map((t) => t.id);
       patchMany(ids, { groupId: nextId, groupLabel: nextLabel });
       setEditingGroupId(null);

@@ -1,5 +1,6 @@
 import type { SideListItem, Task } from "@/lib/types";
 import type { SheetRow } from "@/lib/sheet-rows";
+import { sanitizeGroupSeparators } from "@/lib/todo-group";
 
 /** Collapse whitespace + lowercase for father-friendly substring match. */
 export function normalizeSearchQuery(q: string): string {
@@ -69,16 +70,8 @@ export function filterSheetRowsBySearch(
     if (taskMatchesSearch(row.task, q)) kept.push(row);
   }
 
-  // Drop group dividers with no remaining members
-  const presentGroups = new Set<string>();
-  for (const row of kept) {
-    if (row.kind === "task" && row.task.groupId) {
-      presentGroups.add(row.task.groupId);
-    }
-  }
-  const pruned = kept.filter(
-    (r) => r.kind !== "group-separator" || presentGroups.has(r.groupId),
-  );
+  // Drop orphan/duplicate group dividers (same rules as sheet insert)
+  const pruned = sanitizeGroupSeparators(kept);
 
   const sepIdx = pruned.findIndex((r) => r.kind === "past-separator");
   if (sepIdx < 0) return pruned;

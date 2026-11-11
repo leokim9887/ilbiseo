@@ -365,3 +365,36 @@ export function buildSimilarityAlertMessage(
   const extra = hits.length - 1;
   return `비슷한 할 일이 있습니다.\n${primary}\n(같은 내용 ${extra}건 더)`;
 }
+
+/**
+ * Stable key for a similarity peer cluster (sorted peer ids).
+ * Independent of exact title/memo blob so slight edits stay in the same cluster.
+ */
+export function similarityClusterKey(
+  hits: readonly SimilarityHit[],
+): string {
+  return [...new Set(hits.map((h) => h.task.id))].sort().join("|");
+}
+
+/**
+ * 「무시하고 진행」session dismiss: suppress only when every hit peer
+ * was already ignored for the current work unit.
+ */
+export function isSimilarityClusterDismissed(
+  hits: readonly SimilarityHit[],
+  dismissedPeerIds: ReadonlySet<string>,
+): boolean {
+  if (hits.length === 0) return true;
+  return hits.every((h) => dismissedPeerIds.has(h.task.id));
+}
+
+/** Merge hit peer ids into the work-unit dismiss set (mutates `target`). */
+export function dismissSimilarityPeers(
+  hits: readonly SimilarityHit[] | readonly string[],
+  target: Set<string>,
+): void {
+  for (const item of hits) {
+    const id = typeof item === "string" ? item : item.task.id;
+    if (id) target.add(id);
+  }
+}

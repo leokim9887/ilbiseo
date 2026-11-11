@@ -47,8 +47,9 @@ import {
 import { datedExcelFilename } from "@/lib/excel-filename";
 import {
   buildSimilarityAlertMessage,
+  dismissSimilarityPeers,
   findSimilarActiveTasks,
-  taskWordingBlob,
+  isSimilarityClusterDismissed,
 } from "@/lib/text-similarity";
 import {
   applyColumnSortStack,
@@ -393,8 +394,40 @@ export function ExcelWorkbook({
   /** Inline rename for a group divider label */
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editingGroupLabel, setEditingGroupLabel] = useState("");
-  const similarityAckRef = useRef<Set<string>>(new Set());
+  /**
+   * Session/work-unit dismiss for similar alerts:
+   * - ignore → suppress that peer cluster while still editing this row
+   * - switch to another task → reset so a new overlap can alert again
+   */
+  const similarityWorkTaskIdRef = useRef<string | null>(null);
+  const similarityDismissedPeersRef = useRef<Set<string>>(new Set());
+  const similarityPendingPeersRef = useRef<string[]>([]);
+  const similarityAlertOpenRef = useRef(false);
   const similarityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetSimilarityDismissForTask = useCallback((taskId: string) => {
+    if (similarityWorkTaskIdRef.current === taskId) return;
+    similarityWorkTaskIdRef.current = taskId;
+    similarityDismissedPeersRef.current = new Set();
+    similarityPendingPeersRef.current = [];
+  }, []);
+
+  const dismissPendingSimilarityCluster = useCallback(() => {
+    dismissSimilarityPeers(
+      similarityPendingPeersRef.current,
+      similarityDismissedPeersRef.current,
+    );
+    similarityPendingPeersRef.current = [];
+    similarityAlertOpenRef.current = false;
+    setSimilarityAlert(null);
+    setSimilarityFocusId(null);
+  }, []);
+
+  // Other-row focus = new work unit → clear session dismiss
+  useEffect(() => {
+    if (!activeRow) return;
+    resetSimilarityDismissForTask(activeRow);
+  }, [activeRow, resetSimilarityDismissForTask]);
 
   const baseTasks = sheet === "todo" ? activeTasks : doneTasks;
 
@@ -726,6 +759,7 @@ export function ExcelWorkbook({
 
   const maybeWarnSimilarWording = useCallback(
     (task: Task, patch: Partial<Pick<Task, "title" | "memo">>) => {
+      resetSimilarityDismissForTask(task.id);
       const candidate = {
         title: patch.title !== undefined ? patch.title : task.title,
         memo: patch.memo !== undefined ? patch.memo : task.memo,
@@ -733,16 +767,20 @@ export function ExcelWorkbook({
       // Same-row title∩memo alone must never alert — peers are OTHER tasks only.
       const hits = findSimilarActiveTasks(candidate, similarityPeers, task.id);
       if (hits.length === 0) return;
-      const blob = taskWordingBlob(candidate);
-      const fingerprint = `${task.id}|${blob}|${hits.map((h) => h.task.id).join(",")}`;
-      if (similarityAckRef.current.has(fingerprint)) return;
+      // 「무시하고 진행」한 peer cluster — same work unit에서는 다시 안 뜸
+      if (isSimilarityClusterDismissed(hits, similarityDismissedPeersRef.current)) {
+        return;
+      }
+      // Dialog already open — do not stack / re-ack mid-edit
+      if (similarityAlertOpenRef.current) return;
       const msg = buildSimilarityAlertMessage(hits, similarityPeers);
       if (!msg) return;
-      similarityAckRef.current.add(fingerprint);
+      similarityPendingPeersRef.current = hits.map((h) => h.task.id);
+      similarityAlertOpenRef.current = true;
       setSimilarityFocusId(hits[0].task.id);
       setSimilarityAlert(msg);
     },
-    [similarityPeers],
+    [similarityPeers, resetSimilarityDismissForTask],
   );
 
   const focusSimilarPeerRow = useCallback(
@@ -2235,9 +2273,8 @@ export function ExcelWorkbook({
         open={Boolean(similarityAlert)}
         onOpenChange={(open) => {
           if (!open) {
-            // Backdrop / Esc = 무시 (행으로 이동하지 않음)
-            setSimilarityAlert(null);
-            setSimilarityFocusId(null);
+            // Backdrop / Esc = 무시하고 진행 (해당 cluster dismiss)
+            dismissPendingSimilarityCluster();
           }
         }}
       >
@@ -2263,9 +2300,8 @@ export function ExcelWorkbook({
               className="min-h-9"
               data-similarity-alert-ignore
               onClick={() => {
-                // 무시하고 진행 — keep current edits, do not jump
-                setSimilarityAlert(null);
-                setSimilarityFocusId(null);
+                // 무시하고 진행 — 이 작업·유사 cluster는 다시 안 뜸
+                dismissPendingSimilarityCluster();
               }}
             >
               무시하고 진행
@@ -2277,6 +2313,9 @@ export function ExcelWorkbook({
               data-similarity-alert-ok
               onClick={() => {
                 const peerId = similarityFocusId;
+                // 확인하러 감 — dismiss하지 않음 (다른 행으로 전환 시 reset)
+                similarityPendingPeersRef.current = [];
+                similarityAlertOpenRef.current = false;
                 setSimilarityAlert(null);
                 setSimilarityFocusId(null);
                 if (peerId) focusSimilarPeerRow(peerId);

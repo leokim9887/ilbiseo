@@ -69,9 +69,72 @@ export function canonicalizeTaskGroup<
 }
 
 /**
+ * Display hint from `grp:…` id when label is missing — never re-tokenizes
+ * titles (keeps pinned keywords stable).
+ */
+export function labelHintFromGroupId(
+  groupId: string | null | undefined,
+): string | null {
+  const gid = groupId?.trim() || "";
+  if (!gid.startsWith("grp:")) return null;
+  const rest = gid.slice(4).trim();
+  if (!rest) return null;
+  // Random createId() suffixes are not human keywords.
+  if (/^[a-z0-9_-]{16,}$/i.test(rest) && !/[\uAC00-\uD7A3]/.test(rest)) {
+    return null;
+  }
+  return normalizeGroupLabel(rest);
+}
+
+/**
+ * If selection already includes grouped rows, reuse that group's keyword.
+ * Largest member count wins; ties → first-seen. No re-extraction.
+ */
+export function pickPinnedExistingGroup(
+  tasks: Pick<Task, "groupId" | "groupLabel">[],
+): { groupId: string; groupLabel: string } | null {
+  type Acc = { count: number; label: string | null; firstIdx: number };
+  const byGid = new Map<string, Acc>();
+
+  tasks.forEach((t, idx) => {
+    const gid = canonicalGroupIdForTask(t);
+    if (!gid) return;
+    const label = normalizeGroupLabel(t.groupLabel);
+    const cur = byGid.get(gid);
+    if (!cur) {
+      byGid.set(gid, { count: 1, label, firstIdx: idx });
+      return;
+    }
+    cur.count += 1;
+    if (!cur.label && label) cur.label = label;
+  });
+
+  if (byGid.size === 0) return null;
+
+  const ranked = [...byGid.entries()].sort(
+    (a, b) =>
+      b[1].count - a[1].count || a[1].firstIdx - b[1].firstIdx,
+  );
+  const [groupId, info] = ranked[0];
+  const groupLabel =
+    normalizeGroupLabel(info.label) ||
+    labelHintFromGroupId(groupId) ||
+    "구분";
+  const fromLabel = groupIdFromLabel(groupLabel);
+  return {
+    groupLabel,
+    groupId: fromLabel || groupId,
+  };
+}
+
+/**
  * Pick one keyword for a 「구분하기」 divider.
  * Search mode → search query wins; else common / frequent tokens
  * from title+memo (reuses `tokenizeMeaningful`). Always uppercase.
+ *
+ * Only used when creating a **new** group (no existing members in selection).
+ * Adding rows into an already-grouped set must call `makeTodoGroup`, which
+ * pins the prior label and never re-runs this.
  */
 export function extractGroupKeyword(
   tasks: Pick<Task, "title" | "memo">[],
@@ -134,11 +197,21 @@ export function extractGroupKeyword(
   return normalizeGroupLabel(raw) ?? "구분";
 }
 
-/** Build groupId + label for a new 「구분하기」 action. */
+/**
+ * Build groupId + label for a 「구분하기」 action.
+ *
+ * - Selection already has a group → **pin** that keyword (no re-extract /
+ *   auto-rename). Keyword intersection is not required to add new rows.
+ * - Brand-new group only → extract from search / title+memo.
+ * - Manual divider rename remains the only way to change a pinned label.
+ */
 export function makeTodoGroup(
-  tasks: Pick<Task, "title" | "memo">[],
+  tasks: Pick<Task, "title" | "memo" | "groupId" | "groupLabel">[],
   searchQuery?: string,
 ): { groupId: string; groupLabel: string } {
+  const pinned = pickPinnedExistingGroup(tasks);
+  if (pinned) return pinned;
+
   const groupLabel = extractGroupKeyword(tasks, searchQuery);
   const fromLabel = groupIdFromLabel(groupLabel);
   return {
@@ -209,8 +282,10 @@ function clusterPartition(
     if (!clusters.has(gid)) {
       clusters.set(gid, []);
       groupOrder.push(gid);
+      // Prefer stored label / id hint — never retokenize the whole cluster.
       const label =
         normalizeGroupLabel(row.task.groupLabel) ||
+        labelHintFromGroupId(gid) ||
         extractGroupKeyword([row.task]);
       labelByGid.set(gid, label);
     }
@@ -224,7 +299,8 @@ function clusterPartition(
     const label =
       labelByGid.get(gid) ||
       normalizeGroupLabel(cluster[0].task.groupLabel) ||
-      extractGroupKeyword(cluster.map((r) => r.task));
+      labelHintFromGroupId(gid) ||
+      extractGroupKeyword([cluster[0].task]);
     // Scope suffix keeps React keys unique if a group ever appears twice;
     // insertGroupSeparators still emits at most one sep per 틀.
     out.push({
